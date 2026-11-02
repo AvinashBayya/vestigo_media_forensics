@@ -55,46 +55,85 @@ Milestone 1 is image-only. FFmpeg and ffprobe are installed during environment s
 
 ## Run inside Dev Container
 
-### Backend
+All commands run inside the Dev Container, from the repository root.
+
+### First-time setup
+
+Rebuilding the container runs `scripts/post-create.sh`, which installs ExifTool, Tesseract, and FFmpeg, then the Python and web dependencies. To install the project dependencies by hand:
 
 ```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8400
+python -m pip install -e ".[dev]"
+(cd web && npm ci)
+bash scripts/verify-env.sh
 ```
 
-API:
-
-```text
-http://localhost:8400
-```
-
-### Frontend
+### Backend (port 8400)
 
 ```bash
-cd web
-npm install
-npm run dev -- --port 5180
+scripts/dev-backend.sh
+# same as: uvicorn app.main:app --reload --reload-dir app --host 0.0.0.0 --port 8400
 ```
 
-UI:
+- Health: http://localhost:8400/api/v1/health
+- Interactive API docs: http://localhost:8400/api/v1/docs
 
-```text
-http://localhost:5180
+### Frontend (port 5180)
+
+In a second terminal:
+
+```bash
+scripts/dev-frontend.sh
+# same as: cd web && npm run dev
 ```
+
+Open http://localhost:5180. The frontend proxies `/api` to the backend, so start the backend first.
+
+### Data and configuration
+
+- Uploads, raw tool output, and the SQLite database are stored under `data/` (gitignored). Nothing is deleted automatically; delete artifacts from the UI or with `DELETE /api/v1/artifacts/{id}`.
+- Settings are read from `VESTIGO_*` environment variables or a `.env` file. See `.env.example` for every setting and its default.
+
+### Tests
+
+```bash
+python -m pytest                 # backend unit, pipeline and API tests
+python -m pytest -m container    # tools, SQLite, and ports 8400/5180 (starts servers if needed)
+ruff check app tests             # backend lint
+(cd web && npm test)             # frontend tests (Vitest)
+(cd web && npm run build)        # type check and production build
+```
+
+## Milestone 1 limitations
+
+- C2PA / Content Credentials are **detected, not validated**. Signatures, certificates, and hash bindings are not checked until Milestone 4.
+- OCR uses English language data only.
+- Duplicate search covers only artifacts in the local library.
+- Review state applies to a whole artifact; per-evidence-record review is planned for Milestone 2.
+- There is no login. The service is meant for a single analyst on their own machine.
+
+See `docs/11-BUILD-PLAN.md` for the approved Milestone 1 plan.
 
 ## Repository layout
 
 ```text
 vestigo-media-forensics/
 ├── README.md
-├── .gitignore
+├── pyproject.toml
+├── .env.example
 ├── .devcontainer/
 │   └── devcontainer.json
-├── docs/
-├── app/
-├── web/
-├── tests/
-├── samples/
-└── scripts/
+├── docs/                 # specifications and the approved build plan
+├── app/                  # FastAPI backend
+│   ├── api/              # routes and request-level middleware
+│   ├── core/             # config, database, storage, tools, errors, logging
+│   ├── models/           # SQLAlchemy models
+│   ├── schemas/          # Pydantic request/response schemas
+│   ├── services/         # tool wrappers and artifact/report logic
+│   └── pipeline/         # stage interface, image pipeline, job runner
+├── web/                  # React + Vite + TypeScript + Tailwind frontend
+├── tests/                # pytest suites and test fixtures
+├── samples/              # local media for manual testing (gitignored)
+└── scripts/              # setup, environment check, dev servers
 ```
 
 ## Development rule
