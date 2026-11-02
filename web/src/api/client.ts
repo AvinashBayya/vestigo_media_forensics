@@ -1,0 +1,131 @@
+import axios, { isAxiosError } from "axios";
+
+import type {
+  AnalysisOptions,
+  ApiErrorBody,
+  ArtifactDetail,
+  ArtifactList,
+  ArtifactUploadResponse,
+  DeletionSummary,
+  EvidenceReport,
+  JobCreated,
+  JobStatusResponse,
+  ReviewState,
+} from "./types";
+
+export const API_BASE = "/api/v1";
+
+const http = axios.create({ baseURL: API_BASE });
+
+export class ApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly details: Record<string, unknown>;
+
+  constructor(code: string, message: string, status: number, details: Record<string, unknown> = {}) {
+    super(message);
+    this.code = code;
+    this.status = status;
+    this.details = details;
+  }
+}
+
+function toApiError(error: unknown): ApiError {
+  if (isAxiosError(error)) {
+    const body = error.response?.data as { error?: ApiErrorBody } | undefined;
+    if (body?.error) {
+      return new ApiError(body.error.code, body.error.message, error.response!.status, body.error.details);
+    }
+    if (!error.response) {
+      return new ApiError(
+        "NETWORK_ERROR",
+        "Could not reach the Vestigo backend. Check that it is running on port 8400.",
+        0,
+      );
+    }
+    return new ApiError("HTTP_ERROR", `The backend responded with status ${error.response.status}.`, error.response.status);
+  }
+  return new ApiError("UNKNOWN_ERROR", error instanceof Error ? error.message : "Something went wrong.", 0);
+}
+
+export function errorMessage(error: unknown): string {
+  return error instanceof ApiError ? error.message : toApiError(error).message;
+}
+
+async function call<T>(request: Promise<{ data: T }>): Promise<T> {
+  try {
+    return (await request).data;
+  } catch (error) {
+    throw toApiError(error);
+  }
+}
+
+export const DEFAULT_OPTIONS: AnalysisOptions = {
+  metadata: true,
+  c2pa: true,
+  ocr: true,
+  duplicate_search: true,
+};
+
+export function uploadArtifact(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<ArtifactUploadResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  return call(
+    http.post<ArtifactUploadResponse>("/artifacts/upload", form, {
+      onUploadProgress: (event) => {
+        if (onProgress && event.total) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      },
+    }),
+  );
+}
+
+export function startImageAnalysis(artifactId: string, options: AnalysisOptions): Promise<JobCreated> {
+  return call(http.post<JobCreated>("/analysis/image", { artifact_id: artifactId, options }));
+}
+
+export function getJob(jobId: string): Promise<JobStatusResponse> {
+  return call(http.get<JobStatusResponse>(`/analysis/jobs/${encodeURIComponent(jobId)}`));
+}
+
+export function listArtifacts(limit = 20): Promise<ArtifactList> {
+  return call(http.get<ArtifactList>("/artifacts", { params: { limit } }));
+}
+
+export function getArtifact(artifactId: string): Promise<ArtifactDetail> {
+  return call(http.get<ArtifactDetail>(`/artifacts/${encodeURIComponent(artifactId)}`));
+}
+
+export function getEvidence(artifactId: string, jobId?: string): Promise<EvidenceReport> {
+  return call(
+    http.get<EvidenceReport>(`/artifacts/${encodeURIComponent(artifactId)}/evidence`, {
+      params: jobId ? { job_id: jobId } : undefined,
+    }),
+  );
+}
+
+export function updateReview(artifactId: string, state: ReviewState, analystNotes: string): Promise<ArtifactDetail> {
+  return call(
+    http.patch<ArtifactDetail>(`/artifacts/${encodeURIComponent(artifactId)}/review`, {
+      state,
+      analyst_notes: analystNotes,
+    }),
+  );
+}
+
+export function deleteArtifact(artifactId: string): Promise<DeletionSummary> {
+  return call(http.delete<DeletionSummary>(`/artifacts/${encodeURIComponent(artifactId)}`));
+}
+
+export function contentUrl(artifactId: string): string {
+  return `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}/content`;
+}
+
+export function evidenceDownloadUrl(artifactId: string, jobId: string): string {
+  const params = new URLSearchParams({ job_id: jobId, download: "true" });
+  return `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}/evidence?${params}`;
+}
