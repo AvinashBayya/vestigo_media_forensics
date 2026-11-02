@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+*.local/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Local data
+data/
+uploads/
+exports/
+temp/
+tmp/
+*.db
+*.sqlite
+*.sqlite3
+
+# Media samples
+samples/*
+!samples/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
