@@ -1,145 +1,149 @@
 # Vestigo Media Forensics — Master Build Spec
 
+This is the entry point to the docs. Detailed requirements live in docs 01–10; the approved Milestone 1 plan is
+`11-BUILD-PLAN.md`. If this file and docs 01–10 ever disagree, docs 01–10 win.
+
 ## 1. Project Goal
 
-Build a local-first media forensics web app that:
+Build a local-first media provenance and verification web app that:
 
-- Accepts images, videos, and (later) documents.
-- Runs automated forensic checks.
-- Produces a clear verdict: REAL / SUSPICIOUS / FAKE / UNKNOWN.
-- Shows evidence for every claim.
+- Accepts images (Milestone 1), and videos later (Milestone 3).
+- Runs automated, explainable checks and extracts technical evidence.
+- Shows the method, tool, version, timestamp, source, limitations, and review state behind every result.
+- Leaves conclusions to a human analyst.
 - Keeps all data local (SQLite + local files).
-- Runs fully inside a Docker dev container.
+- Runs fully inside a Docker Dev Container.
+
+The system reports observable signals. It does **not** determine whether media is authentic, real, fake, or
+deceptive (see D2 in `09-DECISIONS.md`).
 
 ## 2. Tech Stack
 
-- Backend: Python 3.11, FastAPI, Pydantic v2, SQLite, SQLAlchemy.
+- Backend: Python 3.11, FastAPI, Pydantic v2, SQLAlchemy, SQLite.
 - Frontend: React + Vite + TypeScript + Tailwind.
 - OCR: Tesseract.
-- Metadata: ExifTool.
-- Media: ffmpeg / ffprobe.
-- Auth: JWT (email + password).
+- Metadata and C2PA detection: ExifTool.
+- Video (Milestone 3): ffmpeg / ffprobe — installed from the start, not invoked in Milestone 1.
 - Storage: local filesystem under `data/`.
 - DB: SQLite file at `data/app.db`.
+- Configuration via `.env` (`VESTIGO_*`); no hardcoded secrets.
 
 ## 3. Core Principles
 
-- Evidence-first: every verdict must link to concrete evidence.
-- Explainable: no black-box "AI says fake" without reasons.
+- Evidence over verdicts: report signals, never a truth claim.
+- Explainable: every result carries its method, tool, and limitations.
+- Human review: only an analyst marks evidence as reviewed.
 - Modular: each check is a separate pipeline stage.
 - Extensible: new checks can be added without breaking old ones.
-- Local-first: no external API calls required for core flow.
+- Local-first: no external API calls in the core flow.
 
 ## 4. High-Level Architecture
 
 - FastAPI backend on port 8400.
 - React frontend on port 5180.
-- SQLite DB for users, assets, analyses, findings.
-- Local file storage for uploaded media.
-- Pipeline engine that runs checks per media type.
+- SQLite DB for artifacts, analysis jobs, and evidence records.
+- Local file storage for uploaded media and derived files.
+- Pipeline engine that runs stages per media type.
 
-## 5. User Roles
+See `02-ARCHITECTURE.md`.
 
-- Guest: can view landing page, sign up, log in.
-- User: can upload media, run analysis, view results.
-- Admin (later): can manage users, view system stats.
+## 5. Users
+
+Milestone 1 is a single-user local tool with no login. The primary user is an OSINT analyst
+(see `01-PRODUCT-SPEC.md`). Multi-user authentication is not in Milestone 1.
 
 ## 6. Core Entities
 
-- User: id, email, hashed_password, created_at.
-- Asset: id, user_id, file_path, file_type, original_filename, size_bytes, sha256, created_at.
-- Analysis: id, asset_id, status, verdict, confidence, started_at, finished_at, error.
-- Finding: id, analysis_id, check_name, severity, score, summary, details_json.
-- Report: id, analysis_id, generated_at, format (json/pdf later).
+- Artifact: an uploaded media file, with hashes, storage path, and review state.
+- AnalysisJob: one run of a pipeline against an artifact.
+- EvidenceRecord: one stage's observable or derived result, with method, tool, tool version, timestamps,
+  source, limitations, errors, classification, and review state.
 
-## 7. Verdict Model
+See `04-EVIDENCE-MODEL.md`.
 
-- REAL: high confidence authentic.
-- SUSPICIOUS: some signs of manipulation or inconsistency.
-- FAKE: strong evidence of manipulation or synthetic origin.
-- UNKNOWN: not enough signal or check failed.
+## 7. Evidence Model (no verdicts)
 
-Each verdict has:
-- confidence (0–100)
-- list of findings with severity and explanation.
+- Each evidence record has a classification describing where it came from: `OBSERVED`, `DERIVED`, `EXTERNAL`,
+  `UNVERIFIED`, or `REVIEWED`. Classification does not change after the record is created.
+- Review state (`UNREVIEWED`, `IN_REVIEW`, `REVIEWED`, `FLAGGED`, `ARCHIVED`) is set only by a human analyst.
+- There is no REAL / SUSPICIOUS / FAKE / UNKNOWN verdict and no overall confidence score.
+- Tool failures are recorded and shown, never hidden.
 
-## 8. Image Pipeline (v1)
+## 8. Image Pipeline (Milestone 1)
 
-Checks:
-- EXIF metadata presence and consistency.
-- C2PA / Content Credentials detection (if present).
-- ELA (Error Level Analysis) style heuristic.
-- Noise / compression inconsistency (basic).
-- Duplicate / near-duplicate detection via perceptual hash.
-- Reverse-image-search placeholder (no external call in v1).
+- SHA-256 and MD5 hashing.
+- EXIF, XMP, and IPTC metadata extraction.
+- C2PA / Content Credentials detection (detection only; validation is Milestone 4).
+- Perceptual hash (pHash).
+- OCR (English).
+- Local duplicate / near-duplicate search.
 
-Output:
-- verdict + confidence + findings.
+Output: a structured JSON evidence report. See `11-BUILD-PLAN.md` §6.
 
-## 9. Video Pipeline (v1)
+## 9. Later Milestones
 
-Checks:
-- ffprobe metadata (codec, duration, resolution, bitrate).
-- Frame sampling.
-- Per-frame basic checks (blur, compression artifacts).
-- Audio track presence and basic stats.
-- Deepfake heuristic placeholders (face-count, temporal inconsistency later).
+See `06-ROADMAP.md`: analyst workflow (M2), video (M3), provenance and C2PA validation (M4), permission-gated
+reverse-image search (M5), GEOINT / geo-lite (M6), Vestigo integration (M7).
 
-Output:
-- verdict + confidence + findings.
+## 10. API Contract (Milestone 1)
 
-## 10. Geo-lite (v1)
+Base URL: `http://localhost:8400/api/v1`
 
-- If EXIF GPS exists:
-  - Reverse geocode via local offline dataset or placeholder.
-  - Show map placeholder (no external map API in v1).
-  - Cross-check GPS vs file timestamps.
+- `GET /health`
+- `POST /artifacts/upload`
+- `GET /artifacts`
+- `GET /artifacts/{artifact_id}`
+- `GET /artifacts/{artifact_id}/content`
+- `PATCH /artifacts/{artifact_id}/review`
+- `DELETE /artifacts/{artifact_id}`
+- `POST /analysis/image`
+- `GET /analysis/jobs/{job_id}`
+- `GET /artifacts/{artifact_id}/evidence` (`?job_id=`, `?download=true`)
 
-## 11. API Contract (v1)
+See `03-API-SPEC.md` and `11-BUILD-PLAN.md` §2.
 
-Base URL: http://localhost:8400/api/v1
+## 11. Non-Functional Requirements
 
-- POST /auth/register
-- POST /auth/login
-- GET /auth/me
-- POST /assets/upload
-- GET /assets
-- GET /assets/{id}
-- POST /analyses/{asset_id}/run
-- GET /analyses/{id}
-- GET /analyses/{id}/findings
-- GET /analyses/{id}/report
-- GET /health
+- All endpoints return JSON (except the original-file preview).
+- All errors use one envelope: `{"error": {"code", "message", "details"}}`.
+- Long-running analysis runs as an asynchronous job.
+- File handling is safe: type checked from content, size and pixel limits, no path traversal, uploads never
+  executed.
+- Logs never contain image contents, metadata values, OCR text, or credentials.
+- Secrets, if any, come from `.env`.
 
-## 12. Non-Functional Requirements
+## 12. Testing
 
-- All endpoints return JSON.
-- All errors have consistent shape.
-- All long-running tasks are async-friendly.
-- All file handling is safe (no path traversal).
-- All secrets via .env, never hardcoded.
-
-## 13. Testing
-
-- Unit tests for each check.
+- Unit tests for each stage.
 - Integration tests for API endpoints.
-- Sample media in `samples/` for testing.
-- Use pytest.
+- Frontend tests for the review UI.
+- Test fixtures in `tests/fixtures/` (`samples/` is for manual testing and is gitignored).
+- pytest for the backend, Vitest for the frontend.
 
-## 14. Milestone 1 Scope
+See `07-TEST-PLAN.md`.
 
-- Project skeleton.
-- Auth (register/login/me).
-- Asset upload + listing.
-- Basic image pipeline (EXIF + hash + ELA-lite).
-- Analysis record + findings.
-- Health check.
-- Minimal React UI: login, upload, results page.
+## 13. Milestone 1 Scope
 
-## 15. Out of Scope (v1)
+- Project skeleton and Dev Container setup.
+- Image upload, listing, preview, and deletion.
+- The image pipeline in §8, run as an analysis job.
+- JSON evidence report and download.
+- Artifact-level review state and analyst notes.
+- Health check including tool availability.
+- Minimal React UI: upload, analysis progress, findings, review, download, delete.
+- Core tests.
 
-- Real deepfake detection models.
-- External reverse image search APIs.
-- PDF report generation.
+## 14. Out of Scope (Milestone 1)
+
+- Verdicts or authenticity scores of any kind.
+- Login and multi-user authentication.
+- Video analysis.
+- ELA and noise analysis.
+- Deepfake detection.
+- External reverse-image search.
+- GEOINT.
+- Facial recognition or biometric identification.
+- Vestigo integration.
+- PDF reports.
 - Admin panel.
-- Multi-user roles beyond basic user.
+- Placeholder or stub modules for any of the above.

@@ -3,7 +3,7 @@
 ## Prompt 1 — Read and plan
 
 ```text
-Read docs/00-MASTER-BUILD-SPEC.md first, then all other docs.
+Read docs/00-MASTER-SPEC.md first, then all other docs.
 
 This project runs in a Docker Dev Container. All commands run inside the container.
 

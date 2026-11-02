@@ -6,11 +6,13 @@
 - FastAPI
 - Uvicorn
 - Pydantic
+- pydantic-settings (configuration from `.env`)
+- python-multipart (required by FastAPI for file uploads)
 - SQLAlchemy
 - SQLite
 - Pillow
-- ExifTool
-- Tesseract OCR
+- ExifTool (metadata and C2PA detection)
+- Tesseract OCR (English language data only)
 - imagehash
 - pytest
 - httpx
@@ -18,10 +20,18 @@
 ## Frontend — Milestone 1
 
 - React
+- React Router
 - Vite
 - TypeScript
-- Axios or fetch
-- Minimal UI library or plain CSS
+- Axios (upload progress)
+- Tailwind CSS
+
+## Frontend tests — Milestone 1
+
+- Vitest
+- Testing Library (React, user-event, jest-dom)
+- jsdom
+- msw (mock API)
 
 ## Container tools
 
