@@ -76,3 +76,41 @@ def test_corrupt_metadata_makes_the_stage_partial(client: TestClient, fixtures: 
     record = next(r for r in records_for(services, job_id) if r.stage == "metadata")
     assert record.status == "partial"
     assert record.errors[0]["type"] == "EXIFTOOL_WARNING"
+
+
+FAKE_TESSERACT = """
+if [ "$1" = "--version" ]; then echo "tesseract 5.5.0"; exit 0; fi
+if [ "$1" = "--list-langs" ]; then printf 'List of available languages (1):\\neng\\n'; exit 0; fi
+echo "Error: could not initialise" >&2
+exit 1
+"""
+
+
+def test_ocr_failure_is_recorded(tmp_path: Path, fixtures: FixtureSet) -> None:
+    tesseract = fake_tool(tmp_path, "tesseract", FAKE_TESSERACT)
+    settings = Settings(_env_file=None, data_dir=tmp_path / "data", job_mode="inline")
+    app = create_app(settings, tools=registry_with({"tesseract": tesseract}))
+
+    with TestClient(app) as client:
+        artifact_id = upload_ok(client, fixtures.ocr_text)["artifact_id"]
+        job_id = start_analysis(client, artifact_id)["job_id"]
+        record = next(r for r in records_for(app.state.services, job_id) if r.stage == "ocr")
+
+    assert record.status == "failed"
+    assert record.errors[0]["type"] == "TOOL_ERROR"
+    assert "could not initialise" in record.errors[0]["message"]
+
+
+def test_ocr_stage_records_text_and_raw_output(
+    client: TestClient, settings: Settings, fixtures: FixtureSet, services
+) -> None:
+    artifact_id = upload_ok(client, fixtures.ocr_text)["artifact_id"]
+    job_id = start_analysis(client, artifact_id)["job_id"]
+
+    record = next(r for r in records_for(services, job_id) if r.stage == "ocr")
+    assert record.status == "succeeded"
+    assert "VESTIGO" in record.payload["text"].upper()
+    assert record.payload["languages"] == ["eng"]
+    assert (
+        settings.data_dir / "artifacts" / artifact_id / "derived" / job_id / "ocr.tesseract.tsv"
+    ).is_file()

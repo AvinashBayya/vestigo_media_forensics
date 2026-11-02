@@ -13,6 +13,7 @@ from app.services.c2pa import detect_c2pa
 from app.services.duplicates import find_matches
 from app.services.hashing import hash_file, hashlib_version
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
+from app.services.ocr import LANGUAGES, PAGE_SEGMENTATION_MODE, run_ocr
 from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
 
 IMAGE_PIPELINE = "image.v1"
@@ -181,6 +182,46 @@ class PerceptualHashStage(AnalysisStage):
             )
 
 
+class OCRStage(AnalysisStage):
+    name = "ocr"
+    media_type = MediaType.IMAGE
+    method = (
+        f"Tesseract OCR (languages: {'+'.join(LANGUAGES)}; automatic page segmentation, "
+        f"--psm {PAGE_SEGMENTATION_MODE}) run on an upright PNG copy of the image. Confidence is the mean "
+        "of Tesseract's per-word confidence scores, on a 0-1 scale."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "artifact:original"
+    tool_name = "Tesseract"
+    option = "ocr"
+    limitations = (
+        "English language data only in Milestone 1. Text in other languages or scripts may be missed or "
+        "misread.",
+        "Handwriting, stylised fonts, small or low-contrast text, and rotated or curved text are often "
+        "misread or missed.",
+        "Confidence is Tesseract's own estimate, not a measured accuracy. Check extracted text against "
+        "the image.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return ctx.tools.require("tesseract").version or "unknown"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("tesseract")
+        result = run_ocr(tool, artifact.path, ctx.scratch_dir, ctx.settings.ocr_timeout_seconds)
+        ctx.derived.write(self.name, "tesseract_tsv", "tesseract.tsv", result.tsv)
+        return StageOutput(
+            {
+                "engine": "tesseract",
+                "languages": list(LANGUAGES),
+                "text": result.text,
+                "confidence": result.confidence,
+                "word_count": result.word_count,
+                "preprocessing": result.preprocessing,
+            }
+        )
+
+
 class DuplicatesStage(AnalysisStage):
     name = "duplicates"
     media_type = MediaType.IMAGE
@@ -227,5 +268,6 @@ IMAGE_STAGES: tuple[AnalysisStage, ...] = (
     MetadataStage(),
     C2PAStage(),
     PerceptualHashStage(),
+    OCRStage(),
     DuplicatesStage(),
 )
