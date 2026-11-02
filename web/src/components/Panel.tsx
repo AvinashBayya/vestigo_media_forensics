@@ -52,7 +52,13 @@ export function Panel({ title, provenance, children }: PanelProps) {
 }
 
 function ProvenanceFooter({ provenance }: { provenance: Provenance }) {
-  const tool = provenance.tool_version ? `${provenance.tool} ${provenance.tool_version}` : provenance.tool;
+  const version = provenance.tool_version;
+  // "ExifTool 13.25", but "hashlib (Python 3.11.18, OpenSSL …)" when the version is a description.
+  const tool = !version
+    ? provenance.tool
+    : /^\d/.test(version)
+      ? `${provenance.tool} ${version}`
+      : `${provenance.tool} (${version})`;
   return (
     <footer className="border-t border-slate-200 px-4 py-2 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-400">
       <p>

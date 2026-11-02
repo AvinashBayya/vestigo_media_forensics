@@ -46,4 +46,4 @@ def hamming_distance(first: str, second: str) -> int:
 
 
 def imagehash_version() -> str:
-    return f"ImageHash {version('ImageHash')} (Pillow {PIL.__version__})"
+    return f"{version('ImageHash')} (Pillow {PIL.__version__})"

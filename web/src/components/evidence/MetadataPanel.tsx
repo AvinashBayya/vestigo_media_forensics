@@ -15,7 +15,10 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export function MetadataPanel({ section }: { section: MetadataSection | null }) {
-  const [active, setActive] = useState<TabKey>("exif");
+  // Open on the first group that has tags, so files without EXIF don't start on an empty tab.
+  const [active, setActive] = useState<TabKey>(
+    () => TABS.find((tab) => section && countTags(section[tab.key]) > 0)?.key ?? "exif",
+  );
   const baseId = useId();
   const activeLabel = TABS.find((tab) => tab.key === active)!.label;
 

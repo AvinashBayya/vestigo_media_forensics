@@ -40,4 +40,4 @@ def hash_file(path: Path) -> FileHashes:
 
 
 def hashlib_version() -> str:
-    return f"Python {platform.python_version()} ({ssl.OPENSSL_VERSION})"
+    return f"Python {platform.python_version()}, {ssl.OPENSSL_VERSION}"

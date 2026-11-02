@@ -48,6 +48,20 @@ describe("ArtifactPage", () => {
     expect(within(metadata).getByText("No IPTC metadata found.")).toBeInTheDocument();
   });
 
+  it("opens the metadata section on the first group that has tags", async () => {
+    const report = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json({ ...report, metadata: { ...report.metadata!, exif: {}, xmp: {} } }),
+      ),
+    );
+    renderApp(PAGE);
+
+    const metadata = await screen.findByRole("region", { name: "Embedded metadata" });
+    expect(within(metadata).getByRole("tab", { name: "Other (1)" })).toHaveAttribute("aria-selected", "true");
+    expect(within(metadata).getByText("FileType")).toBeInTheDocument();
+  });
+
   it("renders the OCR section", async () => {
     renderApp(PAGE);
 
