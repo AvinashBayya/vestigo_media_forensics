@@ -102,6 +102,7 @@ class DuplicatesSection(BaseModel):
     algorithm: Literal["pHash"] = "pHash"
     threshold: int
     library_size: int
+    compared: int
     matches: list[DuplicateMatch]
     provenance: Provenance
 

@@ -33,6 +33,7 @@ class FixtureSet:
     with_metadata: Path
     corrupt_exif: Path
     near_duplicate: Path
+    edited: Path
     oriented: Path
     unrelated: Path
     ocr_text: Path
@@ -149,6 +150,11 @@ def build_fixtures(target: Path) -> FixtureSet:
 
     base.resize((320, 240), Image.Resampling.LANCZOS).save(path("near_duplicate.jpg"), quality=60)
 
+    # A small white box, like a redaction: visually close to the base image but not identical.
+    edited = base.copy()
+    ImageDraw.Draw(edited).rectangle([20, 20, 80, 60], fill="white")
+    edited.save(path("edited.jpg"), quality=92)
+
     # Pixels stored rotated 90° counter-clockwise, with EXIF orientation 6 telling viewers to
     # rotate them back. Displayed upright, it matches the base image.
     exif = Image.Exif()
@@ -177,6 +183,7 @@ def build_fixtures(target: Path) -> FixtureSet:
         with_metadata=path("with_metadata.jpg"),
         corrupt_exif=path("corrupt_exif.jpg"),
         near_duplicate=path("near_duplicate.jpg"),
+        edited=path("edited.jpg"),
         oriented=path("oriented.jpg"),
         unrelated=path("unrelated.png"),
         ocr_text=path("ocr_text.png"),

@@ -155,28 +155,26 @@ class PipelineRunner:
         job_id: str,
         derived: DerivedFileWriter,
     ) -> None:
-        evidence_id = ids.new_id(ids.EVIDENCE)
         with self.services.db.writer() as session, session.begin():
-            session.add(
-                EvidenceRecord(
-                    id=evidence_id,
-                    artifact_id=artifact_id,
-                    job_id=job_id,
-                    stage=result.stage,
-                    status=result.status,
-                    classification=result.classification,
-                    method=result.method,
-                    source=result.source,
-                    tool=result.tool,
-                    tool_version=result.tool_version,
-                    payload=result.output,
-                    errors=[error.model_dump() for error in result.errors],
-                    limitations=result.limitations,
-                    review_state=ReviewState.UNREVIEWED,
-                    started_at=result.started_at,
-                    completed_at=result.completed_at,
-                )
+            record = EvidenceRecord(
+                id=ids.new_id(ids.EVIDENCE),
+                artifact_id=artifact_id,
+                job_id=job_id,
+                stage=result.stage,
+                status=result.status,
+                classification=result.classification,
+                method=result.method,
+                source=result.source,
+                tool=result.tool,
+                tool_version=result.tool_version,
+                payload=result.output,
+                errors=[error.model_dump() for error in result.errors],
+                limitations=result.limitations,
+                review_state=ReviewState.UNREVIEWED,
+                started_at=result.started_at,
+                completed_at=result.completed_at,
             )
+            session.add(record)
             for pending in derived.take(stage.name):
                 session.add(
                     DerivedFile(
@@ -192,7 +190,7 @@ class PipelineRunner:
                     )
                 )
             session.flush()
-            stage.on_recorded(result, evidence_id, session)
+            stage.on_recorded(record, session)
 
     def _finish(
         self,

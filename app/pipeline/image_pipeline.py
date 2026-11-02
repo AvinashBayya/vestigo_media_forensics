@@ -1,10 +1,18 @@
 """Milestone 1 image pipeline (`image.v1`). Stages run in the order of IMAGE_STAGES."""
 
+from dataclasses import asdict
+
+from sqlalchemy.orm import Session
+
+from app import __version__
+from app.models import EvidenceRecord, ImageFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
+from app.services.duplicates import find_matches
 from app.services.hashing import hash_file, hashlib_version
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
+from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
 
 IMAGE_PIPELINE = "image.v1"
 
@@ -84,4 +92,98 @@ class MetadataStage(AnalysisStage):
         return StageOutput(data=result.parsed.sections, warnings=warnings)
 
 
-IMAGE_STAGES: tuple[AnalysisStage, ...] = (HashesStage(), MetadataStage())
+class PerceptualHashStage(AnalysisStage):
+    name = "perceptual_hash"
+    media_type = MediaType.IMAGE
+    method = (
+        "64-bit perceptual hash (pHash): the image, turned upright using its EXIF orientation, is "
+        "converted to greyscale and reduced to 32x32 pixels; a discrete cosine transform is applied and "
+        "each of the 8x8 lowest-frequency coefficients is compared with their median."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "artifact:original"
+    tool_name = "imagehash"
+    limitations = (
+        "A perceptual hash summarises coarse visual structure. Similar hashes mean similar-looking "
+        "images, not a shared source or history.",
+        "It tolerates resizing and recompression but not significant crops, rotations (other than EXIF "
+        "orientation), mirroring, or heavy edits.",
+        "Transparency is ignored. Animated or multi-page images are hashed from the first frame only.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return imagehash_version()
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        result = compute_phash(artifact.path)
+        return StageOutput(
+            {
+                "algorithm": "pHash",
+                "bits": BITS,
+                "value": result.value,
+                "frames": result.frames,
+                "normalization": result.normalization,
+            }
+        )
+
+    def on_recorded(self, record: EvidenceRecord, session: Session) -> None:
+        # The fingerprint index keeps the artifact's most recent successful hash.
+        if record.status in ("succeeded", "partial") and record.payload.get("value"):
+            session.merge(
+                ImageFingerprint(
+                    artifact_id=record.artifact_id,
+                    algorithm=FINGERPRINT_ALGORITHM,
+                    value_hex=record.payload["value"],
+                    evidence_id=record.id,
+                    created_at=record.completed_at,
+                )
+            )
+
+
+class DuplicatesStage(AnalysisStage):
+    name = "duplicates"
+    media_type = MediaType.IMAGE
+    method = (
+        "Compares this image's pHash with the stored pHash of every other artifact in the local library "
+        "using Hamming distance, and lists those at or below the threshold. Byte-identical files are "
+        "found by SHA-256."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "stage:perceptual_hash + local library"
+    tool_name = "Vestigo duplicate search"
+    depends_on = ("perceptual_hash",)
+    option = "duplicate_search"
+    limitations = (
+        "Searches only the artifacts in this local Vestigo library, as it was when the job ran. No "
+        "external or online search is performed.",
+        "Artifacts that have not been analysed have no perceptual hash and are found only if they are "
+        "byte-identical.",
+        "A match means the images look alike at a coarse level. It does not show which came first or "
+        "that one was derived from the other.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return __version__
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        threshold = ctx.settings.phash_max_distance
+        own_hash = ctx.results["perceptual_hash"].output["value"]
+        library = ctx.library.entries(artifact.id, FINGERPRINT_ALGORITHM)
+        search = find_matches(artifact.sha256, own_hash, library, threshold)
+        return StageOutput(
+            {
+                "algorithm": "pHash",
+                "threshold": threshold,
+                "library_size": search.library_size,
+                "compared": search.compared,
+                "matches": [asdict(match) for match in search.matches],
+            }
+        )
+
+
+IMAGE_STAGES: tuple[AnalysisStage, ...] = (
+    HashesStage(),
+    MetadataStage(),
+    PerceptualHashStage(),
+    DuplicatesStage(),
+)

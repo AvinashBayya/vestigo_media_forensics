@@ -13,19 +13,18 @@ from pathlib import Path
 from typing import Any, ClassVar, final
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core import ids
 from app.core.clock import utcnow
 from app.core.config import Settings
-from app.core.database import Database
 from app.core.storage import Storage
 from app.core.tools import ToolError, ToolRegistry
-from app.models import Artifact, ImageFingerprint
+from app.models import EvidenceRecord
 from app.schemas.analysis import AnalysisOptions
 from app.schemas.common import EvidenceClassification, MediaType, StageStatus
 from app.schemas.evidence import DerivedFileInfo, StageError
+from app.services.duplicates import LibraryReader
 
 
 @dataclass(frozen=True)
@@ -112,33 +111,6 @@ class DerivedFileWriter:
         return self._pending.pop(stage, [])
 
 
-@dataclass(frozen=True)
-class LibraryEntry:
-    artifact_id: str
-    filename: str
-    sha256: str
-    perceptual_hash: str | None
-
-
-class LibraryReader:
-    """Read access to the local artifact library, for duplicate search."""
-
-    def __init__(self, db: Database) -> None:
-        self._db = db
-
-    def entries(self, exclude_artifact_id: str, algorithm: str) -> list[LibraryEntry]:
-        stmt = (
-            select(Artifact.id, Artifact.original_filename, Artifact.sha256, ImageFingerprint.value_hex)
-            .outerjoin(
-                ImageFingerprint,
-                (ImageFingerprint.artifact_id == Artifact.id) & (ImageFingerprint.algorithm == algorithm),
-            )
-            .where(Artifact.id != exclude_artifact_id)
-        )
-        with self._db.reader() as session:
-            return [LibraryEntry(*row) for row in session.execute(stmt).all()]
-
-
 @dataclass
 class StageContext:
     job_id: str
@@ -175,7 +147,7 @@ class AnalysisStage(ABC):
     @abstractmethod
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput: ...
 
-    def on_recorded(self, result: StageResult, evidence_id: str, session: Session) -> None:  # noqa: B027
+    def on_recorded(self, record: EvidenceRecord, session: Session) -> None:  # noqa: B027
         """Called in the transaction that saves this stage's evidence record."""
 
     def skip_reason(self, ctx: StageContext) -> str | None:
