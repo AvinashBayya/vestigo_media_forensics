@@ -5,7 +5,13 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.deps import Services
 from app.core.errors import AppError
-from app.schemas.artifact import ArtifactDetail, ArtifactList, ArtifactUploadResponse, ReviewUpdate
+from app.schemas.artifact import (
+    ArtifactDetail,
+    ArtifactList,
+    ArtifactUploadResponse,
+    DeletionSummary,
+    ReviewUpdate,
+)
 from app.schemas.common import ErrorCode, MediaType
 from app.schemas.evidence import EvidenceReport
 from app.services import artifacts, reports
@@ -67,6 +73,11 @@ def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
 def update_review(services: Services, artifact_id: str, update: ReviewUpdate) -> ArtifactDetail:
     artifacts.update_review(services.db, artifact_id, update)
     return artifacts.get_artifact_detail(services.db, artifact_id)
+
+
+@router.delete("/{artifact_id}", response_model=DeletionSummary)
+def delete_artifact(services: Services, artifact_id: str) -> DeletionSummary:
+    return artifacts.delete_artifact(services, artifact_id)
 
 
 @router.get("/{artifact_id}/evidence", response_model=EvidenceReport)

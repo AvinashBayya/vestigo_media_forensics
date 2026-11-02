@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session
 
 from app.core import ids
 from app.core.clock import utcnow
@@ -15,11 +16,11 @@ from app.core.database import Database
 from app.core.errors import AppError
 from app.core.logging import get_logger, log_event
 from app.core.storage import Storage
-from app.models import AnalysisJob, Artifact
-from app.schemas.artifact import ArtifactDetail, ArtifactSummary, ReviewInfo, ReviewUpdate
+from app.models import AnalysisJob, Artifact, EvidenceRecord
+from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo, ReviewUpdate
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
 from app.services import analysis
-from app.services.errors import artifact_not_found
+from app.services.errors import analysis_in_progress, artifact_not_found
 from app.services.hashing import CHUNK_SIZE, FileHasher, FileHashes
 from app.services.validation import (
     SNIFF_BYTES,
@@ -219,3 +220,62 @@ def update_review(db: Database, artifact_id: str, update: ReviewUpdate) -> None:
         artifact.analyst_notes = update.analyst_notes
         artifact.review_updated_at = utcnow()
     log_event(logger, logging.INFO, "artifact.review_updated", artifact_id=artifact_id, status=update.state)
+
+
+def _count(session: Session, model: type, artifact_id: str) -> int:
+    return (
+        session.scalar(select(func.count()).select_from(model).where(model.artifact_id == artifact_id)) or 0
+    )
+
+
+def _delete_rows(session: Session, artifact_id: str) -> None:
+    # Jobs, evidence records, derived-file rows, and fingerprints cascade from the artifact row.
+    session.execute(delete(Artifact).where(Artifact.id == artifact_id))
+
+
+def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
+    """Delete the original, derived files, jobs, evidence records, and database rows (D11).
+
+    The artifact folder is moved to trash/ first and moved back if the database deletion fails, so
+    files and rows are never left out of step.
+    """
+    if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
+        raise artifact_not_found(artifact_id)
+    storage = services.storage
+    trashed = None
+    try:
+        with services.db.writer() as session, session.begin():
+            if session.get(Artifact, artifact_id) is None:
+                raise artifact_not_found(artifact_id)
+            running = analysis.active_job(session, artifact_id)
+            if running is not None:
+                raise analysis_in_progress(running)
+            original_files, derived_files = storage.count_files(artifact_id)
+            summary = DeletionSummary(
+                artifact_id=artifact_id,
+                original_files=original_files,
+                derived_files=derived_files,
+                jobs=_count(session, AnalysisJob, artifact_id),
+                evidence_records=_count(session, EvidenceRecord, artifact_id),
+            )
+            trashed = storage.move_to_trash(artifact_id)
+            _delete_rows(session, artifact_id)
+    except BaseException:
+        if trashed is not None:
+            storage.restore_from_trash(trashed, artifact_id)
+        raise
+
+    if trashed is not None:
+        try:
+            storage.purge(trashed)
+        except OSError as exc:
+            # The rows are gone; leftover files in trash/ are removed at the next startup.
+            log_event(
+                logger,
+                logging.WARNING,
+                "artifact.purge_failed",
+                artifact_id=artifact_id,
+                error_type=type(exc).__name__,
+            )
+    log_event(logger, logging.INFO, "artifact.deleted", artifact_id=artifact_id)
+    return summary
