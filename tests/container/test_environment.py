@@ -4,6 +4,7 @@ The port tests reuse a server that is already running on the port; otherwise the
 """
 
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -52,8 +53,14 @@ def serving(command: list[str], port: int, cwd: Path, env: dict[str, str]) -> It
     if _port_open(port):
         yield
         return
+    # A new session lets us stop the whole process group: `npm run dev` starts vite as a child.
     process = subprocess.Popen(
-        command, cwd=cwd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+        command,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
     )
     try:
         deadline = time.monotonic() + 90
@@ -63,7 +70,7 @@ def serving(command: list[str], port: int, cwd: Path, env: dict[str, str]) -> It
             time.sleep(0.5)
         yield
     finally:
-        process.terminate()
+        os.killpg(process.pid, signal.SIGTERM)
         process.wait(timeout=30)
 
 
