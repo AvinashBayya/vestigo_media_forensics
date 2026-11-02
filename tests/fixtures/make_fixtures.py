@@ -1,0 +1,198 @@
+"""Deterministic test images.
+
+The test suite builds these in a temporary folder. To write them somewhere for manual testing:
+
+    python -m tests.fixtures.make_fixtures samples/generated
+"""
+
+import random
+import struct
+import subprocess
+import sys
+import zlib
+from dataclasses import dataclass, fields
+from pathlib import Path
+
+from PIL import Image, ImageDraw, ImageFont
+
+FIXTURES_DIR = Path(__file__).parent
+C2PA_SAMPLE = FIXTURES_DIR / "c2pa" / "adobe-20220124-C.jpg"
+FONT_PATH = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+OCR_TEXT = "VESTIGO EVIDENCE SAMPLE 2026"
+
+# The C2PA JUMBF type identifier: "c2pa" followed by the standard ISO suffix.
+C2PA_JUMBF_TYPE = b"c2pa" + bytes.fromhex("00110010800000aa00389b71")
+
+
+@dataclass(frozen=True)
+class FixtureSet:
+    jpeg: Path
+    png: Path
+    webp: Path
+    tiff: Path
+    with_metadata: Path
+    corrupt_exif: Path
+    near_duplicate: Path
+    oriented: Path
+    unrelated: Path
+    ocr_text: Path
+    blank: Path
+    invalid_c2pa: Path
+    c2pa: Path
+    gif: Path
+    html_named_jpg: Path
+    truncated_jpeg: Path
+    oversized_dimensions: Path
+    bomb_dimensions: Path
+
+
+def textured_image(seed: int, size: tuple[int, int] = (640, 480)) -> Image.Image:
+    """A gradient with random shapes: enough structure for perceptual hashing to be meaningful."""
+    rng = random.Random(seed)
+    width, height = size
+    image = Image.new("RGB", size)
+    draw = ImageDraw.Draw(image)
+    top = [rng.randrange(256) for _ in range(3)]
+    bottom = [rng.randrange(256) for _ in range(3)]
+    for y in range(height):
+        t = y / (height - 1)
+        draw.line(
+            [(0, y), (width, y)], fill=tuple(int(a + (b - a) * t) for a, b in zip(top, bottom, strict=True))
+        )
+    for _ in range(25):
+        x0, y0 = rng.randrange(width), rng.randrange(height)
+        x1, y1 = x0 + rng.randrange(20, width // 2), y0 + rng.randrange(20, height // 2)
+        color = tuple(rng.randrange(256) for _ in range(3))
+        shape = draw.rectangle if rng.random() < 0.5 else draw.ellipse
+        shape([x0, y0, x1, y1], fill=color)
+    return image
+
+
+def png_with_dimensions(width: int, height: int) -> bytes:
+    """A tiny PNG whose header declares the given size (for pixel-limit tests)."""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        crc = zlib.crc32(kind + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)
+
+    header = struct.pack(">IIBBBBB", width, height, 1, 0, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(b"\x00" * 64))
+        + chunk(b"IEND", b"")
+    )
+
+
+def insert_jpeg_segment(jpeg: bytes, marker: int, payload: bytes) -> bytes:
+    """Insert an APPn segment directly after the SOI marker."""
+    assert jpeg[:2] == b"\xff\xd8"
+    return jpeg[:2] + bytes([0xFF, marker]) + struct.pack(">H", len(payload) + 2) + payload + jpeg[2:]
+
+
+def corrupt_exif_payload() -> bytes:
+    # A TIFF header whose IFD0 claims 65535 entries, far more than the segment holds.
+    return b"Exif\x00\x00" + b"II*\x00" + struct.pack("<I", 8) + struct.pack("<H", 0xFFFF) + b"\x00" * 16
+
+
+def invalid_c2pa_payload() -> bytes:
+    # A JUMBF description box labelled "c2pa" inside a superbox that claims more bytes than exist.
+    label = b"c2pa\x00"
+    jumd = b"jumd" + C2PA_JUMBF_TYPE + b"\x03" + label
+    jumd_box = struct.pack(">I", len(jumd) + 4) + jumd
+    superbox = struct.pack(">I", 0x00FFFFFF) + b"jumb" + jumd_box + b"\xde\xad\xbe\xef" * 4
+    return b"JP" + struct.pack(">H", 1) + struct.pack(">I", 1) + superbox
+
+
+def write_metadata(path: Path) -> None:
+    subprocess.run(
+        [
+            "exiftool",
+            "-q",
+            "-overwrite_original",
+            "-EXIF:Make=VestigoTestCam",
+            "-EXIF:Model=Fixture Model 1",
+            "-EXIF:DateTimeOriginal=2026:01:15 10:30:00",
+            "-EXIF:Software=Vestigo fixture generator",
+            "-EXIF:GPSLatitude=51.5",
+            "-EXIF:GPSLatitudeRef=N",
+            "-EXIF:GPSLongitude=0.12",
+            "-EXIF:GPSLongitudeRef=W",
+            "-XMP-dc:Title=Fixture title",
+            "-XMP-dc:Creator=Fixture Author",
+            "-IPTC:Keywords=fixture",
+            "-IPTC:City=Testville",
+            str(path),
+        ],
+        check=True,
+    )
+
+
+def build_fixtures(target: Path) -> FixtureSet:
+    target.mkdir(parents=True, exist_ok=True)
+    base = textured_image(seed=1)
+
+    def path(name: str) -> Path:
+        return target / name
+
+    base.save(path("base.jpg"), quality=92)
+    base.save(path("base.png"))
+    base.save(path("base.webp"), quality=90)
+    base.save(path("base.tiff"))
+
+    base.save(path("with_metadata.jpg"), quality=92)
+    write_metadata(path("with_metadata.jpg"))
+
+    jpeg_bytes = path("base.jpg").read_bytes()
+    path("corrupt_exif.jpg").write_bytes(insert_jpeg_segment(jpeg_bytes, 0xE1, corrupt_exif_payload()))
+    path("invalid_c2pa.jpg").write_bytes(insert_jpeg_segment(jpeg_bytes, 0xEB, invalid_c2pa_payload()))
+
+    base.resize((320, 240), Image.Resampling.LANCZOS).save(path("near_duplicate.jpg"), quality=60)
+
+    # Pixels stored rotated 90° counter-clockwise, with EXIF orientation 6 telling viewers to
+    # rotate them back. Displayed upright, it matches the base image.
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    base.rotate(90, expand=True).save(path("oriented.jpg"), quality=92, exif=exif)
+
+    textured_image(seed=99).save(path("unrelated.png"))
+
+    text_image = Image.new("RGB", (1200, 200), "white")
+    font = ImageFont.truetype(str(FONT_PATH), 56)
+    ImageDraw.Draw(text_image).text((40, 60), OCR_TEXT, fill="black", font=font)
+    text_image.save(path("ocr_text.png"))
+
+    Image.new("RGB", (400, 300), "white").save(path("blank.png"))
+    Image.new("RGB", (32, 32), "red").save(path("animation.gif"))
+    path("not_really.jpg").write_bytes(b"<!doctype html><html><body>not an image</body></html>")
+    path("truncated.jpg").write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 64)
+    path("oversized.png").write_bytes(png_with_dimensions(11_000, 10_000))
+    path("bomb.png").write_bytes(png_with_dimensions(20_000, 20_000))
+
+    return FixtureSet(
+        jpeg=path("base.jpg"),
+        png=path("base.png"),
+        webp=path("base.webp"),
+        tiff=path("base.tiff"),
+        with_metadata=path("with_metadata.jpg"),
+        corrupt_exif=path("corrupt_exif.jpg"),
+        near_duplicate=path("near_duplicate.jpg"),
+        oriented=path("oriented.jpg"),
+        unrelated=path("unrelated.png"),
+        ocr_text=path("ocr_text.png"),
+        blank=path("blank.png"),
+        invalid_c2pa=path("invalid_c2pa.jpg"),
+        c2pa=C2PA_SAMPLE,
+        gif=path("animation.gif"),
+        html_named_jpg=path("not_really.jpg"),
+        truncated_jpeg=path("truncated.jpg"),
+        oversized_dimensions=path("oversized.png"),
+        bomb_dimensions=path("bomb.png"),
+    )
+
+
+if __name__ == "__main__":
+    out = Path(sys.argv[1] if len(sys.argv) > 1 else "samples/generated")
+    built = build_fixtures(out)
+    for field in fields(built):
+        print(f"{field.name:22} {getattr(built, field.name)}")

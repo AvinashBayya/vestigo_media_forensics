@@ -1,14 +1,6 @@
 from fastapi.testclient import TestClient
 
-
-def assert_error(response, status_code: int, code: str) -> dict:
-    assert response.status_code == status_code
-    body = response.json()
-    assert set(body) == {"error"}
-    assert set(body["error"]) == {"code", "message", "details"}
-    assert body["error"]["code"] == code
-    assert body["error"]["message"]
-    return body["error"]
+from tests.helpers import assert_error
 
 
 def test_unknown_route_uses_error_envelope(client: TestClient) -> None:

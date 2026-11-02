@@ -1,0 +1,68 @@
+from typing import Annotated
+
+from fastapi import APIRouter, File, Query, UploadFile
+from fastapi.responses import FileResponse
+
+from app.api.deps import Services
+from app.core.errors import AppError
+from app.schemas.artifact import ArtifactDetail, ArtifactList, ArtifactUploadResponse, ReviewUpdate
+from app.schemas.common import ErrorCode, MediaType
+from app.services import artifacts
+
+router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+
+
+@router.post("/upload", status_code=201, response_model=ArtifactUploadResponse)
+def upload_artifact(
+    services: Services, file: Annotated[UploadFile | None, File()] = None
+) -> ArtifactUploadResponse:
+    if file is None:
+        raise AppError(400, ErrorCode.MISSING_FILE, "No file was provided in the 'file' form field.")
+    artifact = artifacts.create_artifact(services, file.file, file.filename)
+    return ArtifactUploadResponse(
+        artifact_id=artifact.id,
+        filename=artifact.original_filename,
+        size_bytes=artifact.size_bytes,
+        media_type=MediaType(artifact.media_type),
+        mime_type=artifact.mime_type,
+        sha256=artifact.sha256,
+        created_at=artifact.created_at,
+    )
+
+
+@router.get("", response_model=ArtifactList)
+def list_artifacts(
+    services: Services,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ArtifactList:
+    items, total = artifacts.list_artifacts(services.db, limit, offset)
+    return ArtifactList(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/{artifact_id}", response_model=ArtifactDetail)
+def get_artifact(services: Services, artifact_id: str) -> ArtifactDetail:
+    return artifacts.get_artifact_detail(services.db, artifact_id)
+
+
+@router.get("/{artifact_id}/content", response_class=FileResponse)
+def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
+    """The original file, for preview in the browser."""
+    artifact = artifacts.get_artifact(services.db, artifact_id)
+    return FileResponse(
+        services.storage.resolve(artifact.stored_path),
+        media_type=artifact.mime_type,
+        filename=artifact.original_filename,
+        content_disposition_type="inline",
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.patch("/{artifact_id}/review", response_model=ArtifactDetail)
+def update_review(services: Services, artifact_id: str, update: ReviewUpdate) -> ArtifactDetail:
+    artifacts.update_review(services.db, artifact_id, update)
+    return artifacts.get_artifact_detail(services.db, artifact_id)

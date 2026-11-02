@@ -8,9 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
 from app import __version__
-from app.api import routes_health
-from app.api.deps import AppServices
+from app.api import routes_artifacts, routes_health
+from app.api.upload_limit import UploadSizeLimitMiddleware
 from app.core.config import Settings, get_settings
+from app.core.container import AppServices
 from app.core.database import Database
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging
@@ -59,9 +60,15 @@ def create_app(settings: Settings | None = None, tools: ToolRegistry | None = No
         allow_headers=["Content-Type"],
         expose_headers=["Content-Disposition"],
     )
+    app.add_middleware(
+        UploadSizeLimitMiddleware,
+        path=f"{API_PREFIX}/artifacts/upload",
+        max_file_bytes=settings.max_upload_bytes,
+    )
 
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(routes_health.router)
+    api.include_router(routes_artifacts.router)
     app.include_router(api)
     return app
 

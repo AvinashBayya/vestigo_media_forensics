@@ -5,9 +5,10 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.deps import AppServices
 from app.core.config import Settings
+from app.core.container import AppServices
 from app.main import create_app
+from tests.fixtures.make_fixtures import FixtureSet, build_fixtures
 
 
 @pytest.fixture
@@ -29,3 +30,8 @@ def client(app: FastAPI) -> Iterator[TestClient]:
 @pytest.fixture
 def services(app: FastAPI, client: TestClient) -> AppServices:
     return app.state.services
+
+
+@pytest.fixture(scope="session")
+def fixtures(tmp_path_factory: pytest.TempPathFactory) -> FixtureSet:
+    return build_fixtures(tmp_path_factory.mktemp("fixtures"))
