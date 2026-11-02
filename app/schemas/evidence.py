@@ -46,6 +46,8 @@ class Provenance(BaseModel):
     limitations: list[str] = Field(min_length=1)
     errors: list[StageError]
     review_state: ReviewState
+    # Why the stage did not run, when status is "skipped".
+    skip_reason: str | None = None
     derived_files: list[DerivedFileInfo] = []
 
 

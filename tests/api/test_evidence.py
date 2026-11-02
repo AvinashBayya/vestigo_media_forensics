@@ -26,6 +26,7 @@ PROVENANCE_FIELDS = {
     "limitations",
     "errors",
     "review_state",
+    "skip_reason",
     "derived_files",
 }
 VERDICT_WORDS = re.compile(
@@ -89,6 +90,8 @@ def test_skipped_and_failed_stages_are_visible_in_the_report(
     report = analysed_report(client, fixtures.corrupt_exif, {"ocr": False})
 
     assert report["ocr"]["provenance"]["status"] == "skipped"
+    assert report["ocr"]["provenance"]["skip_reason"] == "Disabled by the analysis option 'ocr'."
+    assert report["hashes"]["provenance"]["skip_reason"] is None
     assert report["ocr"]["text"] == ""
     assert report["metadata"]["provenance"]["status"] == "partial"
     assert report["metadata"]["provenance"]["errors"]

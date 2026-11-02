@@ -49,6 +49,7 @@ def _provenance(record: EvidenceRecord, derived: list[DerivedFile]) -> Provenanc
         limitations=record.limitations,
         errors=[StageError(**error) for error in record.errors],
         review_state=record.review_state,
+        skip_reason=record.payload.get("skip_reason") if record.status == "skipped" else None,
         derived_files=[
             DerivedFileInfo(derived_file_id=f.id, kind=f.kind, sha256=f.sha256, size_bytes=f.size_bytes)
             for f in derived
