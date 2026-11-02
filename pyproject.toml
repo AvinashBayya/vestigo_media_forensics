@@ -36,6 +36,8 @@ filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated",
   # Expected: pixel-limit tests use images Pillow flags before Vestigo rejects them.
   "ignore::PIL.Image.DecompressionBombWarning",
+  # Expected: the corrupt-EXIF fixture is deliberately malformed.
+  "ignore:Corrupt EXIF data:UserWarning",
 ]
 markers = [
   "container: checks the Dev Container environment and ports (run with: pytest -m container)",

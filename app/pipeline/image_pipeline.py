@@ -2,7 +2,9 @@
 
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.schemas.common import EvidenceClassification, MediaType
+from app.schemas.evidence import StageError
 from app.services.hashing import hash_file, hashlib_version
+from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
 
 IMAGE_PIPELINE = "image.v1"
 
@@ -49,4 +51,37 @@ class HashesStage(AnalysisStage):
         return StageOutput(data)
 
 
-IMAGE_STAGES: tuple[AnalysisStage, ...] = (HashesStage(),)
+class MetadataStage(AnalysisStage):
+    name = "metadata"
+    media_type = MediaType.IMAGE
+    method = (
+        f"ExifTool reads the metadata embedded in the file (exiftool {' '.join(EXIFTOOL_ARGS)}). Tags are "
+        "grouped by ExifTool group; a tag that repeats within a group keeps its copy number."
+    )
+    classification = EvidenceClassification.OBSERVED
+    source = "artifact:original"
+    tool_name = "ExifTool"
+    option = "metadata"
+    limitations = (
+        "Embedded metadata is easy to edit, add, or remove. Values are reported as written in the file "
+        "and are not verified.",
+        "Missing metadata is common (many platforms strip it) and is not evidence of anything by itself.",
+        "Composite tags are calculated by ExifTool from other tags; they are not stored in the file.",
+        "File-system attributes (name, dates, permissions) describe Vestigo's stored copy, not the "
+        "uploaded file, and are left out.",
+        "GPS values, if present, are shown as written. Milestone 1 performs no location analysis.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return ctx.tools.require("exiftool").version or "unknown"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("exiftool")
+        result = extract_metadata(tool, artifact.path, ctx.settings.tool_timeout_seconds)
+        ctx.derived.write(self.name, "exiftool_json", "exiftool.json", result.raw_output)
+        warnings = [StageError(type="EXIFTOOL_ERROR", message=text) for text in result.parsed.errors]
+        warnings += [StageError(type="EXIFTOOL_WARNING", message=text) for text in result.parsed.warnings]
+        return StageOutput(data=result.parsed.sections, warnings=warnings)
+
+
+IMAGE_STAGES: tuple[AnalysisStage, ...] = (HashesStage(), MetadataStage())
