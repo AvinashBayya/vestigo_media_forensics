@@ -19,6 +19,7 @@ from app.models import AnalysisJob, Artifact
 from app.schemas.artifact import ArtifactDetail, ArtifactSummary, ReviewInfo, ReviewUpdate
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
 from app.services import analysis
+from app.services.errors import artifact_not_found
 from app.services.hashing import CHUNK_SIZE, FileHasher, FileHashes
 from app.services.validation import (
     SNIFF_BYTES,
@@ -139,17 +140,13 @@ def create_artifact(services: AppServices, stream: BinaryIO, filename: str | Non
     return artifact
 
 
-def not_found(artifact_id: str) -> AppError:
-    return AppError(404, ErrorCode.ARTIFACT_NOT_FOUND, "Artifact not found.", {"artifact_id": artifact_id})
-
-
 def get_artifact(db: Database, artifact_id: str) -> Artifact:
     if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
-        raise not_found(artifact_id)
+        raise artifact_not_found(artifact_id)
     with db.reader() as session:
         artifact = session.get(Artifact, artifact_id)
     if artifact is None:
-        raise not_found(artifact_id)
+        raise artifact_not_found(artifact_id)
     return artifact
 
 
@@ -213,11 +210,11 @@ def list_artifacts(db: Database, limit: int, offset: int) -> tuple[list[Artifact
 
 def update_review(db: Database, artifact_id: str, update: ReviewUpdate) -> None:
     if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
-        raise not_found(artifact_id)
+        raise artifact_not_found(artifact_id)
     with db.writer() as session, session.begin():
         artifact = session.get(Artifact, artifact_id)
         if artifact is None:
-            raise not_found(artifact_id)
+            raise artifact_not_found(artifact_id)
         artifact.review_state = update.state
         artifact.analyst_notes = update.analyst_notes
         artifact.review_updated_at = utcnow()

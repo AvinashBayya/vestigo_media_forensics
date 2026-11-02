@@ -31,7 +31,7 @@ def get_logger(name: str) -> logging.Logger:
 
 def log_event(logger: logging.Logger, level: int, event: str, **fields: object) -> None:
     safe = {key: value for key, value in fields.items() if key in ALLOWED_FIELDS}
-    parts = [f"event={event}", *(f"{key}={value}" for key, value in safe.items())]
+    parts = [f"event={event}", *(f"{key}={value}" for key, value in safe.items() if value is not None)]
     if len(safe) < len(fields):
         parts.append(f"dropped_fields={len(fields) - len(safe)}")
     logger.log(level, " ".join(parts))
