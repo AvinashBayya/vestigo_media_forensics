@@ -91,6 +91,36 @@ def insert_jpeg_segment(jpeg: bytes, marker: int, payload: bytes) -> bytes:
     return jpeg[:2] + bytes([0xFF, marker]) + struct.pack(">H", len(payload) + 2) + payload + jpeg[2:]
 
 
+def c2pa_jumbf_box() -> bytes:
+    """A minimal JUMBF superbox carrying the C2PA type and label (structure only, no manifest)."""
+    jumd = b"jumd" + C2PA_JUMBF_TYPE + b"\x03" + b"c2pa\x00"
+    jumd_box = struct.pack(">I", len(jumd) + 4) + jumd
+    return struct.pack(">I", len(jumd_box) + 8) + b"jumb" + jumd_box
+
+
+def png_with_chunk(png: bytes, kind: bytes, data: bytes) -> bytes:
+    """Insert a chunk before IEND."""
+    crc = zlib.crc32(kind + data) & 0xFFFFFFFF
+    chunk = struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)
+    iend = png.rindex(b"IEND") - 4
+    return png[:iend] + chunk + png[iend:]
+
+
+def webp_with_chunk(webp: bytes, kind: bytes, data: bytes) -> bytes:
+    """Append a RIFF chunk and fix the RIFF size."""
+    chunk = kind + struct.pack("<I", len(data)) + data + (b"\x00" if len(data) % 2 else b"")
+    body = webp[8:] + chunk
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+def tiff_with_tag(tag: int, data: bytes) -> bytes:
+    """A minimal little-endian TIFF whose only IFD entry is an UNDEFINED tag holding `data`."""
+    ifd_offset = 8
+    data_offset = ifd_offset + 2 + 12 + 4
+    ifd = struct.pack("<H", 1) + struct.pack("<HHII", tag, 7, len(data), data_offset) + struct.pack("<I", 0)
+    return b"II*\x00" + struct.pack("<I", ifd_offset) + ifd + data
+
+
 def corrupt_exif_payload() -> bytes:
     # A TIFF header whose IFD0 claims 65535 entries, far more than the segment holds.
     return b"Exif\x00\x00" + b"II*\x00" + struct.pack("<I", 8) + struct.pack("<H", 0xFFFF) + b"\x00" * 16

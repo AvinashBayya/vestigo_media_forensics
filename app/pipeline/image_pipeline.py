@@ -9,6 +9,7 @@ from app.models import EvidenceRecord, ImageFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
+from app.services.c2pa import detect_c2pa
 from app.services.duplicates import find_matches
 from app.services.hashing import hash_file, hashlib_version
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
@@ -90,6 +91,46 @@ class MetadataStage(AnalysisStage):
         warnings = [StageError(type="EXIFTOOL_ERROR", message=text) for text in result.parsed.errors]
         warnings += [StageError(type="EXIFTOOL_WARNING", message=text) for text in result.parsed.warnings]
         return StageOutput(data=result.parsed.sections, warnings=warnings)
+
+
+class C2PAStage(AnalysisStage):
+    name = "c2pa"
+    media_type = MediaType.IMAGE
+    method = (
+        "Detection only. A byte-level scan of the file container (JPEG APP11 segments, PNG caBX chunks, "
+        "WebP C2PA chunks, TIFF tag 52545) looks for a JUMBF box of type 'c2pa', and ExifTool decodes "
+        "any JUMBF boxes and the claim data inside them. The two checks are reported separately."
+    )
+    classification = EvidenceClassification.OBSERVED
+    source = "artifact:original"
+    tool_name = "ExifTool + Vestigo byte-level scan"
+    option = "c2pa"
+    limitations = (
+        "Detection only: signatures, certificate chains, timestamps, and hash bindings are NOT validated "
+        "in Milestone 1. A detected manifest may be invalid, altered, or signed by an untrusted party.",
+        "A detected manifest is not proof that the content is authentic or that its claims are true.",
+        "Absence of a manifest is normal (most images have none, and many platforms remove them) and "
+        "proves nothing.",
+        "Manifests stored outside the file and referenced from XMP are not fetched; no network access "
+        "is used.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return f"ExifTool {ctx.tools.require('exiftool').version}; Vestigo {__version__}"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("exiftool")
+        detection = detect_c2pa(tool, artifact.path, artifact.mime_type, ctx.settings.tool_timeout_seconds)
+        ctx.derived.write(self.name, "exiftool_c2pa_json", "exiftool.json", detection.raw_output)
+        return StageOutput(
+            {
+                "present": detection.present,
+                "validation_performed": False,
+                "manifest_labels": detection.manifest_labels,
+                "details": detection.details,
+            },
+            warnings=[StageError(type="C2PA_STRUCTURE_WARNING", message=text) for text in detection.warnings],
+        )
 
 
 class PerceptualHashStage(AnalysisStage):
@@ -184,6 +225,7 @@ class DuplicatesStage(AnalysisStage):
 IMAGE_STAGES: tuple[AnalysisStage, ...] = (
     HashesStage(),
     MetadataStage(),
+    C2PAStage(),
     PerceptualHashStage(),
     DuplicatesStage(),
 )
