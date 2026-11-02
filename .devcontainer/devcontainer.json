@@ -1,6 +1,15 @@
 {
   "name": "vestigo-media-forensics",
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
-  "postCreateCommand": "sudo apt-get update && sudo apt-get install -y exiftool tesseract-ocr libtesseract-dev ffmpeg && pip install --upgrade pip",
-  "forwardPorts": [8400, 5180]
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    }
+  },
+  "postCreateCommand": "bash scripts/post-create.sh",
+  "forwardPorts": [8400, 5180],
+  "portsAttributes": {
+    "8400": { "label": "Backend API" },
+    "5180": { "label": "Frontend UI" }
+  }
 }
