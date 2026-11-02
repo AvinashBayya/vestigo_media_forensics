@@ -16,7 +16,6 @@ MatchType = Literal["exact_file", "visually_identical", "near"]
 @dataclass(frozen=True)
 class LibraryEntry:
     artifact_id: str
-    filename: str
     sha256: str
     perceptual_hash: str | None
 
@@ -29,7 +28,7 @@ class LibraryReader:
 
     def entries(self, exclude_artifact_id: str, algorithm: str) -> list[LibraryEntry]:
         stmt = (
-            select(Artifact.id, Artifact.original_filename, Artifact.sha256, ImageFingerprint.value_hex)
+            select(Artifact.id, Artifact.sha256, ImageFingerprint.value_hex)
             .outerjoin(
                 ImageFingerprint,
                 (ImageFingerprint.artifact_id == Artifact.id) & (ImageFingerprint.algorithm == algorithm),
@@ -42,8 +41,10 @@ class LibraryReader:
 
 @dataclass(frozen=True)
 class DuplicateCandidate:
+    """A match. Only the matched artifact's ID is kept, so deleting that artifact leaves no trace of
+    its filename here; the evidence report looks the filename up when it is built."""
+
     artifact_id: str
-    filename: str
     distance: int
     similarity: float
     match_type: MatchType
@@ -65,7 +66,7 @@ def find_matches(
     for entry in library:
         library_size += 1
         if entry.sha256 == sha256:
-            matches.append(DuplicateCandidate(entry.artifact_id, entry.filename, 0, 1.0, "exact_file"))
+            matches.append(DuplicateCandidate(entry.artifact_id, 0, 1.0, "exact_file"))
             continue
         if entry.perceptual_hash is None:
             continue
@@ -74,8 +75,6 @@ def find_matches(
         if distance <= threshold:
             match_type: MatchType = "visually_identical" if distance == 0 else "near"
             similarity = round(1 - distance / BITS, 4)
-            matches.append(
-                DuplicateCandidate(entry.artifact_id, entry.filename, distance, similarity, match_type)
-            )
+            matches.append(DuplicateCandidate(entry.artifact_id, distance, similarity, match_type))
     matches.sort(key=lambda match: (match.distance, match.match_type != "exact_file", match.artifact_id))
     return SearchResult(matches, library_size, compared)

@@ -1,13 +1,14 @@
 from typing import Annotated
 
 from fastapi import APIRouter, File, Query, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.deps import Services
 from app.core.errors import AppError
 from app.schemas.artifact import ArtifactDetail, ArtifactList, ArtifactUploadResponse, ReviewUpdate
 from app.schemas.common import ErrorCode, MediaType
-from app.services import artifacts
+from app.schemas.evidence import EvidenceReport
+from app.services import artifacts, reports
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -66,3 +67,17 @@ def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
 def update_review(services: Services, artifact_id: str, update: ReviewUpdate) -> ArtifactDetail:
     artifacts.update_review(services.db, artifact_id, update)
     return artifacts.get_artifact_detail(services.db, artifact_id)
+
+
+@router.get("/{artifact_id}/evidence", response_model=EvidenceReport)
+def get_evidence(
+    services: Services, artifact_id: str, job_id: str | None = None, download: bool = False
+) -> JSONResponse:
+    """Evidence report for the latest finished job, or for `job_id`."""
+    report = reports.build_report(services.db, artifact_id, job_id)
+    headers = {}
+    if download:
+        # Both IDs are validated (letters, digits, underscore), so they are safe in a header.
+        filename = f"vestigo-evidence-{report.artifact_id}-{report.job_id}.json"
+        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return JSONResponse(report.model_dump(mode="json"), headers=headers)

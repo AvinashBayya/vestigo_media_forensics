@@ -43,11 +43,11 @@ def test_find_matches_classifies_and_orders_matches() -> None:
     own_sha = "a" * 64
     own_hash = "0000000000000000"
     library = [
-        LibraryEntry("art_far", "far.jpg", "b" * 64, "ffffffffffffffff"),
-        LibraryEntry("art_near", "near.jpg", "c" * 64, "000000000000000f"),
-        LibraryEntry("art_same_look", "look.png", "d" * 64, "0000000000000000"),
-        LibraryEntry("art_exact_unanalysed", "copy.jpg", own_sha, None),
-        LibraryEntry("art_unanalysed", "other.jpg", "e" * 64, None),
+        LibraryEntry("art_far", "b" * 64, "ffffffffffffffff"),
+        LibraryEntry("art_near", "c" * 64, "000000000000000f"),
+        LibraryEntry("art_same_look", "d" * 64, "0000000000000000"),
+        LibraryEntry("art_exact_unanalysed", own_sha, None),
+        LibraryEntry("art_unanalysed", "e" * 64, None),
     ]
 
     result = find_matches(own_sha, own_hash, library, threshold=10)

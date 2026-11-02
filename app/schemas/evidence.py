@@ -91,6 +91,7 @@ class OCRSection(BaseModel):
 
 class DuplicateMatch(BaseModel):
     artifact_id: str
+    # Current filename, or None if the matched artifact has since been deleted.
     filename: str | None
     available: bool
     similarity: float
@@ -100,9 +101,9 @@ class DuplicateMatch(BaseModel):
 
 class DuplicatesSection(BaseModel):
     algorithm: Literal["pHash"] = "pHash"
-    threshold: int
-    library_size: int
-    compared: int
+    threshold: int | None
+    library_size: int | None
+    compared: int | None
     matches: list[DuplicateMatch]
     provenance: Provenance
 
