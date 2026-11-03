@@ -24,6 +24,7 @@ import { PHashPanel } from "../components/evidence/PHashPanel";
 import { JobProgress } from "../components/JobProgress";
 import { ErrorBanner, EvidenceNotice, InfoBanner } from "../components/Messages";
 import { ReviewPanel } from "../components/ReviewPanel";
+import { ReviewProvider } from "../components/review/ReviewContext";
 import { StatusBadge } from "../components/StatusBadge";
 import { REVIEW_LABELS, formatBytes, formatDateTime, isActive } from "../lib/format";
 
@@ -114,6 +115,7 @@ export function ArtifactPage() {
   const analysing = job !== null && isActive(job.status);
 
   return (
+    <ReviewProvider artifactId={artifact.artifact_id}>
     <div className="space-y-5">
       <header className="space-y-1">
         <h1 className="text-xl font-semibold break-all">{artifact.filename}</h1>
@@ -210,5 +212,6 @@ export function ArtifactPage() {
         />
       )}
     </div>
+    </ReviewProvider>
   );
 }

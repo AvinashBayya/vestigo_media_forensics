@@ -10,11 +10,14 @@ interface ArtifactTableProps {
   sort: ArtifactSort;
   order: SortOrder;
   onSort: (sort: ArtifactSort) => void;
+  selected: ReadonlySet<string>;
+  onSelect: (artifactIds: string[], selected: boolean) => void;
 }
 
 const MUTED = "text-xs text-slate-600 dark:text-slate-400";
 
-export function ArtifactTable({ items, sort, order, onSort }: ArtifactTableProps) {
+export function ArtifactTable({ items, sort, order, onSort, selected, onSelect }: ArtifactTableProps) {
+  const allSelected = items.length > 0 && items.every((item) => selected.has(item.artifact_id));
   const header = (key: ArtifactSort, label: string) => (
     <th scope="col" aria-sort={sort === key ? (order === "asc" ? "ascending" : "descending") : "none"} className="py-2 pr-3 font-medium">
       <button type="button" onClick={() => onSort(key)} className="inline-flex items-center gap-1 hover:underline">
@@ -29,6 +32,14 @@ export function ArtifactTable({ items, sort, order, onSort }: ArtifactTableProps
       <table className="w-full text-left text-sm">
         <thead className="text-xs text-slate-600 dark:text-slate-400">
           <tr>
+            <th scope="col" className="w-8 py-2 pr-2">
+              <input
+                type="checkbox"
+                aria-label="Select all on this page"
+                checked={allSelected}
+                onChange={(event) => onSelect(items.map((item) => item.artifact_id), event.target.checked)}
+              />
+            </th>
             {header("filename", "File")}
             {header("created_at", "Uploaded")}
             {header("size_bytes", "Size")}
@@ -47,6 +58,14 @@ export function ArtifactTable({ items, sort, order, onSort }: ArtifactTableProps
         <tbody>
           {items.map((item) => (
             <tr key={item.artifact_id} className="border-t border-slate-200 align-top dark:border-slate-800">
+              <td className="py-2 pr-2">
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${item.filename}`}
+                  checked={selected.has(item.artifact_id)}
+                  onChange={(event) => onSelect([item.artifact_id], event.target.checked)}
+                />
+              </td>
               <td className="py-2 pr-3">
                 <Link to={`/artifacts/${item.artifact_id}`} className="break-all text-sky-700 underline dark:text-sky-400">
                   {item.filename}

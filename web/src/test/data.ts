@@ -30,6 +30,8 @@ export function provenance(stage: string, overrides: Partial<Provenance> = {}): 
     review_state: "UNREVIEWED",
     skip_reason: null,
     derived_files: [],
+    analyst_notes: "",
+    review_updated_at: null,
     ...overrides,
   };
 }
@@ -110,7 +112,7 @@ export function jobStatus(status: JobStatusResponse["status"], stages: StageStat
 
 export function evidenceReport(overrides: Partial<EvidenceReport> = {}): EvidenceReport {
   return {
-    schema_version: "1.0",
+    schema_version: "1.1",
     artifact_id: ARTIFACT_ID,
     job_id: JOB_ID,
     created_at: NOW,
@@ -208,6 +210,7 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
       provenance: provenance("duplicates"),
     },
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
+    review_history: [],
     ...overrides,
   };
 }

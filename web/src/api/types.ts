@@ -106,6 +106,45 @@ export interface DeletionSummary {
   derived_files: number;
   jobs: number;
   evidence_records: number;
+  review_events: number;
+}
+
+export type ReviewOrigin = "artifact" | "record" | "bulk";
+
+/** One review change. Append-only, with the full note text before and after (M2-3). */
+export interface ReviewEvent {
+  event_id: string;
+  origin: ReviewOrigin;
+  evidence_id: string | null;
+  stage: string | null;
+  job_id: string | null;
+  from_state: ReviewState;
+  to_state: ReviewState;
+  notes_before: string;
+  notes_after: string;
+  created_at: string;
+}
+
+export interface ReviewHistory {
+  artifact_id: string;
+  events: ReviewEvent[];
+}
+
+export interface RecordReview {
+  evidence_id: string;
+  artifact_id: string;
+  job_id: string;
+  stage: string;
+  classification: EvidenceClassification;
+  review_state: ReviewState;
+  analyst_notes: string;
+  review_updated_at: string | null;
+}
+
+export interface BulkReviewResult {
+  state: ReviewState;
+  updated: string[];
+  unchanged: string[];
 }
 
 export interface AnalysisOptions {
@@ -163,6 +202,9 @@ export interface Provenance {
   review_state: ReviewState;
   skip_reason: string | null;
   derived_files: DerivedFileInfo[];
+  /** Record-level review by the analyst (M2-2). */
+  analyst_notes: string;
+  review_updated_at: string | null;
 }
 
 export type TagGroups = Record<string, Record<string, unknown>>;
@@ -279,7 +321,7 @@ export interface DuplicatesSection {
 }
 
 export interface EvidenceReport {
-  schema_version: "1.0";
+  schema_version: "1.1";
   artifact_id: string;
   job_id: string;
   created_at: string;
@@ -293,4 +335,6 @@ export interface EvidenceReport {
   ocr: OCRSection | null;
   duplicates: DuplicatesSection | null;
   review: ReviewInfo;
+  /** Newest first. */
+  review_history: ReviewEvent[];
 }

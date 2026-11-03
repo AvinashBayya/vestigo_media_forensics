@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 
 import type { Provenance } from "../api/types";
 import { CLASSIFICATION_LABELS, REVIEW_LABELS, formatBytes, formatDateTime } from "../lib/format";
+import { RecordReview } from "./review/RecordReview";
 import { StatusBadge } from "./StatusBadge";
 
 interface PanelProps {
@@ -101,6 +102,7 @@ function ProvenanceFooter({ provenance }: { provenance: Provenance }) {
           </>
         )}
       </details>
+      <RecordReview provenance={provenance} />
     </footer>
   );
 }

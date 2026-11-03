@@ -402,7 +402,11 @@ describe("ArtifactPage", () => {
     await user.click(screen.getByRole("button", { name: "Save review" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent("Saved");
-    expect(received).toEqual({ state: "FLAGGED", analyst_notes: "Check the source." });
+    expect(received).toEqual({
+      state: "FLAGGED",
+      analyst_notes: "Check the source.",
+      expected_updated_at: "2026-11-02T09:00:00.000000Z",
+    });
     expect(screen.getByText(/review: Flagged/)).toBeInTheDocument();
   });
 

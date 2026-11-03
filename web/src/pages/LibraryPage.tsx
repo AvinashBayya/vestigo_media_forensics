@@ -1,11 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 
 import { listArtifacts, toSearchParams } from "../api/client";
 import type { ArtifactSort } from "../api/types";
 import { ArtifactTable } from "../components/library/ArtifactTable";
+import { BulkReviewBar, describeBulkResult, type BulkOutcome } from "../components/library/BulkReviewBar";
 import { FilterBar } from "../components/library/FilterBar";
-import { EvidenceNotice, InfoBanner } from "../components/Messages";
+import { ErrorBanner, EvidenceNotice, InfoBanner } from "../components/Messages";
 import { EmptyState, ErrorState, TableSkeleton } from "../components/States";
 import {
   clearFilters,
@@ -31,6 +32,28 @@ export function LibraryPage({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: numbe
   const key = toSearchParams(query).toString();
   const { data, error, loading, reload } = useApiResource(() => listArtifacts(query), key);
   const filtered = isFiltered(state);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [bulkOutcome, setBulkOutcome] = useState<BulkOutcome | null>(null);
+
+  // Selection belongs to the rows on screen: a new search, filter, sort, or page clears it.
+  useEffect(() => setSelected(new Set()), [key]);
+
+  function select(artifactIds: string[], isSelected: boolean) {
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const id of artifactIds) {
+        if (isSelected) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
+
+  function onBulkDone(outcome: BulkOutcome) {
+    setBulkOutcome(outcome);
+    if (outcome.kind === "success") setSelected(new Set());
+    reload();
+  }
 
   const update = useCallback(
     (changes: Partial<LibraryState>, options: { replace?: boolean; keepPage?: boolean } = {}) => {
@@ -64,6 +87,8 @@ export function LibraryPage({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: numbe
         </Link>
       </div>
       {notice && <InfoBanner>{notice}</InfoBanner>}
+      {bulkOutcome?.kind === "success" && <InfoBanner>{describeBulkResult(bulkOutcome.result)}</InfoBanner>}
+      {bulkOutcome?.kind === "error" && <ErrorBanner message={`Bulk review failed. ${bulkOutcome.message}`} />}
       <EvidenceNotice />
       <FilterBar
         state={state}
@@ -117,7 +142,17 @@ export function LibraryPage({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: numbe
               Showing {first}–{last} of {total} {total === 1 ? "artifact" : "artifacts"}
               {loading && " · Updating…"}
             </p>
-            <ArtifactTable items={data.items} sort={state.sort} order={state.order} onSort={onSort} />
+            {selected.size > 0 && (
+              <BulkReviewBar selectedIds={[...selected]} onClear={() => setSelected(new Set())} onDone={onBulkDone} />
+            )}
+            <ArtifactTable
+              items={data.items}
+              sort={state.sort}
+              order={state.order}
+              onSort={onSort}
+              selected={selected}
+              onSelect={select}
+            />
             <nav aria-label="Pages" className="flex items-center gap-3 text-sm">
               <button
                 type="button"

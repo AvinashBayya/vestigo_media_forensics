@@ -14,4 +14,7 @@ export const server = setupServer(
   http.get(`${API}/artifacts`, () => HttpResponse.json(artifactList([]))),
   http.get(`${API}/artifacts/${ARTIFACT_ID}`, () => HttpResponse.json(artifactDetail())),
   http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () => HttpResponse.json(evidenceReport())),
+  http.get(`${API}/artifacts/:artifactId/review-history`, ({ params }) =>
+    HttpResponse.json({ artifact_id: params.artifactId, events: [] }),
+  ),
 );

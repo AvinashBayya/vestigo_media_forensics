@@ -7,10 +7,13 @@ import type {
   ArtifactList,
   ArtifactQuery,
   ArtifactUploadResponse,
+  BulkReviewResult,
   DeletionSummary,
   EvidenceReport,
   JobCreated,
   JobStatusResponse,
+  RecordReview,
+  ReviewHistory,
   ReviewState,
 } from "./types";
 
@@ -119,13 +122,46 @@ export function getEvidence(artifactId: string, jobId?: string): Promise<Evidenc
   );
 }
 
-export function updateReview(artifactId: string, state: ReviewState, analystNotes: string): Promise<ArtifactDetail> {
+/**
+ * Saves the artifact's review. `expectedUpdatedAt` is the review timestamp the analyst last saw; the
+ * backend refuses the save with REVIEW_CONFLICT if the review has changed since.
+ */
+export function updateReview(
+  artifactId: string,
+  state: ReviewState,
+  analystNotes: string,
+  expectedUpdatedAt?: string,
+): Promise<ArtifactDetail> {
   return call(
     http.patch<ArtifactDetail>(`/artifacts/${encodeURIComponent(artifactId)}/review`, {
       state,
       analyst_notes: analystNotes,
+      ...(expectedUpdatedAt !== undefined ? { expected_updated_at: expectedUpdatedAt } : {}),
     }),
   );
+}
+
+export function updateRecordReview(
+  artifactId: string,
+  evidenceId: string,
+  state: ReviewState,
+  analystNotes: string,
+  expectedUpdatedAt: string | null,
+): Promise<RecordReview> {
+  return call(
+    http.patch<RecordReview>(
+      `/artifacts/${encodeURIComponent(artifactId)}/evidence/${encodeURIComponent(evidenceId)}/review`,
+      { state, analyst_notes: analystNotes, expected_updated_at: expectedUpdatedAt },
+    ),
+  );
+}
+
+export function bulkReview(artifactIds: string[], state: ReviewState): Promise<BulkReviewResult> {
+  return call(http.post<BulkReviewResult>("/artifacts/review", { artifact_ids: artifactIds, state }));
+}
+
+export function getReviewHistory(artifactId: string): Promise<ReviewHistory> {
+  return call(http.get<ReviewHistory>(`/artifacts/${encodeURIComponent(artifactId)}/review-history`));
 }
 
 export function deleteArtifact(artifactId: string): Promise<DeletionSummary> {
