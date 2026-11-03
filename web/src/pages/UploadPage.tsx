@@ -1,4 +1,4 @@
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { EvidenceNotice, InfoBanner } from "../components/Messages";
 import { RecentArtifacts } from "../components/RecentArtifacts";
@@ -17,7 +17,12 @@ export function UploadPage() {
         <UploadForm />
       </section>
       <section className="space-y-2">
-        <h2 className="font-medium">Recent uploads</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="font-medium">Recent uploads</h2>
+          <Link to="/" className="text-sm text-sky-700 underline dark:text-sky-400">
+            View the Library
+          </Link>
+        </div>
         <RecentArtifacts />
       </section>
     </div>

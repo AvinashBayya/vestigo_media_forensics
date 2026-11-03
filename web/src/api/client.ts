@@ -5,6 +5,7 @@ import type {
   ApiErrorBody,
   ArtifactDetail,
   ArtifactList,
+  ArtifactQuery,
   ArtifactUploadResponse,
   DeletionSummary,
   EvidenceReport,
@@ -92,8 +93,18 @@ export function getJob(jobId: string): Promise<JobStatusResponse> {
   return call(http.get<JobStatusResponse>(`/analysis/jobs/${encodeURIComponent(jobId)}`));
 }
 
-export function listArtifacts(limit = 20): Promise<ArtifactList> {
-  return call(http.get<ArtifactList>("/artifacts", { params: { limit } }));
+/** Repeated keys for lists (`review_state=A&review_state=B`), as FastAPI expects. */
+export function toSearchParams(query: ArtifactQuery): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === "") continue;
+    for (const item of Array.isArray(value) ? value : [value]) params.append(key, String(item));
+  }
+  return params;
+}
+
+export function listArtifacts(query: ArtifactQuery = {}): Promise<ArtifactList> {
+  return call(http.get<ArtifactList>("/artifacts", { params: toSearchParams(query) }));
 }
 
 export function getArtifact(artifactId: string): Promise<ArtifactDetail> {

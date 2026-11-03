@@ -50,20 +50,54 @@ export interface ArtifactSummary {
   latest_job_status: JobStatus | null;
 }
 
-export interface ArtifactDetail extends ArtifactSummary {
+/** An artifact with indicators for its latest analysis job (app/services/library.py). */
+export interface ArtifactListItem extends ArtifactSummary {
+  latest_job: JobSummary | null;
+  /** Failed or partial stages in the latest job, plus one if the job failed. Null if never analysed. */
+  problem_count: number | null;
+  /** Matches in the latest duplicate search. Null if that search produced no result. */
+  duplicate_match_count: number | null;
+  /** Library artifacts uploaded after that search finished. Null if there is no search result. */
+  added_since_analysis: number | null;
+  in_duplicate_library: boolean;
+}
+
+export interface ArtifactDetail extends ArtifactListItem {
   sha256: string;
   md5: string;
   width: number | null;
   height: number | null;
   review: ReviewInfo;
-  latest_job: JobSummary | null;
 }
 
 export interface ArtifactList {
-  items: ArtifactSummary[];
+  items: ArtifactListItem[];
   total: number;
   limit: number;
   offset: number;
+  counts_by_review_state: Record<ReviewState, number>;
+}
+
+export type AnalysisStatusFilter = JobStatus | "not_analysed";
+export type ArtifactSort = "created_at" | "filename" | "size_bytes" | "review_state";
+export type SortOrder = "asc" | "desc";
+export type SupportedMimeType = "image/jpeg" | "image/png" | "image/webp" | "image/tiff";
+
+/** Query parameters of GET /artifacts. All optional. */
+export interface ArtifactQuery {
+  q?: string;
+  review_state?: ReviewState[];
+  analysis_status?: AnalysisStatusFilter[];
+  has_problems?: boolean;
+  has_duplicates?: boolean;
+  mime_type?: SupportedMimeType[];
+  uploaded_from?: string;
+  uploaded_to?: string;
+  include_archived?: boolean;
+  sort?: ArtifactSort;
+  order?: SortOrder;
+  limit?: number;
+  offset?: number;
 }
 
 export interface DeletionSummary {

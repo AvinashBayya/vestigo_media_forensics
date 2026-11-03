@@ -1,5 +1,7 @@
 import type {
   ArtifactDetail,
+  ArtifactList,
+  ArtifactListItem,
   EvidenceReport,
   JobStatusResponse,
   Provenance,
@@ -48,8 +50,42 @@ export function artifactDetail(overrides: Partial<ArtifactDetail> = {}): Artifac
     height: 480,
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
     latest_job: { job_id: JOB_ID, status: "completed", created_at: NOW, started_at: NOW, completed_at: NOW },
+    problem_count: 0,
+    duplicate_match_count: 1,
+    added_since_analysis: 0,
+    in_duplicate_library: true,
     ...overrides,
   };
+}
+
+let itemCounter = 0;
+
+/** A Library row. IDs are unique unless given. */
+export function listItem(overrides: Partial<ArtifactListItem> = {}): ArtifactListItem {
+  itemCounter += 1;
+  const id = `art_${itemCounter.toString(16).padStart(32, "0")}`;
+  return {
+    artifact_id: id,
+    filename: `image-${itemCounter}.jpg`,
+    media_type: "image",
+    mime_type: "image/jpeg",
+    size_bytes: 36_000,
+    created_at: NOW,
+    review_state: "UNREVIEWED",
+    latest_job_status: "completed",
+    latest_job: { job_id: JOB_ID, status: "completed", created_at: NOW, started_at: NOW, completed_at: NOW },
+    problem_count: 0,
+    duplicate_match_count: 0,
+    added_since_analysis: 0,
+    in_duplicate_library: true,
+    ...overrides,
+  };
+}
+
+export function artifactList(items: ArtifactListItem[], overrides: Partial<ArtifactList> = {}): ArtifactList {
+  const counts = { UNREVIEWED: 0, IN_REVIEW: 0, REVIEWED: 0, FLAGGED: 0, ARCHIVED: 0 };
+  for (const item of items) counts[item.review_state] += 1;
+  return { items, total: items.length, limit: 25, offset: 0, counts_by_review_state: counts, ...overrides };
 }
 
 export function jobStatus(status: JobStatusResponse["status"], stages: StageStatus[]): JobStatusResponse {

@@ -18,7 +18,7 @@ describe("UploadForm progress", () => {
       return new Promise(() => {}); // still uploading
     });
     const user = userEvent.setup();
-    renderApp("/");
+    renderApp("/upload");
 
     await user.upload(
       screen.getByLabelText(/choose an image/i),

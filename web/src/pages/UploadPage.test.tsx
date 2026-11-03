@@ -15,7 +15,7 @@ function imageFile(name = "harbour.jpg", type = "image/jpeg") {
 describe("UploadPage", () => {
   it("accepts an image and enables upload", async () => {
     const user = userEvent.setup();
-    renderApp("/");
+    renderApp("/upload");
 
     const submit = screen.getByRole("button", { name: "Upload and analyse" });
     expect(submit).toBeDisabled();
@@ -28,7 +28,7 @@ describe("UploadPage", () => {
 
   it("rejects unsupported files before uploading", async () => {
     const user = userEvent.setup({ applyAccept: false });
-    renderApp("/");
+    renderApp("/upload");
 
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile("notes.txt", "text/plain"));
 
@@ -59,7 +59,7 @@ describe("UploadPage", () => {
       }),
     );
     const user = userEvent.setup();
-    renderApp("/");
+    renderApp("/upload");
 
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile());
     await user.click(screen.getByLabelText(/text in image/i));
@@ -76,7 +76,7 @@ describe("UploadPage", () => {
       ),
     );
     const user = userEvent.setup();
-    renderApp("/");
+    renderApp("/upload");
 
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile());
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
@@ -109,7 +109,7 @@ describe("UploadPage", () => {
         }),
       ),
     );
-    renderApp("/");
+    renderApp("/upload");
 
     expect(await screen.findByRole("link", { name: "harbour.jpg" })).toHaveAttribute("href", `/artifacts/${ARTIFACT_ID}`);
     expect(screen.getByText("Flagged")).toBeInTheDocument();
@@ -117,7 +117,7 @@ describe("UploadPage", () => {
   });
 
   it("states that the system does not decide authenticity", () => {
-    renderApp("/");
+    renderApp("/upload");
     expect(screen.getByText(/does not determine whether media is authentic/i)).toBeInTheDocument();
   });
 });

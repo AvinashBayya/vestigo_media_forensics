@@ -487,8 +487,8 @@ describe("ArtifactPage", () => {
     await user.click(screen.getByRole("button", { name: "Delete artifact" }));
     await user.click(screen.getByRole("button", { name: "Delete permanently" }));
 
-    expect(await screen.findByRole("heading", { name: "Analyse an image" })).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Deleted “harbour.jpg” and all of its evidence.");
+    expect(await screen.findByRole("heading", { name: "Library" })).toBeInTheDocument();
+    expect(screen.getByText("Deleted “harbour.jpg” and all of its evidence.")).toBeInTheDocument();
     expect(deleted).toBe(true);
   });
 

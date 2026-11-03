@@ -2,18 +2,18 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { errorMessage, listArtifacts } from "../api/client";
-import type { ArtifactSummary } from "../api/types";
+import type { ArtifactListItem } from "../api/types";
 import { REVIEW_LABELS, formatBytes, formatDateTime } from "../lib/format";
 import { ErrorBanner } from "./Messages";
 import { StatusBadge } from "./StatusBadge";
 
 export function RecentArtifacts() {
-  const [items, setItems] = useState<ArtifactSummary[] | null>(null);
+  const [items, setItems] = useState<ArtifactListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    listArtifacts(20)
+    listArtifacts({ limit: 5 })
       .then((list) => !cancelled && setItems(list.items))
       .catch((err) => !cancelled && setError(errorMessage(err)));
     return () => {
