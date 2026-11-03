@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
+from starlette.background import BackgroundTask
 
 from app.api.deps import Services
 from app.core.errors import AppError
@@ -24,9 +25,11 @@ from app.schemas.review import (
     RecordReviewUpdate,
     ReviewHistory,
 )
-from app.services import analysis, artifacts, library, reports, review
+from app.services import analysis, artifacts, exports, library, reports, review
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
+
+EXPORT_SHA256_HEADER = "X-Vestigo-Export-SHA256"
 
 
 @router.post("/upload", status_code=201, response_model=ArtifactUploadResponse)
@@ -126,6 +129,22 @@ def get_job_history(services: Services, artifact_id: str) -> JobHistory:
 @router.delete("/{artifact_id}", response_model=DeletionSummary)
 def delete_artifact(services: Services, artifact_id: str) -> DeletionSummary:
     return artifacts.delete_artifact(services, artifact_id)
+
+
+@router.get("/{artifact_id}/export", response_class=FileResponse)
+def export_evidence_package(
+    services: Services, artifact_id: str, job_id: str | None = None, include_original: bool = False
+) -> FileResponse:
+    """ZIP evidence package for the latest finished job, or `job_id` (M2-6). The original upload is
+    included only when `include_original=true`."""
+    package = exports.build_export(services, artifact_id, job_id, include_original)
+    return FileResponse(
+        package.path,
+        media_type="application/zip",
+        filename=package.filename,
+        headers={EXPORT_SHA256_HEADER: package.sha256, "Cache-Control": "no-store"},
+        background=BackgroundTask(package.path.unlink, missing_ok=True),
+    )
 
 
 @router.get("/{artifact_id}/evidence", response_model=EvidenceReport)

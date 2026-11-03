@@ -68,7 +68,7 @@ def create_app(
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PATCH", "DELETE"],
         allow_headers=["Content-Type"],
-        expose_headers=["Content-Disposition"],
+        expose_headers=["Content-Disposition", "X-Vestigo-Export-SHA256"],
     )
     app.add_middleware(
         UploadSizeLimitMiddleware,
