@@ -27,6 +27,7 @@ from app.schemas.evidence import (
     Provenance,
     StageError,
 )
+from app.services import review
 from app.services.analysis import active_job, latest_job, to_job_summary
 from app.services.artifacts import get_artifact, to_review_info, to_summary
 from app.services.errors import analysis_in_progress, job_not_found
@@ -50,6 +51,8 @@ def _provenance(record: EvidenceRecord, derived: list[DerivedFile]) -> Provenanc
         limitations=record.limitations,
         errors=[StageError(**error) for error in record.errors],
         review_state=record.review_state,
+        analyst_notes=record.analyst_notes,
+        review_updated_at=record.review_updated_at,
         skip_reason=record.payload.get("skip_reason") if record.status == "skipped" else None,
         derived_files=[
             DerivedFileInfo(derived_file_id=f.id, kind=f.kind, sha256=f.sha256, size_bytes=f.size_bytes)
@@ -173,6 +176,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         for file in session.scalars(select(DerivedFile).where(DerivedFile.job_id == job.id)):
             derived.setdefault(file.stage, []).append(file)
         latest = latest_job(session, artifact_id)
+        review_history = review.history(session, artifact_id)
         duplicates = records.get("duplicates")
         matches = duplicates.payload.get("matches", []) if duplicates else []
         matched_ids = {match["artifact_id"] for match in matches}
@@ -203,5 +207,6 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         artifact=to_summary(artifact, latest.status if latest else None),
         job=to_job_summary(job),
         review=to_review_info(artifact),
+        review_history=review_history,
         **sections,
     )

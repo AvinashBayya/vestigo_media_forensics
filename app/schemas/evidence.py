@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.schemas.analysis import JobSummary
 from app.schemas.artifact import ArtifactSummary, ReviewInfo
 from app.schemas.common import EvidenceClassification, ReviewState, StageStatus
+from app.schemas.review import ReviewEventOut
 
 REPORT_NOTICE = (
     "This report lists signals observed in the file and derived from it, with the method and "
@@ -49,6 +50,9 @@ class Provenance(BaseModel):
     # Why the stage did not run, when status is "skipped".
     skip_reason: str | None = None
     derived_files: list[DerivedFileInfo] = []
+    # Record-level review by the analyst (M2-2). Never changes `classification`.
+    analyst_notes: str = ""
+    review_updated_at: datetime | None = None
 
 
 class HashesSection(BaseModel):
@@ -148,7 +152,8 @@ class DuplicatesSection(BaseModel):
 
 
 class EvidenceReport(BaseModel):
-    schema_version: Literal["1.0"] = "1.0"
+    # 1.1 (Milestone 2) adds record-level review in `provenance` and `review_history`; nothing removed.
+    schema_version: Literal["1.1"] = "1.1"
     artifact_id: str
     job_id: str
     created_at: datetime
@@ -162,3 +167,5 @@ class EvidenceReport(BaseModel):
     ocr: OCRSection | None
     duplicates: DuplicatesSection | None
     review: ReviewInfo
+    # Every review change for this artifact, artifact- and record-level, newest first.
+    review_history: list[ReviewEventOut] = []

@@ -16,8 +16,8 @@ from app.core.database import Database
 from app.core.errors import AppError
 from app.core.logging import get_logger, log_event
 from app.core.storage import Storage
-from app.models import AnalysisJob, Artifact, EvidenceRecord
-from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo, ReviewUpdate
+from app.models import AnalysisJob, Artifact, EvidenceRecord, ReviewEvent
+from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
 from app.services import analysis, library
 from app.services.errors import analysis_in_progress, artifact_not_found
@@ -188,19 +188,6 @@ def to_review_info(artifact: Artifact) -> ReviewInfo:
     )
 
 
-def update_review(db: Database, artifact_id: str, update: ReviewUpdate) -> None:
-    if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
-        raise artifact_not_found(artifact_id)
-    with db.writer() as session, session.begin():
-        artifact = session.get(Artifact, artifact_id)
-        if artifact is None:
-            raise artifact_not_found(artifact_id)
-        artifact.review_state = update.state
-        artifact.analyst_notes = update.analyst_notes
-        artifact.review_updated_at = utcnow()
-    log_event(logger, logging.INFO, "artifact.review_updated", artifact_id=artifact_id, status=update.state)
-
-
 def _count(session: Session, model: type, artifact_id: str) -> int:
     return (
         session.scalar(select(func.count()).select_from(model).where(model.artifact_id == artifact_id)) or 0
@@ -208,7 +195,8 @@ def _count(session: Session, model: type, artifact_id: str) -> int:
 
 
 def _delete_rows(session: Session, artifact_id: str) -> None:
-    # Jobs, evidence records, derived-file rows, and fingerprints cascade from the artifact row.
+    # Jobs, evidence records, derived-file rows, fingerprints, and review events cascade from the
+    # artifact row.
     session.execute(delete(Artifact).where(Artifact.id == artifact_id))
 
 
@@ -236,6 +224,7 @@ def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
                 derived_files=derived_files,
                 jobs=_count(session, AnalysisJob, artifact_id),
                 evidence_records=_count(session, EvidenceRecord, artifact_id),
+                review_events=_count(session, ReviewEvent, artifact_id),
             )
             trashed = storage.move_to_trash(artifact_id)
             _delete_rows(session, artifact_id)

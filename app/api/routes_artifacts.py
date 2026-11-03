@@ -15,7 +15,14 @@ from app.schemas.artifact import (
 )
 from app.schemas.common import ErrorCode, MediaType
 from app.schemas.evidence import EvidenceReport
-from app.services import artifacts, library, reports
+from app.schemas.review import (
+    BulkReviewRequest,
+    BulkReviewResult,
+    RecordReview,
+    RecordReviewUpdate,
+    ReviewHistory,
+)
+from app.services import artifacts, library, reports, review
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -76,8 +83,27 @@ def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
 
 @router.patch("/{artifact_id}/review", response_model=ArtifactDetail)
 def update_review(services: Services, artifact_id: str, update: ReviewUpdate) -> ArtifactDetail:
-    artifacts.update_review(services.db, artifact_id, update)
+    review.update_artifact_review(services.db, artifact_id, update)
     return artifacts.get_artifact_detail(services.db, artifact_id)
+
+
+@router.post("/review", response_model=BulkReviewResult)
+def bulk_review(services: Services, request: BulkReviewRequest) -> BulkReviewResult:
+    """Set one review state on up to 200 artifacts. All or nothing (M2-5)."""
+    return review.bulk_review(services.db, request)
+
+
+@router.get("/{artifact_id}/review-history", response_model=ReviewHistory)
+def get_review_history(services: Services, artifact_id: str) -> ReviewHistory:
+    return review.get_history(services.db, artifact_id)
+
+
+@router.patch("/{artifact_id}/evidence/{evidence_id}/review", response_model=RecordReview)
+def update_record_review(
+    services: Services, artifact_id: str, evidence_id: str, update: RecordReviewUpdate
+) -> RecordReview:
+    """Review one evidence record. Its classification never changes (M2-2)."""
+    return review.update_record_review(services.db, artifact_id, evidence_id, update)
 
 
 @router.delete("/{artifact_id}", response_model=DeletionSummary)

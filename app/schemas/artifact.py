@@ -126,6 +126,9 @@ class ReviewUpdate(BaseModel):
 
     state: ReviewState
     analyst_notes: str = Field("", max_length=20_000)
+    # The review's updated_at as last seen. If sent and the review has changed since, the update is
+    # refused with REVIEW_CONFLICT (409) instead of overwriting the newer review.
+    expected_updated_at: AwareDatetime | None = None
 
 
 class DeletionSummary(BaseModel):
@@ -134,3 +137,4 @@ class DeletionSummary(BaseModel):
     derived_files: int
     jobs: int
     evidence_records: int
+    review_events: int = 0
