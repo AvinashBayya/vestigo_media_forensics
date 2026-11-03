@@ -1,6 +1,7 @@
 # Milestone 1 Build Plan (approved)
 
 Approved: 2026-11-02. This is the implementation plan for Milestone 1 (image foundation).
+Milestone 2 is planned in `12-MILESTONE-2-PLAN.md`.
 Where `00-MASTER-SPEC.md` previously conflicted with docs 01–10, docs 01–10 win; 00 has been updated to match.
 
 ## 0. Approved decisions

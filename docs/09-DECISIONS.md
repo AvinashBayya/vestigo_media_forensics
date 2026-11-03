@@ -119,3 +119,13 @@ Further OCR tuning is deferred.
   confidence as the engine's own estimate, never as accuracy.
 - The evidence report keeps the raw OCR text, preprocessing steps and parameters, the selected pass
   and the reason for it, confidence, limitations, and errors.
+
+## D15 — Milestone 2 scope and decisions
+
+Milestone 2 (Analyst Workflow) follows the approved plan in `12-MILESTONE-2-PLAN.md`, decisions
+M2-1 to M2-11. In summary: Alembic migrations with in-place upgrade of Milestone 1 databases;
+per-evidence-record review that never changes classification; append-only review history with full
+note text; archived artifacts hidden by default; bulk review limited to 200 artifacts, all-or-nothing;
+a ZIP evidence package with a SHA-256 manifest (original only on request; no HTML or PDF);
+duplicate-library include/exclude that affects future searches only; editable defaults with the
+duplicate threshold read-only; the Library as the home page; no OCR-text search and no thumbnails.
