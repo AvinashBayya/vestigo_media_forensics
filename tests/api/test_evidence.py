@@ -4,8 +4,10 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.core.container import AppServices
+from app.models import EvidenceRecord
 from app.schemas.common import EvidenceClassification, JobStatus, ReviewState, StageStatus
 from tests.fixtures.make_fixtures import FixtureSet
 from tests.helpers import assert_error, upload_ok
@@ -101,6 +103,81 @@ def test_skipped_and_failed_stages_are_visible_in_the_report(
     assert report["metadata"]["provenance"]["status"] == "partial"
     assert report["metadata"]["provenance"]["errors"]
     assert report["job"]["status"] == "completed_with_errors"
+
+
+def test_ocr_section_reports_preprocessing_candidates_and_selection(
+    client: TestClient, fixtures: FixtureSet
+) -> None:
+    ocr = analysed_report(client, fixtures.ocr_noisy)["ocr"]
+
+    assert ocr["text"]
+    assert ocr["selected"]["variant"] == "threshold"
+    assert ocr["selected"]["reason"]
+    assert [c["variant"] for c in ocr["candidates"]] == ["grayscale", "threshold"]
+    assert {c["status"] for c in ocr["candidates"]} == {"succeeded"}
+    assert ocr["text"] == ocr["candidates"][1]["text"]
+    steps = {step["step"]: step for step in ocr["preprocessing"]}
+    assert steps["grayscale"]["applied"] is True
+    assert steps["upscale"]["parameters"]["factor"] == 2
+    assert steps["adaptive_threshold"]["parameters"]["offset"] == 20
+    assert "cleaned_text" in ocr and "cleaning" in ocr
+    provenance = ocr["provenance"]
+    assert "Pillow" in provenance["tool_version"]
+    assert "adaptive threshold" in provenance["method"]
+    assert any("not measured accuracy" in item for item in provenance["limitations"])
+
+
+def test_ocr_cleaned_text_is_separate_from_raw_text(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    artifact_id = upload_ok(client, fixtures.ocr_text)["artifact_id"]
+    start_analysis(client, artifact_id)
+    raw = "VESTIGO SAMPLE  \n|\n2026"
+    _replace_ocr_payload(services, artifact_id, {"text": raw, "cleaned_text": "VESTIGO SAMPLE\n2026"})
+
+    ocr = client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json()["ocr"]
+    assert ocr["text"] == raw
+    assert ocr["cleaned_text"] == "VESTIGO SAMPLE\n2026"
+
+
+def test_ocr_records_from_before_two_pass_ocr_still_render(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    artifact_id = upload_ok(client, fixtures.ocr_text)["artifact_id"]
+    start_analysis(client, artifact_id)
+    legacy = {
+        "engine": "tesseract",
+        "languages": ["eng"],
+        "text": "VESTIGO EVIDENCE SAMPLE 2026",
+        "confidence": 0.95,
+        "word_count": 4,
+        "preprocessing": ["Converted to an 8-bit RGB PNG."],
+    }
+    _replace_ocr_payload(services, artifact_id, legacy, replace=True)
+
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/evidence")
+    assert response.status_code == 200, response.text
+    ocr = response.json()["ocr"]
+    assert ocr["text"] == legacy["text"]
+    assert ocr["cleaned_text"] is None
+    assert ocr["cleaning"] == []
+    assert ocr["candidates"] == []
+    assert ocr["selected"] is None
+    assert ocr["preprocessing"] == [
+        {"step": "note", "applied": True, "description": "Converted to an 8-bit RGB PNG.", "parameters": {}}
+    ]
+
+
+def _replace_ocr_payload(
+    services: AppServices, artifact_id: str, payload: dict[str, Any], replace: bool = False
+) -> None:
+    with services.db.writer() as session, session.begin():
+        record = session.scalars(
+            select(EvidenceRecord).where(
+                EvidenceRecord.artifact_id == artifact_id, EvidenceRecord.stage == "ocr"
+            )
+        ).one()
+        record.payload = payload if replace else {**record.payload, **payload}
 
 
 def test_duplicate_matches_show_current_filenames(client: TestClient, fixtures: FixtureSet) -> None:

@@ -21,6 +21,7 @@ from app.schemas.evidence import (
     EvidenceReport,
     HashesSection,
     MetadataSection,
+    OCRPreprocessingStep,
     OCRSection,
     PerceptualHashSection,
     Provenance,
@@ -85,12 +86,27 @@ def _perceptual_hash(payload: dict[str, Any], provenance: Provenance) -> Percept
     )
 
 
+def _ocr_steps(raw: list[Any]) -> list[OCRPreprocessingStep]:
+    # Records made before two-pass OCR stored preprocessing as plain sentences.
+    return [
+        OCRPreprocessingStep(step="note", applied=True, description=item)
+        if isinstance(item, str)
+        else OCRPreprocessingStep.model_validate(item)
+        for item in raw
+    ]
+
+
 def _ocr(payload: dict[str, Any], provenance: Provenance) -> OCRSection:
     return OCRSection(
         languages=payload.get("languages", list(LANGUAGES)),
         text=payload.get("text", ""),
+        cleaned_text=payload.get("cleaned_text"),
+        cleaning=payload.get("cleaning", []),
         confidence=payload.get("confidence"),
         word_count=payload.get("word_count", 0),
+        preprocessing=_ocr_steps(payload.get("preprocessing", [])),
+        candidates=payload.get("candidates", []),
+        selected=payload.get("selected"),
         provenance=provenance,
     )
 

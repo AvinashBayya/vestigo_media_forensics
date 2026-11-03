@@ -82,12 +82,49 @@ class PerceptualHashSection(BaseModel):
     provenance: Provenance
 
 
+class OCRPreprocessingStep(BaseModel):
+    step: str
+    applied: bool
+    description: str
+    parameters: dict[str, Any] = {}
+
+
+class OCRCandidate(BaseModel):
+    """One Tesseract pass. Both passes are reported, whichever was selected."""
+
+    variant: Literal["grayscale", "threshold"]
+    status: Literal["succeeded", "failed"]
+    text: str | None
+    confidence: float | None
+    word_count: int | None
+    error: str | None
+
+
+class OCRSelection(BaseModel):
+    variant: Literal["grayscale", "threshold"]
+    reason: str
+
+
+class OCRCleaningRule(BaseModel):
+    rule: str
+    description: str
+    lines_affected: int
+
+
 class OCRSection(BaseModel):
     engine: Literal["tesseract"] = "tesseract"
     languages: list[str]
+    # Raw Tesseract text of the selected pass, unchanged.
     text: str
+    # Text after cosmetic cleaning, or None when cleaning changed nothing (or for older records).
+    cleaned_text: str | None = None
+    cleaning: list[OCRCleaningRule] = []
     confidence: float | None
     word_count: int
+    preprocessing: list[OCRPreprocessingStep] = []
+    # Empty, and `selected` None, for records made before two-pass OCR.
+    candidates: list[OCRCandidate] = []
+    selected: OCRSelection | None = None
     provenance: Provenance
 
 
