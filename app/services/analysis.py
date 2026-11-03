@@ -1,6 +1,6 @@
 from collections.abc import Callable
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app import __version__
@@ -10,7 +10,15 @@ from app.core.database import Database
 from app.models import AnalysisJob, Artifact, EvidenceRecord
 from app.pipeline.image_pipeline import IMAGE_PIPELINE
 from app.pipeline.jobs import JobExecutor
-from app.schemas.analysis import ImageAnalysisRequest, JobStatusResponse, JobSummary, StageProgress
+from app.schemas.analysis import (
+    AnalysisOptions,
+    ImageAnalysisRequest,
+    JobHistory,
+    JobHistoryItem,
+    JobStatusResponse,
+    JobSummary,
+    StageProgress,
+)
 from app.schemas.common import ACTIVE_JOB_STATUSES, ErrorBody, ErrorCode, JobStatus, StageStatus
 from app.services.errors import analysis_in_progress, artifact_not_found, job_not_found
 
@@ -95,9 +103,7 @@ def get_job_status(db: Database, job_id: str, stage_names: Callable[[str], list[
             status = StageStatus.SKIPPED
         stages.append(StageProgress(stage=name, status=status, started_at=None, completed_at=None))
 
-    error = None
-    if job.error_code:
-        error = ErrorBody(code=ErrorCode(job.error_code), message=job.error_message or "")
+    error = _job_error(job)
     return JobStatusResponse(
         **to_job_summary(job).model_dump(),
         artifact_id=job.artifact_id,
@@ -109,3 +115,48 @@ def get_job_status(db: Database, job_id: str, stage_names: Callable[[str], list[
 
 def _times(record: EvidenceRecord) -> dict:
     return {"started_at": record.started_at, "completed_at": record.completed_at}
+
+
+def _job_error(job: AnalysisJob) -> ErrorBody | None:
+    return (
+        ErrorBody(code=ErrorCode(job.error_code), message=job.error_message or "") if job.error_code else None
+    )
+
+
+def job_history(db: Database, artifact_id: str) -> JobHistory:
+    """Every analysis job of an artifact, newest first, with its problem count."""
+    if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
+        raise artifact_not_found(artifact_id)
+    problems = (
+        select(
+            EvidenceRecord.job_id,
+            func.sum(
+                case((EvidenceRecord.status.in_((StageStatus.FAILED, StageStatus.PARTIAL)), 1), else_=0)
+            ),
+        )
+        .where(EvidenceRecord.artifact_id == artifact_id)
+        .group_by(EvidenceRecord.job_id)
+    )
+    with db.reader() as session:
+        if session.get(Artifact, artifact_id) is None:
+            raise artifact_not_found(artifact_id)
+        jobs = session.scalars(
+            select(AnalysisJob)
+            .where(AnalysisJob.artifact_id == artifact_id)
+            .order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc())
+        ).all()
+        counts = dict(session.execute(problems).all())
+    return JobHistory(
+        artifact_id=artifact_id,
+        jobs=[
+            JobHistoryItem(
+                **to_job_summary(job).model_dump(),
+                pipeline=job.pipeline,
+                app_version=job.app_version,
+                options=AnalysisOptions.model_validate(job.options),
+                error=_job_error(job),
+                problem_count=(counts.get(job.id) or 0) + (1 if job.status == JobStatus.FAILED else 0),
+            )
+            for job in jobs
+        ],
+    )

@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.deps import Services
 from app.core.errors import AppError
+from app.schemas.analysis import JobHistory
 from app.schemas.artifact import (
     ArtifactDetail,
     ArtifactList,
@@ -22,7 +23,7 @@ from app.schemas.review import (
     RecordReviewUpdate,
     ReviewHistory,
 )
-from app.services import artifacts, library, reports, review
+from app.services import analysis, artifacts, library, reports, review
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -104,6 +105,12 @@ def update_record_review(
 ) -> RecordReview:
     """Review one evidence record. Its classification never changes (M2-2)."""
     return review.update_record_review(services.db, artifact_id, evidence_id, update)
+
+
+@router.get("/{artifact_id}/jobs", response_model=JobHistory)
+def get_job_history(services: Services, artifact_id: str) -> JobHistory:
+    """Every analysis job of the artifact, newest first."""
+    return analysis.job_history(services.db, artifact_id)
 
 
 @router.delete("/{artifact_id}", response_model=DeletionSummary)
