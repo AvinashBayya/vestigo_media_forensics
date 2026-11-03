@@ -82,6 +82,59 @@ describe("ArtifactPage", () => {
     expect(within(duplicates).getByText(/Threshold: Hamming distance ≤ 10 of 64 bits/)).toBeInTheDocument();
   });
 
+  it("shows a resized, recompressed copy as a near match", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(
+          evidenceReport({
+            duplicates: {
+              ...base.duplicates!,
+              matches: [
+                {
+                  artifact_id: OTHER_ARTIFACT_ID,
+                  filename: "harbour-resized-q60.jpg",
+                  available: true,
+                  similarity: 0.9531,
+                  distance: 3,
+                  match_type: "near",
+                },
+              ],
+            },
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const duplicates = await screen.findByRole("region", { name: "Duplicate search (local library)" });
+    expect(within(duplicates).getByRole("link", { name: "harbour-resized-q60.jpg" })).toHaveAttribute(
+      "href",
+      `/artifacts/${OTHER_ARTIFACT_ID}`,
+    );
+    expect(within(duplicates).getByText(/Similar · distance 3\/64 · similarity 95%/)).toBeInTheDocument();
+    expect(within(duplicates).queryByText(/No match among/)).not.toBeInTheDocument();
+  });
+
+  it("says an empty duplicate result covers only the library as it was when the analysis ran", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(
+          evidenceReport({ duplicates: { ...base.duplicates!, library_size: 0, compared: 0, matches: [] } }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const duplicates = await screen.findByRole("region", { name: "Duplicate search (local library)" });
+    expect(
+      within(duplicates).getByText(/No match among the 0 other artifacts that were in the local library when this analysis ran/),
+    ).toBeInTheDocument();
+    expect(within(duplicates).getByText(/Images added later are not included/)).toBeInTheDocument();
+    expect(within(duplicates).getByText(/Run the analysis again to search the current library/)).toBeInTheDocument();
+  });
+
   it("describes C2PA results as detection only", async () => {
     server.use(
       http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>

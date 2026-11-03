@@ -2,7 +2,7 @@ import { Link } from "react-router";
 
 import { contentUrl } from "../../api/client";
 import type { DuplicateMatch, DuplicatesSection, MatchType } from "../../api/types";
-import { formatPercent } from "../../lib/format";
+import { formatDateTime, formatPercent } from "../../lib/format";
 import { Panel } from "../Panel";
 
 const MATCH_LABELS: Record<MatchType, string> = {
@@ -17,7 +17,11 @@ export function DuplicatesPanel({ section }: { section: DuplicatesSection | null
       {section && (
         <>
           {section.matches.length === 0 ? (
-            <p>No matching images in the local library.</p>
+            <p>
+              No match among the {section.library_size ?? 0} other artifacts that were in the local library when
+              this analysis ran ({formatDateTime(section.provenance.completed_at)}). Images added later are not
+              included. Run the analysis again to search the current library.
+            </p>
           ) : (
             <ul className="divide-y divide-slate-200 dark:divide-slate-800">
               {section.matches.map((match) => (

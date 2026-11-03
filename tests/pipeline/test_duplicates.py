@@ -1,8 +1,12 @@
+from pathlib import Path
+
 from fastapi.testclient import TestClient
+from PIL import Image
 from sqlalchemy import select
 
 from app.core.container import AppServices
 from app.models import ImageFingerprint
+from app.services.phash import hamming_distance
 from tests.fixtures.make_fixtures import FixtureSet
 from tests.helpers import upload_ok
 from tests.pipeline.test_runner import records_for, start_analysis
@@ -77,3 +81,91 @@ def test_duplicate_search_can_be_disabled(
 
     record = next(r for r in records_for(services, job_id) if r.stage == "duplicates")
     assert record.status == "skipped"
+
+
+def evidence_report(client: TestClient, artifact_id: str) -> dict:
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/evidence")
+    assert response.status_code == 200
+    return response.json()
+
+
+def assert_complete_provenance(provenance: dict, stage: str) -> None:
+    assert provenance["stage"] == stage
+    assert provenance["status"] == "succeeded"
+    assert provenance["method"]
+    assert provenance["tool"]
+    assert provenance["tool_version"]
+    assert provenance["source"]
+    assert provenance["started_at"] and provenance["completed_at"]
+    assert provenance["started_at"] <= provenance["completed_at"]
+    assert provenance["limitations"]
+    assert provenance["errors"] == []
+
+
+def test_resized_recompressed_copy_is_reported_as_a_near_duplicate_through_the_api(
+    client: TestClient, services: AppServices, fixtures: FixtureSet, tmp_path: Path
+) -> None:
+    resized = tmp_path / "resized_recompressed.jpg"
+    with Image.open(fixtures.jpeg) as original:
+        original.resize((original.width // 2, original.height // 2), Image.Resampling.LANCZOS).save(
+            resized, quality=50
+        )
+
+    original_id, _ = analyse(client, fixtures.jpeg)
+    unrelated_id, _ = analyse(client, fixtures.unrelated)
+    resized_id, resized_job = analyse(client, resized)
+
+    original_report = evidence_report(client, original_id)
+    resized_report = evidence_report(client, resized_id)
+    unrelated_report = evidence_report(client, unrelated_id)
+
+    # Each image's pHash is recorded as evidence with full provenance.
+    original_hash = original_report["perceptual_hash"]["value"]
+    resized_hash = resized_report["perceptual_hash"]["value"]
+    unrelated_hash = unrelated_report["perceptual_hash"]["value"]
+    for report in (original_report, resized_report, unrelated_report):
+        assert_complete_provenance(report["perceptual_hash"]["provenance"], "perceptual_hash")
+
+    duplicates = resized_report["duplicates"]
+    threshold = services.settings.phash_max_distance
+    distance = hamming_distance(original_hash, resized_hash)
+    assert distance <= threshold
+    assert hamming_distance(unrelated_hash, resized_hash) > threshold
+
+    # The API returns the original as a perceptual match (not a byte match), and not the unrelated image.
+    by_id = {match["artifact_id"]: match for match in duplicates["matches"]}
+    assert set(by_id) == {original_id}
+    match = by_id[original_id]
+    assert match["match_type"] == ("visually_identical" if distance == 0 else "near")
+    assert match["distance"] == distance
+    assert match["similarity"] == round(1 - distance / 64, 4)
+    assert match["filename"] == fixtures.jpeg.name
+    assert match["available"] is True
+    assert duplicates["threshold"] == threshold
+    assert duplicates["library_size"] == 2
+    assert duplicates["compared"] == 2
+    assert_complete_provenance(duplicates["provenance"], "duplicates")
+
+    # The stored evidence record carries the same distance and threshold.
+    payload = stage_payload(services, resized_job, "duplicates")
+    assert payload["threshold"] == threshold
+    assert [(m["artifact_id"], m["distance"]) for m in payload["matches"]] == [(original_id, distance)]
+
+    # The unrelated image did not match the original either.
+    assert unrelated_report["duplicates"]["matches"] == []
+
+
+def test_duplicate_search_covers_only_artifacts_already_in_the_library(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    # The search is a record of the library at the time the job ran. An earlier artifact's
+    # evidence is not rewritten when a copy is added later; re-running its analysis finds it.
+    original_id, original_job = analyse(client, fixtures.jpeg)
+    resized_id, _ = analyse(client, fixtures.near_duplicate)
+
+    assert stage_payload(services, original_job, "duplicates")["matches"] == []
+    assert [m["artifact_id"] for m in evidence_report(client, original_id)["duplicates"]["matches"]] == []
+
+    rerun_job = start_analysis(client, original_id)["job_id"]
+    rerun_matches = stage_payload(services, rerun_job, "duplicates")["matches"]
+    assert [m["artifact_id"] for m in rerun_matches] == [resized_id]
