@@ -33,6 +33,8 @@ describe("LibraryPage", () => {
     expect(await screen.findByRole("heading", { name: "Library" })).toBeInTheDocument();
     const nav = screen.getByRole("navigation", { name: "Main" });
     expect(within(nav).getByRole("link", { name: "Library" })).toHaveAttribute("href", "/");
+    expect(within(nav).getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(within(nav).getByRole("link", { name: "Upload" })).toHaveAttribute("href", "/upload");
     expect(screen.getAllByRole("link", { name: "Upload an image" })[0]).toHaveAttribute("href", "/upload");
   });

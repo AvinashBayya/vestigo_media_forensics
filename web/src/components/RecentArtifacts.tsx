@@ -1,28 +1,17 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
-import { errorMessage, listArtifacts } from "../api/client";
-import type { ArtifactListItem } from "../api/types";
+import { listArtifacts } from "../api/client";
 import { REVIEW_LABELS, formatBytes, formatDateTime } from "../lib/format";
-import { ErrorBanner } from "./Messages";
+import { useApiResource } from "../lib/useApiResource";
+import { ErrorState, TableSkeleton } from "./States";
 import { StatusBadge } from "./StatusBadge";
 
 export function RecentArtifacts() {
-  const [items, setItems] = useState<ArtifactListItem[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { data, error, reload } = useApiResource(() => listArtifacts({ limit: 5 }), "recent");
+  const items = data?.items ?? null;
 
-  useEffect(() => {
-    let cancelled = false;
-    listArtifacts({ limit: 5 })
-      .then((list) => !cancelled && setItems(list.items))
-      .catch((err) => !cancelled && setError(errorMessage(err)));
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (error) return <ErrorBanner message={error} />;
-  if (items === null) return <p className="text-sm text-slate-600">Loading…</p>;
+  if (error) return <ErrorState error={error} onRetry={reload} title="Recent uploads could not be loaded." />;
+  if (items === null) return <TableSkeleton rows={3} label="Loading recent uploads" />;
   if (items.length === 0) return <p className="text-sm text-slate-600 dark:text-slate-400">No uploads yet.</p>;
 
   return (

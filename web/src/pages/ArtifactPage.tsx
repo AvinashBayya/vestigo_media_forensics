@@ -25,7 +25,7 @@ import { OCRPanel } from "../components/evidence/OCRPanel";
 import { PHashPanel } from "../components/evidence/PHashPanel";
 import { JobProgress } from "../components/JobProgress";
 import { ProblemsSummary } from "../components/ProblemsSummary";
-import { ErrorState } from "../components/States";
+import { EmptyState, ErrorState } from "../components/States";
 import { ErrorBanner, EvidenceNotice, InfoBanner } from "../components/Messages";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { ReviewProvider } from "../components/review/ReviewContext";
@@ -198,9 +198,20 @@ export function ArtifactPage() {
         <div className="min-w-0 space-y-4">
           {job && <JobProgress job={job} />}
           {!job && !report && (
-            <p className="rounded-lg border border-slate-200 bg-white p-4 text-sm dark:border-slate-800 dark:bg-slate-900">
-              This image has not been analysed yet.
-            </p>
+            <EmptyState
+              title="This image has not been analysed yet"
+              action={
+                <button
+                  type="button"
+                  onClick={() => void runAnalysis()}
+                  className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white dark:bg-slate-100 dark:text-slate-900"
+                >
+                  Run analysis
+                </button>
+              }
+            >
+              Analysis uses the default checks from Settings. Evidence appears here when it finishes.
+            </EmptyState>
           )}
           {report && (
             <div key={report.job_id} className="space-y-4">
