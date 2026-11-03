@@ -12,6 +12,7 @@ import type {
   EvidenceReport,
   HealthResponse,
   JobHistory,
+  LibrarySummary,
   JobCreated,
   JobStatusResponse,
   RecordReview,
@@ -191,4 +192,13 @@ export async function getHealth(): Promise<HealthResponse> {
   } catch (error) {
     throw toApiError(error);
   }
+}
+
+/** Includes or excludes the artifact from future duplicate searches. Recorded evidence is not changed. */
+export function setDuplicateLibrary(artifactId: string, included: boolean): Promise<ArtifactDetail> {
+  return call(http.patch<ArtifactDetail>(`/artifacts/${encodeURIComponent(artifactId)}/duplicate-library`, { included }));
+}
+
+export function getLibrarySummary(): Promise<LibrarySummary> {
+  return call(http.get<LibrarySummary>("/library/summary"));
 }

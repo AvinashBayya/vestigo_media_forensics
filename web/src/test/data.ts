@@ -199,6 +199,7 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
       threshold: 10,
       library_size: 2,
       compared: 1,
+      excluded_count: 0,
       matches: [
         {
           artifact_id: OTHER_ARTIFACT_ID,

@@ -17,6 +17,7 @@ import {
 import type { ArtifactDetail, EvidenceReport, JobHistoryItem, JobStatusResponse } from "../api/types";
 import { AnalysisHistory } from "../components/AnalysisHistory";
 import { DeleteArtifactDialog } from "../components/DeleteArtifactDialog";
+import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
 import { HashesPanel } from "../components/evidence/HashesPanel";
@@ -200,6 +201,7 @@ export function ArtifactPage() {
 
           <ReviewPanel artifact={artifact} onSaved={setArtifact} />
           <AnalysisHistory jobs={history} viewingJobId={report?.job_id ?? null} onView={(jobId) => void viewJob(jobId)} />
+          <DuplicateLibraryControl artifact={artifact} onChanged={setArtifact} />
         </aside>
 
         <div className="min-w-0 space-y-4">
@@ -226,7 +228,11 @@ export function ArtifactPage() {
               <ProblemsSummary report={report} job={shownJob} />
               <HashesPanel section={report.hashes} />
               <C2PAPanel section={report.c2pa} />
-              <DuplicatesPanel section={report.duplicates} />
+              <DuplicatesPanel
+                section={report.duplicates}
+                addedSince={viewingEarlier ? null : artifact.added_since_analysis}
+                onRerun={analysing ? undefined : () => void runAnalysis()}
+              />
               <OCRPanel section={report.ocr} />
               <PHashPanel section={report.perceptual_hash} />
               <MetadataPanel section={report.metadata} />

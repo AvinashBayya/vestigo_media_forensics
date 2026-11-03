@@ -316,6 +316,8 @@ export interface DuplicatesSection {
   threshold: number | null;
   library_size: number | null;
   compared: number | null;
+  /** Artifacts excluded from duplicate search by the analyst (M2-7). Null for records made before M2. */
+  excluded_count: number | null;
   matches: DuplicateMatch[];
   provenance: Provenance;
 }
@@ -370,4 +372,21 @@ export interface HealthResponse {
   storage: "ok" | "error";
   tools: Record<string, ToolHealth>;
   checked_at: string;
+}
+
+export interface LibraryArtifactRef {
+  artifact_id: string;
+  filename: string;
+  created_at: string;
+  indexed: boolean;
+}
+
+export interface LibrarySummary {
+  artifact_count: number;
+  indexed_count: number;
+  not_indexed_count: number;
+  excluded_count: number;
+  not_indexed: LibraryArtifactRef[];
+  excluded: LibraryArtifactRef[];
+  storage: { original_bytes: number; derived_bytes: number };
 }

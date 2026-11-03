@@ -11,7 +11,14 @@ const MATCH_LABELS: Record<MatchType, string> = {
   near: "Similar",
 };
 
-export function DuplicatesPanel({ section }: { section: DuplicatesSection | null }) {
+interface DuplicatesPanelProps {
+  section: DuplicatesSection | null;
+  /** Library artifacts uploaded after this search, when this is the latest analysis. */
+  addedSince?: number | null;
+  onRerun?: () => void;
+}
+
+export function DuplicatesPanel({ section, addedSince, onRerun }: DuplicatesPanelProps) {
   return (
     <Panel title="Duplicate search (local library)" provenance={section?.provenance ?? null}>
       {section && (
@@ -32,7 +39,19 @@ export function DuplicatesPanel({ section }: { section: DuplicatesSection | null
           <p className="text-xs text-slate-600 dark:text-slate-400">
             Searched {section.library_size ?? 0} other artifacts ({section.compared ?? 0} with a perceptual hash).
             Threshold: Hamming distance ≤ {section.threshold} of 64 bits.
+            {section.excluded_count ? ` ${section.excluded_count} excluded from duplicate search and not compared.` : ""}
           </p>
+          {addedSince ? (
+            <p className="rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:bg-sky-950 dark:text-sky-100">
+              {addedSince === 1 ? "1 artifact was" : `${addedSince} artifacts were`} added to the library after this search
+              and {addedSince === 1 ? "was" : "were"} not compared.{" "}
+              {onRerun && (
+                <button type="button" onClick={onRerun} className="font-medium underline">
+                  Run analysis again
+                </button>
+              )}
+            </p>
+          ) : null}
         </>
       )}
     </Panel>
