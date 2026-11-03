@@ -68,6 +68,115 @@ describe("ArtifactPage", () => {
     const ocr = await screen.findByRole("region", { name: "Text in image (OCR)" });
     expect(within(ocr).getByText("VESTIGO EVIDENCE SAMPLE 2026")).toBeInTheDocument();
     expect(within(ocr).getByText(/Tesseract confidence 91% \(the engine's own estimate\)/)).toBeInTheDocument();
+    expect(within(ocr).getByText("Used: Grayscale pass.")).toBeInTheDocument();
+    expect(within(ocr).getByText(/its confidence gain was -0.01/)).toBeInTheDocument();
+    expect(within(ocr).getByText("Grayscale pass: 4 words, confidence 91% (the engine's own estimate)")).toBeInTheDocument();
+    expect(within(ocr).getByText("Threshold pass: 4 words, confidence 90% (the engine's own estimate)")).toBeInTheDocument();
+    expect(within(ocr).getByText("Preprocessing")).toBeInTheDocument();
+    expect(within(ocr).getByText("Converted to 8-bit greyscale.")).toBeInTheDocument();
+    expect(within(ocr).getByText("mode=L")).toBeInTheDocument();
+    expect(within(ocr).queryByText("Cleaned text")).not.toBeInTheDocument();
+    expect(within(ocr).queryByText(/accura/i)).not.toBeInTheDocument();
+  });
+
+  it("shows cleaned OCR text with the raw output kept alongside", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(
+          evidenceReport({
+            ocr: {
+              ...base.ocr!,
+              text: "FIELD NOTES\n|\n17 MARCH",
+              cleaned_text: "FIELD NOTES\n17 MARCH",
+              cleaning: [
+                {
+                  rule: "remove_symbol_only_lines",
+                  description: "Removed lines that contain only symbols or punctuation (no letters or digits).",
+                  lines_affected: 1,
+                },
+              ],
+              selected: { variant: "threshold", reason: "The grayscale pass found no words." },
+            },
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const ocr = await screen.findByRole("region", { name: "Text in image (OCR)" });
+    expect(within(ocr).getByText("Cleaned text")).toBeInTheDocument();
+    const boxes = within(ocr).getAllByText((_, element) => element?.tagName === "PRE");
+    expect(boxes.map((box) => box.textContent)).toEqual(["FIELD NOTES\n17 MARCH", "FIELD NOTES\n|\n17 MARCH"]);
+    expect(within(ocr).getByText("Raw OCR output (unchanged)")).toBeInTheDocument();
+    expect(within(ocr).getByText(/Removed lines that contain only symbols or punctuation .* \(1\)/)).toBeInTheDocument();
+    expect(within(ocr).getByText("Used: Threshold pass.")).toBeInTheDocument();
+  });
+
+  it("shows a failed threshold pass", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(
+          evidenceReport({
+            ocr: {
+              ...base.ocr!,
+              candidates: [
+                base.ocr!.candidates[0],
+                {
+                  variant: "threshold",
+                  status: "failed",
+                  text: null,
+                  confidence: null,
+                  word_count: null,
+                  error: "Tesseract exited with code 1 (boom).",
+                },
+              ],
+              selected: { variant: "grayscale", reason: "The threshold pass failed, so the grayscale pass is used." },
+              provenance: provenance("ocr", {
+                status: "partial",
+                errors: [{ type: "OCR_VARIANT_FAILED", message: "The threshold pass failed." }],
+              }),
+            },
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const ocr = await screen.findByRole("region", { name: "Text in image (OCR)" });
+    expect(within(ocr).getByText("Threshold pass: failed (Tesseract exited with code 1 (boom).)")).toBeInTheDocument();
+    expect(within(ocr).getByText("VESTIGO EVIDENCE SAMPLE 2026")).toBeInTheDocument();
+  });
+
+  it("renders OCR records made before two-pass OCR", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(
+          evidenceReport({
+            ocr: {
+              ...base.ocr!,
+              cleaned_text: null,
+              cleaning: [],
+              preprocessing: [
+                { step: "note", applied: true, description: "Converted to an 8-bit RGB PNG.", parameters: {} },
+              ],
+              candidates: [],
+              selected: null,
+            },
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const ocr = await screen.findByRole("region", { name: "Text in image (OCR)" });
+    expect(within(ocr).getByText("VESTIGO EVIDENCE SAMPLE 2026")).toBeInTheDocument();
+    expect(within(ocr).getByText(/Tesseract confidence 91%/)).toBeInTheDocument();
+    expect(within(ocr).getByText("Converted to an 8-bit RGB PNG.")).toBeInTheDocument();
+    expect(within(ocr).queryByText(/^Used:/)).not.toBeInTheDocument();
+    expect(within(ocr).queryByText("Cleaned text")).not.toBeInTheDocument();
   });
 
   it("renders the duplicate section", async () => {
@@ -181,8 +290,13 @@ describe("ArtifactPage", () => {
               engine: "tesseract",
               languages: ["eng"],
               text: "",
+              cleaned_text: null,
+              cleaning: [],
               confidence: null,
               word_count: 0,
+              preprocessing: [],
+              candidates: [],
+              selected: null,
               provenance: provenance("ocr", {
                 status: "skipped",
                 tool_version: null,

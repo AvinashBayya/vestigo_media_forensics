@@ -183,12 +183,44 @@ export interface PerceptualHashSection {
   provenance: Provenance;
 }
 
+export type OCRVariant = "grayscale" | "threshold";
+
+export interface OCRPreprocessingStep {
+  step: string;
+  applied: boolean;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface OCRCandidate {
+  variant: OCRVariant;
+  status: "succeeded" | "failed";
+  text: string | null;
+  confidence: number | null;
+  word_count: number | null;
+  error: string | null;
+}
+
+export interface OCRCleaningRule {
+  rule: string;
+  description: string;
+  lines_affected: number;
+}
+
 export interface OCRSection {
   engine: "tesseract";
   languages: string[];
+  /** Raw Tesseract text of the selected pass, unchanged. */
   text: string;
+  /** Null when cleaning changed nothing, and for records made before two-pass OCR. */
+  cleaned_text: string | null;
+  cleaning: OCRCleaningRule[];
   confidence: number | null;
   word_count: number;
+  preprocessing: OCRPreprocessingStep[];
+  /** Empty, and `selected` null, for records made before two-pass OCR. */
+  candidates: OCRCandidate[];
+  selected: { variant: OCRVariant; reason: string } | null;
   provenance: Provenance;
 }
 
