@@ -1,6 +1,7 @@
 # Milestone 2 Build Plan — Analyst Workflow (approved)
 
-Approved: 2026-11-03. This is the implementation plan for Milestone 2 (`06-ROADMAP.md`): make evidence
+Approved: 2026-11-03. Implemented: 2026-11-03 (implementation notes in `09-DECISIONS.md` D16).
+This is the implementation plan for Milestone 2 (`06-ROADMAP.md`): make evidence
 easier to review and manage. Milestone 1 (`11-BUILD-PLAN.md`) is complete. OCR is best-effort provisional
 evidence (D14) and is not tuned further in M2.
 

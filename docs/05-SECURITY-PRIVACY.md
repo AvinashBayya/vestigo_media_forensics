@@ -73,6 +73,9 @@ Logs must not contain:
 - Sensitive EXIF data
 - API keys
 - User credentials
+- Library search terms (query strings are redacted from access logs)
+- Analyst notes
+- Setting values
 
 Logs may contain:
 

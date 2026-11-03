@@ -71,6 +71,17 @@ Fields:
 - `FLAGGED`
 - `ARCHIVED`
 
+### Review (Milestone 2)
+
+- **Artifact review**: one review state and analyst notes for the whole artifact.
+- **Record review**: each evidence record has its own review state, analyst notes, and
+  `review_updated_at`. Reviewing a record never changes its classification, payload, or anything
+  produced by analysis. Artifact and record review are separate.
+- **Review events** (`review_events`): every change to a review state or notes, at either level or by
+  bulk review, is recorded with its origin (`artifact`, `record`, `bulk`), the states before and after,
+  and the complete note text before and after. Events are append-only: the database rejects updates
+  and deletes, except when the artifact itself is deleted.
+
 ## 5. Required fields
 
 Every evidence record must include:
@@ -101,6 +112,15 @@ Deleting an artifact must delete:
 - Derived files
 - Analysis jobs
 - Evidence records
+- Review events
 - Database rows
 
 The deletion action must be explicit and confirmed in the UI.
+
+## 8. Evidence packages (Milestone 2)
+
+An exported ZIP evidence package contains the evidence report, the review data and full review
+history, the raw tool outputs of one analysis job, and (only on request) the original file. A manifest
+lists the SHA-256 and size of every file, and the SHA-256 recorded when each derived file and the
+original were stored. A recorded file that is missing or no longer matches is listed as a problem,
+never silently left out.

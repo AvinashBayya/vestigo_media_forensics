@@ -107,7 +107,38 @@
 - Review state can be changed
 - Error message displays correctly
 
-## 5. Container tests
+## 5. Milestone 2 tests (analyst workflow)
+
+Backend:
+
+- Migrations: the Alembic baseline reproduces the frozen Milestone 1 schema
+  (`tests/fixtures/m1_schema.sql`); the models match the head revision; a Milestone 1 database with
+  data in every table upgrades in place with every row unchanged; a failed upgrade changes nothing; a
+  newer revision, or an unknown database without history, is refused.
+- Library: each filter and search field, literal `%` and `_`, Unicode case folding, every sort in both
+  directions with stable ties, pagination, invalid parameters, and indicator values.
+- Review: events with full notes, no-op saves, conflicts, bulk all-or-nothing and the 200 limit,
+  record review leaves classification unchanged, history, append-only events enforced by the
+  database, deletion removes events, notes never logged.
+- Analysis history; duplicate-library exclusion (skipped and counted, evidence never rewritten,
+  re-include); library summary.
+- Evidence package: contents, manifest and `SHA256SUMS` re-verified, original only on request,
+  earlier jobs, missing or changed derived files reported, errors, temporary file removed, no verdict
+  wording.
+- Settings: defaults, partial updates persisted across restarts, validation, environment keys
+  rejected, invalid stored values ignored, defaults applied to analyses, values not logged.
+- Access logs redact query strings.
+
+Frontend:
+
+- Library: URL state, search, filters, sort, pagination, indicators, empty / no-results / loading /
+  error states, bulk review with confirmation and result.
+- Artifact: review conflicts, unsaved-changes guard, review history, record review, problems summary,
+  analysis history, export (with the package SHA-256), duplicate-library control and re-run hint,
+  load errors with retry, not-analysed state.
+- Settings page and saved defaults (upload, Library page size, re-run); health banner.
+
+## 6. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

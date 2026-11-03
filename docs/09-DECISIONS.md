@@ -129,3 +129,24 @@ note text; archived artifacts hidden by default; bulk review limited to 200 arti
 a ZIP evidence package with a SHA-256 manifest (original only on request; no HTML or PDF);
 duplicate-library include/exclude that affects future searches only; editable defaults with the
 duplicate threshold read-only; the Library as the home page; no OCR-text search and no thumbnails.
+
+## D16 — Milestone 2 implementation notes
+
+Details settled while implementing D15, recorded so later work keeps them:
+
+- `GET /artifacts` keeps `include_archived=true` as its default so existing clients see every artifact;
+  the Library sends `false`.
+- Library search matches artifact IDs only for ID-like terms (`art_…` or 8+ hex characters), so a
+  search for `_` does not match every `art_` ID. Case folding is Unicode-aware through a
+  `vestigo_casefold` SQL function.
+- Query strings are redacted from uvicorn access logs, because they carry search terms.
+- Review conflicts are detected only when the client sends `expected_updated_at`; the Library and
+  artifact pages always send it. A save that changes nothing writes no event.
+- The duplicates stage's `library_size` now counts the artifacts actually searched; excluded artifacts
+  are counted in `excluded_count`.
+- The evidence package adds `SHA256SUMS` alongside `manifest.json` for `sha256sum -c`, and the UI shows
+  the package SHA-256 after download.
+- Settings that are security limits or affect recorded evidence (the duplicate threshold) stay in the
+  environment and are read-only in the UI.
+- The frontend uses a React Router data router so the unsaved-changes guard can block navigation.
+

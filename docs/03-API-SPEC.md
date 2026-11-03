@@ -92,6 +92,8 @@ Response:
 }
 ```
 
+If `options` is omitted, the default analysis options saved in Settings are used (Milestone 2).
+
 ### `GET /analysis/jobs/{job_id}`
 
 Returns job status and stage progress.
@@ -175,6 +177,78 @@ If the threshold pass fails and the grayscale pass succeeds, the stage status is
 
 Records made before two-pass OCR return `cleaned_text: null`, empty `cleaning` and `candidates`,
 `selected: null`, and their stored preprocessing notes as steps named `note`.
+
+## Milestone 2 endpoints (analyst workflow)
+
+All additive; Milestone 1 requests and responses keep their meaning. See `12-MILESTONE-2-PLAN.md`.
+
+### `GET /artifacts` — search, filters, sorting
+
+All query parameters are optional; unknown parameters return 422 `VALIDATION_ERROR` (values are not
+echoed).
+
+| Parameter | Meaning |
+|---|---|
+| `q` | Case-insensitive (Unicode) substring of the filename or analyst notes (artifact or evidence record). ID-like terms (`art_…` or 8+ hex characters) also match the artifact ID and SHA-256/MD5 prefixes. `%` and `_` are literal. Max 200 characters. |
+| `review_state` | Repeatable. |
+| `analysis_status` | Repeatable: `queued`, `running`, `completed`, `completed_with_errors`, `failed`, `not_analysed`. |
+| `has_problems`, `has_duplicates` | Latest job has failed/partial checks; latest duplicate search found matches. |
+| `mime_type` | Repeatable: `image/jpeg`, `image/png`, `image/webp`, `image/tiff`. |
+| `uploaded_from`, `uploaded_to` | Inclusive; ISO-8601 with a timezone. |
+| `include_archived` | Default `true` (Milestone 1 behaviour). The Library sends `false`; asking for `review_state=ARCHIVED` always includes them. |
+| `sort`, `order` | `created_at` (default, `desc`), `filename` (case-insensitive), `size_bytes`, `review_state` (evidence-model order). Ties: newest upload, then ID. |
+| `limit`, `offset` | 1–200 (default 50); ≥ 0. |
+
+Each item adds `latest_job`, `problem_count` (failed or partial stages in the latest job, plus one if
+the job failed; `null` if never analysed), `duplicate_match_count` (`null` if the latest job has no
+duplicate-search result), `added_since_analysis` (library artifacts uploaded after that search;
+`null` without a result), and `in_duplicate_library`. The response adds `counts_by_review_state`,
+which ignores the review-state and archive filters. `GET /artifacts/{id}` returns the same fields.
+
+### Review
+
+| Endpoint | Behaviour |
+|---|---|
+| `PATCH /artifacts/{id}/review` | Optional `expected_updated_at`: if the review changed since, 409 `REVIEW_CONFLICT` with `details.current`. Saving without a change writes nothing. |
+| `POST /artifacts/review` | Bulk: `{"artifact_ids": [...1–200], "state": "..."}`. All or nothing: any missing ID returns 404 `ARTIFACT_NOT_FOUND` with `details.missing`, and nothing changes. Response: `state`, `updated`, `unchanged`. Notes are not changed. |
+| `PATCH /artifacts/{id}/evidence/{evidence_id}/review` | One evidence record: `{state, analyst_notes, expected_updated_at?}` (`null` = never reviewed). Never changes classification or payload. 404 `EVIDENCE_RECORD_NOT_FOUND`; 409 `REVIEW_CONFLICT`. |
+| `GET /artifacts/{id}/review-history` | Append-only review events, newest first: `origin` (`artifact`, `record`, `bulk`), `from_state`, `to_state`, full `notes_before` and `notes_after`, `created_at`, and `stage`/`job_id` for record events. |
+
+The evidence report becomes `schema_version` `"1.1"`: each section's `provenance` adds
+`analyst_notes` and `review_updated_at`, and the report adds `review_history`. The duplicates section
+adds `excluded_count`.
+
+### Analysis history
+
+`GET /artifacts/{id}/jobs`: every job, newest first, with `pipeline`, `app_version`, `options`,
+job-level `error` (e.g. `INTERRUPTED`), and `problem_count`.
+
+### Evidence package
+
+`GET /artifacts/{id}/export?job_id=&include_original=false` returns a ZIP for the latest finished job
+or `job_id`: `report.json`, `review.json`, `derived/…`, `original/…` (only with
+`include_original=true`), `manifest.json` (SHA-256 and size of every file; recorded hashes; a
+`problems` list for recorded files that are missing or changed), `SHA256SUMS`, and `README.txt` (the
+evidence notice and how to verify). Header `X-Vestigo-Export-SHA256` is the ZIP's SHA-256. Errors:
+404 as for the evidence report, 409 `ANALYSIS_IN_PROGRESS`, 500 `EXPORT_FAILED`.
+
+### Duplicate library
+
+| Endpoint | Behaviour |
+|---|---|
+| `PATCH /artifacts/{id}/duplicate-library` | `{"included": false}` excludes the artifact from future duplicate searches (perceptual and byte-identical); `true` includes it again. Recorded evidence is never rewritten. Returns the artifact detail. |
+| `GET /library/summary` | `artifact_count`, `indexed_count`, `not_indexed_count`, `excluded_count`, the newest 100 not-indexed and excluded artifacts, and `storage` (`original_bytes`, `derived_bytes`). |
+
+The duplicates stage records `excluded_count`; `library_size` counts the artifacts actually searched.
+
+### Settings
+
+| Endpoint | Behaviour |
+|---|---|
+| `GET /settings` | `editable` (`default_analysis_options`, `library_page_size` 10/25/50/100, `auto_analyze_after_upload`), `environment` (read-only: limits, `duplicate_threshold`, timeouts, OCR languages, workers, data folder, version, schema revision), `updated_at`. |
+| `PATCH /settings` | Any subset of the editable settings. Environment keys (e.g. `phash_max_distance`, `duplicate_threshold`) return 422 asking to set them in `.env`. |
+
+New error codes: `REVIEW_CONFLICT`, `EVIDENCE_RECORD_NOT_FOUND`, `EXPORT_FAILED`.
 
 ## Review state values
 
