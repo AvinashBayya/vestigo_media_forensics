@@ -202,3 +202,37 @@ export function setDuplicateLibrary(artifactId: string, included: boolean): Prom
 export function getLibrarySummary(): Promise<LibrarySummary> {
   return call(http.get<LibrarySummary>("/library/summary"));
 }
+
+export interface DownloadedPackage {
+  blob: Blob;
+  filename: string;
+  /** SHA-256 of the whole ZIP, from the X-Vestigo-Export-SHA256 header. */
+  sha256: string;
+}
+
+/** Downloads the ZIP evidence package (M2-6) for one job. The original is included only on request. */
+export async function downloadEvidencePackage(
+  artifactId: string,
+  jobId: string,
+  includeOriginal: boolean,
+): Promise<DownloadedPackage> {
+  try {
+    const response = await http.get<Blob>(`/artifacts/${encodeURIComponent(artifactId)}/export`, {
+      params: { job_id: jobId, include_original: includeOriginal },
+      responseType: "blob",
+    });
+    const disposition = String(response.headers["content-disposition"] ?? "");
+    const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `vestigo-evidence-${artifactId}-${jobId}.zip`;
+    return { blob: response.data, filename, sha256: String(response.headers["x-vestigo-export-sha256"] ?? "") };
+  } catch (error) {
+    // Error bodies arrive as a Blob when a blob response was requested.
+    if (isAxiosError(error) && error.response?.data instanceof Blob) {
+      try {
+        error.response.data = JSON.parse(await error.response.data.text());
+      } catch {
+        // Not JSON; fall through to the generic message.
+      }
+    }
+    throw toApiError(error);
+  }
+}

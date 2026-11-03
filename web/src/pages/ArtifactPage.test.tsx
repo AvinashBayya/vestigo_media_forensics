@@ -499,7 +499,7 @@ describe("ArtifactPage", () => {
   it("links the evidence download to the report's job", async () => {
     renderApp(PAGE);
 
-    const link = await screen.findByRole("link", { name: "Download evidence (JSON)" });
+    const link = await screen.findByRole("link", { name: "Download JSON report" });
     expect(link).toHaveAttribute("href", `${API}/artifacts/${ARTIFACT_ID}/evidence?job_id=${JOB_ID}&download=true`);
   });
 });

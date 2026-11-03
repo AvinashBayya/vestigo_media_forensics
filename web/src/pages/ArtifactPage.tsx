@@ -7,7 +7,6 @@ import {
   contentUrl,
   deleteArtifact,
   errorMessage,
-  evidenceDownloadUrl,
   getArtifact,
   getEvidence,
   getJob,
@@ -18,6 +17,7 @@ import type { ArtifactDetail, EvidenceReport, JobHistoryItem, JobStatusResponse 
 import { AnalysisHistory } from "../components/AnalysisHistory";
 import { DeleteArtifactDialog } from "../components/DeleteArtifactDialog";
 import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
+import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
 import { HashesPanel } from "../components/evidence/HashesPanel";
@@ -172,15 +172,6 @@ export function ArtifactPage() {
           </div>
 
           <div className="flex flex-col gap-2 text-sm">
-            {report && (
-              <a
-                href={evidenceDownloadUrl(artifact.artifact_id, report.job_id)}
-                download
-                className="rounded-md bg-slate-900 px-3 py-1.5 text-center font-medium text-white dark:bg-slate-100 dark:text-slate-900"
-              >
-                Download evidence (JSON)
-              </a>
-            )}
             <button
               type="button"
               onClick={runAnalysis}
@@ -199,6 +190,7 @@ export function ArtifactPage() {
             </button>
           </div>
 
+          {report && <ExportMenu artifactId={artifact.artifact_id} jobId={report.job_id} />}
           <ReviewPanel artifact={artifact} onSaved={setArtifact} />
           <AnalysisHistory jobs={history} viewingJobId={report?.job_id ?? null} onView={(jobId) => void viewJob(jobId)} />
           <DuplicateLibraryControl artifact={artifact} onChanged={setArtifact} />
