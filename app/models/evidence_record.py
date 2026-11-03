@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -30,6 +30,9 @@ class EvidenceRecord(Base):
     payload: Mapped[dict[str, Any]] = mapped_column("payload_json", JSON)
     errors: Mapped[list[dict[str, Any]]] = mapped_column("errors_json", JSON)
     limitations: Mapped[list[str]] = mapped_column("limitations_json", JSON)
+    # Set only by an analyst (decision M2-2). Review never changes `classification`.
     review_state: Mapped[str] = mapped_column(String(16))
     started_at: Mapped[datetime]
     completed_at: Mapped[datetime]
+    analyst_notes: Mapped[str] = mapped_column(Text, default="", server_default=text("''"))
+    review_updated_at: Mapped[datetime | None]

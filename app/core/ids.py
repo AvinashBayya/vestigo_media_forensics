@@ -1,4 +1,4 @@
-"""Prefixed random identifiers (art_…, job_…, ev_…, df_…)."""
+"""Prefixed random identifiers (art_…, job_…, ev_…, df_…, rve_…)."""
 
 import re
 import uuid
@@ -7,6 +7,7 @@ ARTIFACT = "art"
 JOB = "job"
 EVIDENCE = "ev"
 DERIVED_FILE = "df"
+REVIEW_EVENT = "rve"
 
 
 def new_id(prefix: str) -> str:

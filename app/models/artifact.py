@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, String, Text
+from sqlalchemy import CheckConstraint, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -12,6 +12,9 @@ class Artifact(Base):
         CheckConstraint("size_bytes > 0", name="ck_artifacts_size_positive"),
         CheckConstraint("length(sha256) = 64", name="ck_artifacts_sha256_length"),
         CheckConstraint("length(md5) = 32", name="ck_artifacts_md5_length"),
+        Index("ix_artifacts_review_state", "review_state"),
+        Index("ix_artifacts_size_bytes", "size_bytes"),
+        Index("ix_artifacts_original_filename_nocase", text("original_filename COLLATE NOCASE")),
     )
 
     id: Mapped[str] = mapped_column(String(40), primary_key=True)
@@ -30,3 +33,6 @@ class Artifact(Base):
     analyst_notes: Mapped[str] = mapped_column(Text)
     review_updated_at: Mapped[datetime]
     created_at: Mapped[datetime] = mapped_column(index=True)
+    # False excludes the artifact from future duplicate searches (decision M2-7). Existing evidence is
+    # never rewritten.
+    in_duplicate_library: Mapped[bool] = mapped_column(default=True, server_default=text("1"))
