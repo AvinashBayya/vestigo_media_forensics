@@ -16,6 +16,7 @@ from app.schemas.artifact import (
 )
 from app.schemas.common import ErrorCode, MediaType
 from app.schemas.evidence import EvidenceReport
+from app.schemas.library import DuplicateLibraryUpdate
 from app.schemas.review import (
     BulkReviewRequest,
     BulkReviewResult,
@@ -105,6 +106,15 @@ def update_record_review(
 ) -> RecordReview:
     """Review one evidence record. Its classification never changes (M2-2)."""
     return review.update_record_review(services.db, artifact_id, evidence_id, update)
+
+
+@router.patch("/{artifact_id}/duplicate-library", response_model=ArtifactDetail)
+def update_duplicate_library(
+    services: Services, artifact_id: str, update: DuplicateLibraryUpdate
+) -> ArtifactDetail:
+    """Include or exclude the artifact from future duplicate searches. Recorded evidence is unchanged."""
+    artifacts.set_duplicate_library(services.db, artifact_id, update.included)
+    return artifacts.get_artifact_detail(services.db, artifact_id)
 
 
 @router.get("/{artifact_id}/jobs", response_model=JobHistory)

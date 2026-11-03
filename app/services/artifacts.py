@@ -180,6 +180,23 @@ def get_artifact_detail(db: Database, artifact_id: str) -> ArtifactDetail:
     )
 
 
+def set_duplicate_library(db: Database, artifact_id: str, included: bool) -> None:
+    if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
+        raise artifact_not_found(artifact_id)
+    with db.writer() as session, session.begin():
+        artifact = session.get(Artifact, artifact_id)
+        if artifact is None:
+            raise artifact_not_found(artifact_id)
+        library.set_duplicate_library(session, artifact, included)
+    log_event(
+        logger,
+        logging.INFO,
+        "artifact.duplicate_library_updated",
+        artifact_id=artifact_id,
+        status="included" if included else "excluded",
+    )
+
+
 def to_review_info(artifact: Artifact) -> ReviewInfo:
     return ReviewInfo(
         state=ReviewState(artifact.review_state),

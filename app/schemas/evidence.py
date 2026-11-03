@@ -147,6 +147,8 @@ class DuplicatesSection(BaseModel):
     threshold: int | None
     library_size: int | None
     compared: int | None
+    # Artifacts excluded from duplicate search by the analyst (M2-7). None for records made before M2.
+    excluded_count: int | None = None
     matches: list[DuplicateMatch]
     provenance: Provenance
 

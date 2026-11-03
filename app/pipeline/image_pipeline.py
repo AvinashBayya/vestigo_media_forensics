@@ -263,7 +263,8 @@ class DuplicatesStage(AnalysisStage):
     method = (
         "Compares this image's pHash with the stored pHash of every other artifact in the local library "
         "using Hamming distance, and lists those at or below the threshold. Byte-identical files are "
-        "found by SHA-256."
+        "found by SHA-256. Artifacts the analyst excluded from duplicate search are not compared; their "
+        "number is recorded."
     )
     classification = EvidenceClassification.DERIVED
     source = "stage:perceptual_hash + local library"
@@ -277,6 +278,8 @@ class DuplicatesStage(AnalysisStage):
         "byte-identical.",
         "A match means the images look alike at a coarse level. It does not show which came first or "
         "that one was derived from the other.",
+        "Artifacts excluded from duplicate search by the analyst are not compared, even if identical. "
+        "`excluded_count` records how many were left out.",
     )
 
     def tool_version(self, ctx: StageContext) -> str:
@@ -285,14 +288,15 @@ class DuplicatesStage(AnalysisStage):
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         threshold = ctx.settings.phash_max_distance
         own_hash = ctx.results["perceptual_hash"].output["value"]
-        library = ctx.library.entries(artifact.id, FINGERPRINT_ALGORITHM)
-        search = find_matches(artifact.sha256, own_hash, library, threshold)
+        library = ctx.library.snapshot(artifact.id, FINGERPRINT_ALGORITHM)
+        search = find_matches(artifact.sha256, own_hash, library.entries, threshold)
         return StageOutput(
             {
                 "algorithm": "pHash",
                 "threshold": threshold,
                 "library_size": search.library_size,
                 "compared": search.compared,
+                "excluded_count": library.excluded_count,
                 "matches": [asdict(match) for match in search.matches],
             }
         )

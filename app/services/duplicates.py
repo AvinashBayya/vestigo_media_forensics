@@ -26,17 +26,27 @@ class LibraryReader:
     def __init__(self, db: Database) -> None:
         self._db = db
 
-    def entries(self, exclude_artifact_id: str, algorithm: str) -> list[LibraryEntry]:
+    def snapshot(self, artifact_id: str, algorithm: str) -> "LibrarySnapshot":
+        """Every other artifact in the duplicate library, and how many the analyst excluded (M2-7)."""
         stmt = (
-            select(Artifact.id, Artifact.sha256, ImageFingerprint.value_hex)
+            select(Artifact.id, Artifact.sha256, ImageFingerprint.value_hex, Artifact.in_duplicate_library)
             .outerjoin(
                 ImageFingerprint,
                 (ImageFingerprint.artifact_id == Artifact.id) & (ImageFingerprint.algorithm == algorithm),
             )
-            .where(Artifact.id != exclude_artifact_id)
+            .where(Artifact.id != artifact_id)
         )
         with self._db.reader() as session:
-            return [LibraryEntry(*row) for row in session.execute(stmt).all()]
+            rows = session.execute(stmt).all()
+        entries = [LibraryEntry(row[0], row[1], row[2]) for row in rows if row[3]]
+        return LibrarySnapshot(entries=entries, excluded_count=len(rows) - len(entries))
+
+
+@dataclass(frozen=True)
+class LibrarySnapshot:
+    entries: list[LibraryEntry]
+    # Artifacts left out because the analyst excluded them from duplicate search.
+    excluded_count: int
 
 
 @dataclass(frozen=True)

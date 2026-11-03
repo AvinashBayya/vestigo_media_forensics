@@ -18,7 +18,7 @@ from sqlalchemy import ColumnElement, Select, and_, case, exists, func, or_, sel
 from sqlalchemy.orm import Session, aliased
 
 from app.core import ids
-from app.models import AnalysisJob, Artifact, EvidenceRecord
+from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ImageFingerprint
 from app.schemas.analysis import JobSummary
 from app.schemas.artifact import (
     AnalysisStatusFilter,
@@ -28,6 +28,8 @@ from app.schemas.artifact import (
     SortOrder,
 )
 from app.schemas.common import JobStatus, MediaType, ReviewState, StageStatus
+from app.schemas.library import LibraryArtifactRef, LibrarySummary, StorageUsage
+from app.services.phash import FINGERPRINT_ALGORITHM
 
 PROBLEM_STATUSES = (StageStatus.FAILED, StageStatus.PARTIAL)
 RESULT_STATUSES = (StageStatus.SUCCEEDED, StageStatus.PARTIAL)
@@ -255,3 +257,47 @@ def list_item(session: Session, artifact_id: str) -> ArtifactListItem | None:
     rows = session.execute(_base(columns).where(Artifact.id == artifact_id)).all()
     items = _to_items(session, list(rows))
     return items[0] if items else None
+
+
+SUMMARY_LIST_LIMIT = 100
+
+
+def set_duplicate_library(session: Session, artifact: Artifact, included: bool) -> None:
+    """Include or exclude an artifact from future duplicate searches. Recorded evidence is untouched."""
+    artifact.in_duplicate_library = included
+
+
+def library_summary(session: Session) -> LibrarySummary:
+    indexed = exists().where(
+        ImageFingerprint.artifact_id == Artifact.id, ImageFingerprint.algorithm == FINGERPRINT_ALGORITHM
+    )
+    newest = (Artifact.created_at.desc(), Artifact.id.desc())
+
+    def refs(*conditions: ColumnElement[bool]) -> list[LibraryArtifactRef]:
+        rows = session.execute(
+            select(Artifact.id, Artifact.original_filename, Artifact.created_at, indexed.label("indexed"))
+            .where(*conditions)
+            .order_by(*newest)
+            .limit(SUMMARY_LIST_LIMIT)
+        ).all()
+        return [
+            LibraryArtifactRef(artifact_id=a, filename=f, created_at=c, indexed=bool(i))
+            for a, f, c, i in rows
+        ]
+
+    def count(*conditions: ColumnElement[bool]) -> int:
+        return session.scalar(select(func.count()).select_from(Artifact).where(*conditions)) or 0
+
+    included = Artifact.in_duplicate_library.is_(True)
+    return LibrarySummary(
+        artifact_count=count(),
+        indexed_count=count(included, indexed),
+        not_indexed_count=count(included, ~indexed),
+        excluded_count=count(~included),
+        not_indexed=refs(included, ~indexed),
+        excluded=refs(~included),
+        storage=StorageUsage(
+            original_bytes=session.scalar(select(func.coalesce(func.sum(Artifact.size_bytes), 0))) or 0,
+            derived_bytes=session.scalar(select(func.coalesce(func.sum(DerivedFile.size_bytes), 0))) or 0,
+        ),
+    )

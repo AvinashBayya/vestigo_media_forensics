@@ -131,6 +131,7 @@ def _duplicates(filenames: dict[str, str]) -> Callable[[dict[str, Any], Provenan
             threshold=payload.get("threshold"),
             library_size=payload.get("library_size"),
             compared=payload.get("compared"),
+            excluded_count=payload.get("excluded_count"),
             matches=matches,
             provenance=provenance,
         )
