@@ -10,6 +10,8 @@ import type {
   BulkReviewResult,
   DeletionSummary,
   EvidenceReport,
+  HealthResponse,
+  JobHistory,
   JobCreated,
   JobStatusResponse,
   RecordReview,
@@ -175,4 +177,18 @@ export function contentUrl(artifactId: string): string {
 export function evidenceDownloadUrl(artifactId: string, jobId: string): string {
   const params = new URLSearchParams({ job_id: jobId, download: "true" });
   return `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}/evidence?${params}`;
+}
+
+export function getJobHistory(artifactId: string): Promise<JobHistory> {
+  return call(http.get<JobHistory>(`/artifacts/${encodeURIComponent(artifactId)}/jobs`));
+}
+
+/** Health is reported with HTTP 503 when the database or storage fails; the body is still a report. */
+export async function getHealth(): Promise<HealthResponse> {
+  try {
+    return (await http.get<HealthResponse>("/health", { validateStatus: (status) => status === 200 || status === 503 }))
+      .data;
+  } catch (error) {
+    throw toApiError(error);
+  }
 }

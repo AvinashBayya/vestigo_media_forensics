@@ -11,6 +11,10 @@ interface PanelProps {
   children?: ReactNode;
 }
 
+export function sectionAnchor(stage: string): string {
+  return `section-${stage}`;
+}
+
 /** A report section: its findings, any errors, and how they were produced. */
 export function Panel({ title, provenance, children }: PanelProps) {
   const headingId = useId();
@@ -19,6 +23,7 @@ export function Panel({ title, provenance, children }: PanelProps) {
 
   return (
     <section
+      id={provenance ? sectionAnchor(provenance.stage) : undefined}
       aria-labelledby={headingId}
       className="rounded-lg border border-slate-200 bg-white shadow-xs dark:border-slate-800 dark:bg-slate-900"
     >

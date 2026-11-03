@@ -11,9 +11,11 @@ import {
   getArtifact,
   getEvidence,
   getJob,
+  getJobHistory,
   startImageAnalysis,
 } from "../api/client";
-import type { ArtifactDetail, EvidenceReport, JobStatusResponse } from "../api/types";
+import type { ArtifactDetail, EvidenceReport, JobHistoryItem, JobStatusResponse } from "../api/types";
+import { AnalysisHistory } from "../components/AnalysisHistory";
 import { DeleteArtifactDialog } from "../components/DeleteArtifactDialog";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
@@ -22,6 +24,8 @@ import { MetadataPanel } from "../components/evidence/MetadataPanel";
 import { OCRPanel } from "../components/evidence/OCRPanel";
 import { PHashPanel } from "../components/evidence/PHashPanel";
 import { JobProgress } from "../components/JobProgress";
+import { ProblemsSummary } from "../components/ProblemsSummary";
+import { ErrorState } from "../components/States";
 import { ErrorBanner, EvidenceNotice, InfoBanner } from "../components/Messages";
 import { ReviewPanel } from "../components/ReviewPanel";
 import { ReviewProvider } from "../components/review/ReviewContext";
@@ -39,16 +43,20 @@ export function ArtifactPage() {
   const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
   const [job, setJob] = useState<JobStatusResponse | null>(null);
   const [report, setReport] = useState<EvidenceReport | null>(null);
+  const [history, setHistory] = useState<JobHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<ApiError | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     try {
-      const detail = await getArtifact(artifactId);
+      const [detail, jobs] = await Promise.all([getArtifact(artifactId), getJobHistory(artifactId)]);
       setArtifact(detail);
+      setHistory(jobs.jobs);
       const latest = detail.latest_job;
       if (latest && isActive(latest.status)) {
         setReport(null);
@@ -59,9 +67,18 @@ export function ArtifactPage() {
       }
     } catch (err) {
       if (err instanceof ApiError && err.code === "ARTIFACT_NOT_FOUND") setNotFound(true);
-      else setError(errorMessage(err));
+      else setLoadError(err instanceof ApiError ? err : new ApiError("UNKNOWN_ERROR", errorMessage(err), 0));
     }
   }, [artifactId]);
+
+  async function viewJob(jobId: string) {
+    setError(null);
+    try {
+      setReport(await getEvidence(artifactId, jobId));
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -109,10 +126,14 @@ export function ArtifactPage() {
     return <ErrorBanner message="This artifact does not exist. It may have been deleted." />;
   }
   if (!artifact) {
-    return error ? <ErrorBanner message={error} /> : <p className="text-sm text-slate-600">Loading…</p>;
+    if (loadError) return <ErrorState error={loadError} onRetry={() => void load()} title="This artifact could not be loaded." />;
+    return error ? <ErrorBanner message={error} /> : <p role="status" className="text-sm text-slate-600">Loading…</p>;
   }
 
   const analysing = job !== null && isActive(job.status);
+  const latestFinished = history.find((item) => !isActive(item.status)) ?? null;
+  const shownJob = report ? (history.find((item) => item.job_id === report.job_id) ?? null) : null;
+  const viewingEarlier = report !== null && latestFinished !== null && report.job_id !== latestFinished.job_id;
 
   return (
     <ReviewProvider artifactId={artifact.artifact_id}>
@@ -130,6 +151,7 @@ export function ArtifactPage() {
       <EvidenceNotice text={report?.notice} />
       {notice && <InfoBanner>{notice}</InfoBanner>}
       {error && <ErrorBanner message={error} />}
+      {loadError && <ErrorState error={loadError} onRetry={() => void load()} title="This page could not be refreshed." />}
 
       <div className="grid gap-5 md:grid-cols-[18rem_1fr]">
         <aside className="space-y-4">
@@ -177,6 +199,7 @@ export function ArtifactPage() {
           </div>
 
           <ReviewPanel artifact={artifact} onSaved={setArtifact} />
+          <AnalysisHistory jobs={history} viewingJobId={report?.job_id ?? null} onView={(jobId) => void viewJob(jobId)} />
         </aside>
 
         <div className="min-w-0 space-y-4">
@@ -187,18 +210,27 @@ export function ArtifactPage() {
             </p>
           )}
           {report && (
-            <>
+            <div key={report.job_id} className="space-y-4">
+              {viewingEarlier && latestFinished && (
+                <InfoBanner>
+                  You are viewing an earlier analysis from {formatDateTime(report.job.created_at)}.{" "}
+                  <button type="button" onClick={() => void viewJob(latestFinished.job_id)} className="font-medium underline">
+                    View the latest analysis
+                  </button>
+                </InfoBanner>
+              )}
               <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                 <span>Analysis finished {formatDateTime(report.job.completed_at)}</span>
                 <StatusBadge status={report.job.status} />
               </div>
+              <ProblemsSummary report={report} job={shownJob} />
               <HashesPanel section={report.hashes} />
               <C2PAPanel section={report.c2pa} />
               <DuplicatesPanel section={report.duplicates} />
               <OCRPanel section={report.ocr} />
               <PHashPanel section={report.perceptual_hash} />
               <MetadataPanel section={report.metadata} />
-            </>
+            </div>
           )}
         </div>
       </div>

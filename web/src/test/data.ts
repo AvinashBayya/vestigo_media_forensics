@@ -2,6 +2,8 @@ import type {
   ArtifactDetail,
   ArtifactList,
   ArtifactListItem,
+  HealthResponse,
+  JobHistoryItem,
   EvidenceReport,
   JobStatusResponse,
   Provenance,
@@ -211,6 +213,35 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
     },
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
     review_history: [],
+    ...overrides,
+  };
+}
+
+export function jobHistoryItem(overrides: Partial<JobHistoryItem> = {}): JobHistoryItem {
+  return {
+    job_id: JOB_ID,
+    status: "completed",
+    created_at: NOW,
+    started_at: NOW,
+    completed_at: NOW,
+    pipeline: "image.v1",
+    app_version: "0.1.0",
+    options: { metadata: true, c2pa: true, ocr: true, duplicate_search: true },
+    error: null,
+    problem_count: 0,
+    ...overrides,
+  };
+}
+
+export function health(overrides: Partial<HealthResponse> = {}): HealthResponse {
+  const tool = { status: "ok" as const, version: "1", used_in: "M1", languages: null, detail: null };
+  return {
+    status: "ok",
+    version: "0.1.0",
+    database: "ok",
+    storage: "ok",
+    tools: { exiftool: tool, tesseract: { ...tool, languages: ["eng"] }, ffmpeg: tool, ffprobe: tool },
+    checked_at: NOW,
     ...overrides,
   };
 }

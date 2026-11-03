@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router";
 
+import { HealthBanner } from "./HealthBanner";
+
 const NAV_LINK = ({ isActive }: { isActive: boolean }) =>
   `rounded-md px-2 py-1 text-sm ${isActive ? "bg-slate-100 font-medium dark:bg-slate-800" : "hover:bg-slate-100 dark:hover:bg-slate-800"}`;
 
@@ -34,6 +36,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <span className="text-xs text-slate-500 dark:text-slate-400">Local analysis · evidence, not verdicts</span>
         </div>
       </header>
+      <HealthBanner />
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
   );

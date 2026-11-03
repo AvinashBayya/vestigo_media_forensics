@@ -338,3 +338,36 @@ export interface EvidenceReport {
   /** Newest first. */
   review_history: ReviewEvent[];
 }
+
+export interface JobHistoryItem extends JobSummary {
+  pipeline: string;
+  app_version: string;
+  options: AnalysisOptions;
+  /** Job-level failure, e.g. INTERRUPTED by a restart. */
+  error: ApiErrorBody | null;
+  /** Failed or partial stages, plus one if the job itself failed. */
+  problem_count: number;
+}
+
+export interface JobHistory {
+  artifact_id: string;
+  /** Newest first. */
+  jobs: JobHistoryItem[];
+}
+
+export interface ToolHealth {
+  status: "ok" | "missing" | "error";
+  version: string | null;
+  used_in: string;
+  languages: string[] | null;
+  detail: string | null;
+}
+
+export interface HealthResponse {
+  status: "ok" | "degraded" | "error";
+  version: string;
+  database: "ok" | "error";
+  storage: "ok" | "error";
+  tools: Record<string, ToolHealth>;
+  checked_at: string;
+}
