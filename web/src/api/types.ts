@@ -390,3 +390,34 @@ export interface LibrarySummary {
   excluded: LibraryArtifactRef[];
   storage: { original_bytes: number; derived_bytes: number };
 }
+
+export type LibraryPageSize = 10 | 25 | 50 | 100;
+export const LIBRARY_PAGE_SIZES: LibraryPageSize[] = [10, 25, 50, 100];
+
+export interface EditableSettings {
+  default_analysis_options: AnalysisOptions;
+  library_page_size: LibraryPageSize;
+  auto_analyze_after_upload: boolean;
+}
+
+/** Read-only: set with VESTIGO_* environment variables or .env. */
+export interface EnvironmentSettings {
+  data_dir: string;
+  max_upload_bytes: number;
+  max_image_pixels: number;
+  duplicate_threshold: number;
+  job_mode: string;
+  job_workers: number;
+  tool_timeout_seconds: number;
+  ocr_timeout_seconds: number;
+  ocr_languages: string[];
+  log_level: string;
+  app_version: string;
+  schema_revision: string | null;
+}
+
+export interface SettingsResponse {
+  editable: EditableSettings;
+  environment: EnvironmentSettings;
+  updated_at: string | null;
+}

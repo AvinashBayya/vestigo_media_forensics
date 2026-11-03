@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from "react-router";
 
 import {
   ApiError,
-  DEFAULT_OPTIONS,
   contentUrl,
   deleteArtifact,
   errorMessage,
@@ -102,7 +101,7 @@ export function ArtifactPage() {
   async function runAnalysis() {
     setError(null);
     try {
-      const created = await startImageAnalysis(artifactId, DEFAULT_OPTIONS);
+      const created = await startImageAnalysis(artifactId);
       setReport(null);
       setJob(await getJob(created.job_id));
     } catch (err) {

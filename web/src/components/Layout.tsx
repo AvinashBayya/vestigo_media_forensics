@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router";
 
+import { SettingsProvider } from "../lib/settings";
 import { HealthBanner } from "./HealthBanner";
 
 const NAV_LINK = ({ isActive }: { isActive: boolean }) =>
@@ -8,6 +9,7 @@ const NAV_LINK = ({ isActive }: { isActive: boolean }) =>
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
+    <SettingsProvider>
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-3">
@@ -31,6 +33,9 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 Upload
               </NavLink>
+              <NavLink to="/settings" className={NAV_LINK}>
+                Settings
+              </NavLink>
             </nav>
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400">Local analysis · evidence, not verdicts</span>
@@ -39,5 +44,6 @@ export function Layout({ children }: { children: ReactNode }) {
       <HealthBanner />
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
+    </SettingsProvider>
   );
 }

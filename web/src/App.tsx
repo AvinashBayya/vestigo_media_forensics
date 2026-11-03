@@ -3,6 +3,7 @@ import { Link, Outlet, type RouteObject } from "react-router";
 import { Layout } from "./components/Layout";
 import { ArtifactPage } from "./pages/ArtifactPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { UploadPage } from "./pages/UploadPage";
 
 /** Route objects for a data router, which `useBlocker` (unsaved-changes guard) requires. */
@@ -17,6 +18,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <LibraryPage /> },
       { path: "upload", element: <UploadPage /> },
       { path: "artifacts/:artifactId", element: <ArtifactPage /> },
+      { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <NotFound /> },
     ],
   },

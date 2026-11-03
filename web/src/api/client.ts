@@ -17,6 +17,8 @@ import type {
   JobStatusResponse,
   RecordReview,
   ReviewHistory,
+  SettingsResponse,
+  EditableSettings,
   ReviewState,
 } from "./types";
 
@@ -91,8 +93,11 @@ export function uploadArtifact(
   );
 }
 
-export function startImageAnalysis(artifactId: string, options: AnalysisOptions): Promise<JobCreated> {
-  return call(http.post<JobCreated>("/analysis/image", { artifact_id: artifactId, options }));
+/** Without `options`, the backend uses the default analysis options from Settings. */
+export function startImageAnalysis(artifactId: string, options?: AnalysisOptions): Promise<JobCreated> {
+  return call(
+    http.post<JobCreated>("/analysis/image", { artifact_id: artifactId, ...(options ? { options } : {}) }),
+  );
 }
 
 export function getJob(jobId: string): Promise<JobStatusResponse> {
@@ -235,4 +240,12 @@ export async function downloadEvidencePackage(
     }
     throw toApiError(error);
   }
+}
+
+export function getSettings(): Promise<SettingsResponse> {
+  return call(http.get<SettingsResponse>("/settings"));
+}
+
+export function updateSettings(changes: Partial<EditableSettings>): Promise<SettingsResponse> {
+  return call(http.patch<SettingsResponse>("/settings", changes));
 }

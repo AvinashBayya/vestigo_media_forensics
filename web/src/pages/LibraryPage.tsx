@@ -16,21 +16,26 @@ import {
   toUrlParams,
   type LibraryState,
 } from "../lib/libraryState";
+import { useSettings } from "../lib/settings";
 import { useApiResource } from "../lib/useApiResource";
-
-export const DEFAULT_PAGE_SIZE = 25;
 
 export const UPLOAD_BUTTON =
   "inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-300";
 
-export function LibraryPage({ pageSize = DEFAULT_PAGE_SIZE }: { pageSize?: number }) {
+export function LibraryPage() {
+  const { settings, loaded: settingsLoaded } = useSettings();
+  const pageSize = settings.library_page_size;
   const [params, setParams] = useSearchParams();
   const location = useLocation();
   const notice = (location.state as { notice?: string } | null)?.notice;
   const state = parseLibraryState(params);
   const query = toArtifactQuery(state, pageSize);
   const key = toSearchParams(query).toString();
-  const { data, error, loading, reload } = useApiResource(() => listArtifacts(query), key);
+  // The page size comes from Settings, so the first request waits for them.
+  const { data, error, loading, reload } = useApiResource(
+    () => (settingsLoaded ? listArtifacts(query) : new Promise<never>(() => undefined)),
+    settingsLoaded ? key : "waiting-for-settings",
+  );
   const filtered = isFiltered(state);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [bulkOutcome, setBulkOutcome] = useState<BulkOutcome | null>(null);

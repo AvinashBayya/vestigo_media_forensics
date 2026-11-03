@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { ARTIFACT_ID, artifactDetail, artifactList, evidenceReport, health, jobHistoryItem } from "./data";
+import { ARTIFACT_ID, artifactDetail, artifactList, evidenceReport, health, jobHistoryItem, settingsResponse } from "./data";
 
 export const API = "/api/v1";
 
@@ -15,6 +15,18 @@ export const server = setupServer(
   http.get(`${API}/artifacts/${ARTIFACT_ID}`, () => HttpResponse.json(artifactDetail())),
   http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () => HttpResponse.json(evidenceReport())),
   http.get(`${API}/health`, () => HttpResponse.json(health())),
+  http.get(`${API}/settings`, () => HttpResponse.json(settingsResponse())),
+  http.get(`${API}/library/summary`, () =>
+    HttpResponse.json({
+      artifact_count: 0,
+      indexed_count: 0,
+      not_indexed_count: 0,
+      excluded_count: 0,
+      not_indexed: [],
+      excluded: [],
+      storage: { original_bytes: 0, derived_bytes: 0 },
+    }),
+  ),
   http.get(`${API}/artifacts/:artifactId/jobs`, ({ params }) =>
     HttpResponse.json({ artifact_id: params.artifactId, jobs: params.artifactId === ARTIFACT_ID ? [jobHistoryItem()] : [] }),
   ),

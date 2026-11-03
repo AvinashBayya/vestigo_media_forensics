@@ -4,6 +4,7 @@ import type {
   ArtifactListItem,
   HealthResponse,
   JobHistoryItem,
+  SettingsResponse,
   EvidenceReport,
   JobStatusResponse,
   Provenance,
@@ -244,5 +245,31 @@ export function health(overrides: Partial<HealthResponse> = {}): HealthResponse 
     tools: { exiftool: tool, tesseract: { ...tool, languages: ["eng"] }, ffmpeg: tool, ffprobe: tool },
     checked_at: NOW,
     ...overrides,
+  };
+}
+
+export function settingsResponse(editable: Partial<SettingsResponse["editable"]> = {}): SettingsResponse {
+  return {
+    editable: {
+      default_analysis_options: { metadata: true, c2pa: true, ocr: true, duplicate_search: true },
+      library_page_size: 25,
+      auto_analyze_after_upload: true,
+      ...editable,
+    },
+    environment: {
+      data_dir: "/workspaces/vestigo-media-forensics/data",
+      max_upload_bytes: 52_428_800,
+      max_image_pixels: 100_000_000,
+      duplicate_threshold: 10,
+      job_mode: "thread",
+      job_workers: 2,
+      tool_timeout_seconds: 60,
+      ocr_timeout_seconds: 120,
+      ocr_languages: ["eng"],
+      log_level: "INFO",
+      app_version: "0.1.0",
+      schema_revision: "0002_m2_analyst_workflow",
+    },
+    updated_at: null,
   };
 }
