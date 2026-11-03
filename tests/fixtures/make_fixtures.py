@@ -13,12 +13,21 @@ import zlib
 from dataclasses import dataclass, fields
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 FIXTURES_DIR = Path(__file__).parent
 C2PA_SAMPLE = FIXTURES_DIR / "c2pa" / "adobe-20220124-C.jpg"
-FONT_PATH = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
+FONT_PATH = FONT_DIR / "DejaVuSans.ttf"
 OCR_TEXT = "VESTIGO EVIDENCE SAMPLE 2026"
+
+# Words drawn into the OCR fixtures, used by tests to count how many were recovered.
+OCR_SCREENSHOT_WORDS = (
+    "Case", "Dashboard", "Artifact", "uploaded", "Status", "analysis", "complete",
+    "Reviewer", "assigned", "Download", "Report",
+)  # fmt: skip
+OCR_LOW_RES_TEXT = "INVOICE 4821 PAID IN FULL"
+OCR_NOISY_TEXT = "FIELD NOTES 17 MARCH"
 
 # The C2PA JUMBF type identifier: "c2pa" followed by the standard ISO suffix.
 C2PA_JUMBF_TYPE = b"c2pa" + bytes.fromhex("00110010800000aa00389b71")
@@ -37,6 +46,9 @@ class FixtureSet:
     oriented: Path
     unrelated: Path
     ocr_text: Path
+    ocr_screenshot: Path
+    ocr_low_res: Path
+    ocr_noisy: Path
     blank: Path
     invalid_c2pa: Path
     c2pa: Path
@@ -159,6 +171,48 @@ def write_metadata(path: Path) -> None:
     )
 
 
+def font(name: str, size: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(str(FONT_DIR / name), size)
+
+
+def screenshot_image() -> Image.Image:
+    """An app-window screenshot: small UI text, a dark title bar, and a button with white text."""
+    image = Image.new("RGB", (900, 360), (243, 244, 246))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([0, 0, 900, 48], fill=(31, 41, 55))
+    draw.text((20, 14), "Case Dashboard", fill="white", font=font("DejaVuSans-Bold.ttf", 18))
+    body = font("DejaVuSans.ttf", 15)
+    draw.text((24, 80), "Artifact uploaded at 10:42", fill=(55, 65, 81), font=body)
+    draw.text((24, 112), "Status: analysis complete", fill=(55, 65, 81), font=body)
+    draw.text((24, 144), "Reviewer assigned: none", fill=(107, 114, 128), font=body)
+    draw.line([24, 180, 876, 180], fill=(209, 213, 219), width=1)
+    draw.rounded_rectangle([24, 210, 224, 250], radius=6, fill=(37, 99, 235))
+    draw.text((46, 220), "Download Report", fill="white", font=font("DejaVuSans-Bold.ttf", 15))
+    return image
+
+
+def low_res_text_image() -> Image.Image:
+    """8 px text in a 150x20 image, as in a thumbnail or a small crop."""
+    image = Image.new("RGB", (150, 20), "white")
+    ImageDraw.Draw(image).text((4, 6), OCR_LOW_RES_TEXT, fill=(20, 20, 20), font=font("DejaVuSans.ttf", 8))
+    return image
+
+
+def noisy_text_image() -> Image.Image:
+    """Stylised, low-contrast text on an uneven background, with speckle noise and slight blur."""
+    width, height = 900, 220
+    image = Image.new("L", (width, height))
+    image.putdata([150 + (x * 60) // width - (y * 30) // height for y in range(height) for x in range(width)])
+    draw = ImageDraw.Draw(image)
+    draw.text((40, 70), OCR_NOISY_TEXT, fill=95, font=font("DejaVuSansMono-BoldOblique.ttf", 60))
+    rng = random.Random(7)
+    pixels = image.load()
+    for _ in range(width * height // 25):
+        x, y = rng.randrange(width), rng.randrange(height)
+        pixels[x, y] = rng.choice((40, 230))
+    return image.filter(ImageFilter.GaussianBlur(1.2)).convert("RGB")
+
+
 def build_fixtures(target: Path) -> FixtureSet:
     target.mkdir(parents=True, exist_ok=True)
     base = textured_image(seed=1)
@@ -197,6 +251,9 @@ def build_fixtures(target: Path) -> FixtureSet:
     font = ImageFont.truetype(str(FONT_PATH), 56)
     ImageDraw.Draw(text_image).text((40, 60), OCR_TEXT, fill="black", font=font)
     text_image.save(path("ocr_text.png"))
+    screenshot_image().save(path("ocr_screenshot.png"))
+    low_res_text_image().save(path("ocr_low_res.png"))
+    noisy_text_image().save(path("ocr_noisy.png"))
 
     Image.new("RGB", (400, 300), "white").save(path("blank.png"))
     Image.new("RGB", (32, 32), "red").save(path("animation.gif"))
@@ -217,6 +274,9 @@ def build_fixtures(target: Path) -> FixtureSet:
         oriented=path("oriented.jpg"),
         unrelated=path("unrelated.png"),
         ocr_text=path("ocr_text.png"),
+        ocr_screenshot=path("ocr_screenshot.png"),
+        ocr_low_res=path("ocr_low_res.png"),
+        ocr_noisy=path("ocr_noisy.png"),
         blank=path("blank.png"),
         invalid_c2pa=path("invalid_c2pa.jpg"),
         c2pa=C2PA_SAMPLE,
