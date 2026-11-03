@@ -52,8 +52,24 @@
 ### OCR tests
 
 - Image with clear text produces extracted text
-- Image without text returns empty result
+- Image without text returns empty result (blank image and a textured image with no text)
 - OCR failure is recorded, not hidden
+- Word recovery is measured against the single-pass behaviour before D13
+  (`python -m tests.fixtures.measure_ocr`). Improvement is asserted only where the gain is stable;
+  elsewhere the tests assert no regression:
+  - clean rendered text: no regression
+  - screenshot-style text, including light-on-dark title bar and button text: improvement
+  - low-resolution text: no regression; upscaling applied and recorded
+  - stylised, noisy, low-contrast text: improvement, through the threshold pass
+- Pass selection rule, at and either side of each limit
+- Cleaning removes only symbol-only lines and whitespace, never a line containing a letter or digit;
+  raw text stays in `text`; every rule that changed the text is recorded
+- Upscale factor limits, threshold output and parameters, orientation and transparency handling
+- Original upload is unchanged; grayscale and threshold images and both TSVs are stored as derived files
+- Threshold pass failure makes the stage `partial` with `OCR_VARIANT_FAILED`; grayscale pass failure
+  fails the stage
+- API returns `cleaned_text`, `preprocessing`, `candidates`, and `selected`; OCR records made before
+  two-pass OCR still render
 
 ### Evidence tests
 
@@ -85,7 +101,8 @@
 - Upload shows progress
 - Analysis result renders
 - Metadata section renders
-- OCR section renders
+- OCR section renders: cleaned text with the raw output alongside, the pass used and why, each pass's
+  result or error, and preprocessing steps; OCR records made before two-pass OCR still render
 - Duplicate section renders
 - Review state can be changed
 - Error message displays correctly

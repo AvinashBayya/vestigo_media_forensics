@@ -126,8 +126,15 @@ Returns the complete evidence report.
   },
   "ocr": {
     "engine": "tesseract",
+    "languages": ["eng"],
     "text": "...",
-    "confidence": 0.0
+    "cleaned_text": null,
+    "cleaning": [],
+    "confidence": 0.0,
+    "word_count": 0,
+    "preprocessing": [],
+    "candidates": [],
+    "selected": null
   },
   "duplicates": [
     {
@@ -142,6 +149,32 @@ Returns the complete evidence report.
   }
 }
 ```
+
+## OCR section
+
+OCR runs Tesseract twice on prepared copies of the image (decision D13). The original file is never
+modified.
+
+| Field | Meaning |
+|---|---|
+| `text` | Raw Tesseract text of the selected pass, unchanged apart from removing surrounding whitespace and the page separator. |
+| `cleaned_text` | The same text after cosmetic cleaning, or `null` when cleaning changed nothing. Cleaning removes only lines that contain no letters or digits, trailing whitespace, and repeated blank lines. |
+| `cleaning` | One entry per cleaning rule that changed the text: `rule`, `description`, `lines_affected`. |
+| `confidence` | Mean of Tesseract's per-word confidence for the selected pass, 0-1. The engine's own estimate, not a measured accuracy. `null` when no words were found. |
+| `word_count` | Words found by the selected pass. |
+| `preprocessing` | Every step, applied or not: `step`, `applied`, `description`, `parameters`. Steps: `first_frame`, `exif_orientation`, `flatten_transparency`, `grayscale`, `upscale` (`factor`, `resample`, `max_factor`, `target_longest_side`, `input_size`, `output_size`), `adaptive_threshold` (`method`, `window_radius_px`, `offset`, `polarity`, `applies_to`). |
+| `candidates` | Both passes, `grayscale` then `threshold`: `variant`, `status` (`succeeded` or `failed`), `text`, `confidence`, `word_count`, `error`. |
+| `selected` | `{ "variant": "grayscale" \| "threshold", "reason": "..." }`: which pass supplied `text`, and why. |
+
+Derived files for the OCR stage (listed in `provenance.derived_files`): `ocr_input_grayscale`,
+`tesseract_tsv_grayscale`, `ocr_input_threshold`, and `tesseract_tsv_threshold`. A failed pass has no
+TSV.
+
+If the threshold pass fails and the grayscale pass succeeds, the stage status is `partial` with an
+`OCR_VARIANT_FAILED` error. If the grayscale pass fails, the stage fails.
+
+Records made before two-pass OCR return `cleaned_text: null`, empty `cleaning` and `candidates`,
+`selected: null`, and their stored preprocessing notes as steps named `note`.
 
 ## Review state values
 
