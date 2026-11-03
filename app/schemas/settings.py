@@ -1,0 +1,71 @@
+"""Basic local settings (decision M2-8).
+
+Editable settings are stored in SQLite. Environment settings come from VESTIGO_* variables or .env and
+are read-only here: they include security limits and the duplicate threshold, which is recorded in
+every duplicate-search result.
+"""
+
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.schemas.analysis import AnalysisOptions
+
+LibraryPageSize = Literal[10, 25, 50, 100]
+
+
+class EditableSettings(BaseModel):
+    # Used for new analyses when no options are given, and as the upload page's defaults.
+    default_analysis_options: AnalysisOptions = Field(default_factory=AnalysisOptions)
+    library_page_size: LibraryPageSize = 25
+    # Start the analysis as soon as an upload finishes.
+    auto_analyze_after_upload: bool = True
+
+
+class EnvironmentSettings(BaseModel):
+    data_dir: str
+    max_upload_bytes: int
+    max_image_pixels: int
+    # The pHash Hamming-distance threshold for duplicate matches (read-only in the UI).
+    duplicate_threshold: int
+    job_mode: str
+    job_workers: int
+    tool_timeout_seconds: float
+    ocr_timeout_seconds: float
+    ocr_languages: list[str]
+    log_level: str
+    app_version: str
+    schema_revision: str | None
+
+
+ENVIRONMENT_KEYS = frozenset(EnvironmentSettings.model_fields) | {"phash_max_distance"}
+
+
+class SettingsUpdate(BaseModel):
+    """Any subset of the editable settings. Environment settings cannot be changed here."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    default_analysis_options: AnalysisOptions | None = None
+    library_page_size: LibraryPageSize | None = None
+    auto_analyze_after_upload: bool | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_environment_keys(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            fixed = sorted(ENVIRONMENT_KEYS & set(data))
+            if fixed:
+                raise ValueError(
+                    f"{', '.join(fixed)} cannot be changed here: set it in the environment (.env) and "
+                    "restart the backend."
+                )
+        return data
+
+
+class SettingsResponse(BaseModel):
+    editable: EditableSettings
+    environment: EnvironmentSettings
+    # When an editable setting was last changed; None if all are at their defaults.
+    updated_at: datetime | None

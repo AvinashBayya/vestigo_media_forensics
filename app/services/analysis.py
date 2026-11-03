@@ -20,6 +20,7 @@ from app.schemas.analysis import (
     StageProgress,
 )
 from app.schemas.common import ACTIVE_JOB_STATUSES, ErrorBody, ErrorCode, JobStatus, StageStatus
+from app.services.app_settings import editable_settings
 from app.services.errors import analysis_in_progress, artifact_not_found, job_not_found
 
 
@@ -60,13 +61,19 @@ def start_image_analysis(db: Database, executor: JobExecutor, request: ImageAnal
         existing = active_job(session, artifact_id)
         if existing is not None:
             raise analysis_in_progress(existing)
+        # Requests without options use the analyst's default options from Settings (M2-8).
+        options = (
+            request.options
+            if "options" in request.model_fields_set
+            else editable_settings(session)[0].default_analysis_options
+        )
         job = AnalysisJob(
             id=ids.new_id(ids.JOB),
             artifact_id=artifact_id,
             pipeline=IMAGE_PIPELINE,
             app_version=__version__,
             status=JobStatus.QUEUED,
-            options=request.options.model_dump(),
+            options=options.model_dump(),
             created_at=utcnow(),
         )
         session.add(job)

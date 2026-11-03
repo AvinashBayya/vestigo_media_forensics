@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 
 from app import __version__
-from app.api import routes_analysis, routes_artifacts, routes_health, routes_library
+from app.api import routes_analysis, routes_artifacts, routes_health, routes_library, routes_settings
 from app.api.upload_limit import UploadSizeLimitMiddleware
 from app.core.config import Settings, get_settings
 from app.core.container import AppServices
@@ -81,6 +81,7 @@ def create_app(
     api.include_router(routes_artifacts.router)
     api.include_router(routes_analysis.router)
     api.include_router(routes_library.router)
+    api.include_router(routes_settings.router)
     app.include_router(api)
     return app
 
