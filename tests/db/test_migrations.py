@@ -143,13 +143,29 @@ def test_new_database_is_created_at_the_head_revision(tmp_path: Path) -> None:
     assert revision_in(tmp_path / "app.db") == migrations.head_revision()
 
 
+# Alembic reflects SQLite expression indexes as plain column indexes, so it would always report this
+# one as changed. Its exact definition is checked separately below.
+EXPRESSION_INDEXES = {"ix_artifacts_original_filename_nocase"}
+
+
+def _index_name(difference: tuple) -> str | None:
+    return getattr(difference[1], "name", None) if difference[0] in ("add_index", "remove_index") else None
+
+
 def test_models_match_the_head_revision(tmp_path: Path) -> None:
     db = Database(tmp_path / "app.db")
     db.initialize()
     with db.engine.connect() as connection:
         differences = compare_metadata(MigrationContext.configure(connection), Base.metadata)
     db.dispose()
-    assert differences == []
+    assert [d for d in differences if _index_name(d) not in EXPRESSION_INDEXES] == []
+    with sqlite3.connect(tmp_path / "app.db") as connection:
+        (sql,) = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'ix_artifacts_original_filename_nocase'"
+        ).fetchone()
+    assert " ".join(sql.split()) == (
+        "CREATE INDEX ix_artifacts_original_filename_nocase ON artifacts (original_filename COLLATE NOCASE)"
+    )
 
 
 def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: Path) -> None:
@@ -165,7 +181,10 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     assert db.is_healthy()
     db.dispose()
 
-    assert m1_rows(path) == before
+    after = m1_rows(path)
+    assert after.pop("schema_meta") == [("schema_version", "2")]
+    before.pop("schema_meta")
+    assert after == before
     assert revision_in(path) == migrations.head_revision()
     with sqlite3.connect(path) as connection:
         assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
@@ -256,3 +275,55 @@ def test_foreign_keys_are_enforced_again_after_migrating(tmp_path: Path) -> None
     with db.reader() as session:
         assert session.connection().exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
     db.dispose()
+
+
+# --- Milestone 2 revision (0002_m2_analyst_workflow) ------------------------------------------------
+
+
+def test_milestone_1_rows_get_milestone_2_defaults(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    db = Database(path)
+    db.initialize()
+    db.dispose()
+
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("SELECT DISTINCT in_duplicate_library FROM artifacts").fetchall() == [(1,)]
+        assert connection.execute(
+            "SELECT DISTINCT analyst_notes, review_updated_at, review_state FROM evidence_records"
+        ).fetchall() == [("", None, "UNREVIEWED")]
+        assert connection.execute("SELECT count(*) FROM review_events").fetchone() == (0,)
+        assert connection.execute("SELECT count(*) FROM app_settings").fetchone() == (0,)
+
+
+def _insert_review_event(connection: sqlite3.Connection, event_id: str, evidence_id: str | None) -> None:
+    connection.execute(
+        "INSERT INTO review_events VALUES (?, ?, ?, 'artifact', 'UNREVIEWED', 'IN_REVIEW', '', 'note', ?)",
+        (event_id, ART_A, evidence_id, T1),
+    )
+
+
+def test_review_events_are_append_only_until_the_artifact_is_deleted(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        _insert_review_event(connection, "rve_" + "1" * 32, None)
+        _insert_review_event(connection, "rve_" + "2" * 32, EV_HASH)
+        connection.commit()
+
+        for statement in (
+            "UPDATE review_events SET notes_after = 'changed'",
+            "DELETE FROM review_events",
+            f"DELETE FROM evidence_records WHERE id = '{EV_HASH}'",
+        ):
+            with pytest.raises(sqlite3.DatabaseError, match="review events are append-only"):
+                connection.execute(statement)
+        assert connection.execute("SELECT count(*) FROM review_events").fetchone() == (2,)
+
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        assert connection.execute("SELECT count(*) FROM review_events").fetchone() == (0,)
+        assert connection.execute("SELECT count(*) FROM evidence_records").fetchone() == (0,)
