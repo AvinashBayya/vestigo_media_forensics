@@ -30,6 +30,8 @@ PROVENANCE_FIELDS = {
     "review_state",
     "skip_reason",
     "derived_files",
+    "analyst_notes",
+    "review_updated_at",
 }
 VERDICT_WORDS = re.compile(
     r"authentic|fake|\breal\b|verdict|genuine|manipulat|deepfake|forg|tamper|truth|suspicious",
@@ -48,7 +50,7 @@ def analysed_report(client: TestClient, path, options: dict | None = None) -> di
 def test_report_keeps_the_03_shape_and_adds_provenance(client: TestClient, fixtures: FixtureSet) -> None:
     report = analysed_report(client, fixtures.with_metadata)
 
-    assert report["schema_version"] == "1.0"
+    assert report["schema_version"] == "1.1"
     assert report["artifact_id"].startswith("art_")
     assert report["job_id"].startswith("job_")
     assert report["created_at"].endswith("Z")

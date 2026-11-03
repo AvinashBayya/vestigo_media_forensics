@@ -4,13 +4,13 @@ from sqlalchemy import func, select
 
 from app.core.config import Settings
 from app.core.container import AppServices
-from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ImageFingerprint
+from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ImageFingerprint, ReviewEvent
 from app.services import artifacts as artifacts_service
 from tests.fixtures.make_fixtures import FixtureSet
 from tests.helpers import assert_error, upload_ok
 from tests.pipeline.test_runner import _insert_job, start_analysis
 
-ROW_MODELS = (Artifact, AnalysisJob, EvidenceRecord, DerivedFile, ImageFingerprint)
+ROW_MODELS = (Artifact, AnalysisJob, EvidenceRecord, DerivedFile, ImageFingerprint, ReviewEvent)
 
 
 def row_counts(services: AppServices, artifact_id: str) -> dict[str, int]:
@@ -31,6 +31,15 @@ def test_delete_removes_files_evidence_and_rows(
     start_analysis(client, artifact_id)
     keep_id = upload_ok(client, fixtures.png)["artifact_id"]
     start_analysis(client, keep_id)
+    # Artifact- and record-level review history (M2-3).
+    client.patch(f"/api/v1/artifacts/{artifact_id}/review", json={"state": "IN_REVIEW", "analyst_notes": "n"})
+    evidence_id = client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json()["ocr"]["provenance"][
+        "evidence_id"
+    ]
+    client.patch(
+        f"/api/v1/artifacts/{artifact_id}/evidence/{evidence_id}/review",
+        json={"state": "REVIEWED", "analyst_notes": "checked"},
+    )
     artifact_dir = settings.data_dir / "artifacts" / artifact_id
     assert all(count > 0 for count in row_counts(services, artifact_id).values())
 
@@ -44,6 +53,7 @@ def test_delete_removes_files_evidence_and_rows(
         "derived_files": 6,
         "jobs": 1,
         "evidence_records": 6,
+        "review_events": 2,
     }
     assert not artifact_dir.exists()
     assert list((settings.data_dir / "trash").iterdir()) == []
