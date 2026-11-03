@@ -13,7 +13,17 @@ from app.services.c2pa import detect_c2pa
 from app.services.duplicates import find_matches
 from app.services.hashing import hash_file, hashlib_version
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
-from app.services.ocr import LANGUAGES, PAGE_SEGMENTATION_MODE, run_ocr
+from app.services.ocr import (
+    LANGUAGES,
+    MAX_UPSCALE_FACTOR,
+    MIN_CONFIDENCE_GAIN,
+    MIN_CONFIDENCE_WITHOUT_PASS_A_WORDS,
+    MIN_WORD_RETENTION,
+    PAGE_SEGMENTATION_MODE,
+    UPSCALE_TARGET_SIDE,
+    pillow_version,
+    run_ocr,
+)
 from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
 
 IMAGE_PIPELINE = "image.v1"
@@ -187,8 +197,15 @@ class OCRStage(AnalysisStage):
     media_type = MediaType.IMAGE
     method = (
         f"Tesseract OCR (languages: {'+'.join(LANGUAGES)}; automatic page segmentation, "
-        f"--psm {PAGE_SEGMENTATION_MODE}) run on an upright PNG copy of the image. Confidence is the mean "
-        "of Tesseract's per-word confidence scores, on a 0-1 scale."
+        f"--psm {PAGE_SEGMENTATION_MODE}) run twice on copies of the image, prepared with Pillow: "
+        "(A) upright, greyscale, and upscaled up to "
+        f"{MAX_UPSCALE_FACTOR}x (Lanczos) if the longest side allows it within {UPSCALE_TARGET_SIDE} px; "
+        "(B) the same image after a local-mean adaptive threshold. Pass B is used only if it raises mean "
+        f"confidence by at least {MIN_CONFIDENCE_GAIN:.2f} while keeping at least {MIN_WORD_RETENTION:.0%} "
+        "of pass A's words, or, when pass A finds no words, if its mean confidence is at least "
+        f"{MIN_CONFIDENCE_WITHOUT_PASS_A_WORDS:.2f}. Confidence is the mean of Tesseract's per-word "
+        "confidence scores, on a 0-1 scale. Cleaned text removes only symbol-only lines and extra "
+        "whitespace; the raw text is kept unchanged."
     )
     classification = EvidenceClassification.DERIVED
     source = "artifact:original"
@@ -201,25 +218,43 @@ class OCRStage(AnalysisStage):
         "misread or missed.",
         "Confidence is Tesseract's own estimate, not a measured accuracy. Check extracted text against "
         "the image.",
+        "The choice between the two passes uses Tesseract's confidence, not measured accuracy. Upscaling "
+        "can raise confidence while changing individual characters, so check numbers and names against "
+        "the image.",
+        "The adaptive threshold assumes dark text on a lighter background and can remove faint or "
+        "light-on-dark text. Both passes are recorded so the discarded result can be checked.",
+        "Cleaned text is cosmetic: it removes lines with no letters or digits and extra whitespace. The "
+        "raw OCR text is kept unchanged.",
     )
 
     def tool_version(self, ctx: StageContext) -> str:
-        return ctx.tools.require("tesseract").version or "unknown"
+        version = ctx.tools.require("tesseract").version or "unknown"
+        return f"{version}; Pillow {pillow_version()}"
 
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         tool = ctx.tools.require("tesseract")
         result = run_ocr(tool, artifact.path, ctx.scratch_dir, ctx.settings.ocr_timeout_seconds)
-        ctx.derived.write(self.name, "tesseract_tsv", "tesseract.tsv", result.tsv)
-        return StageOutput(
-            {
-                "engine": "tesseract",
-                "languages": list(LANGUAGES),
-                "text": result.text,
-                "confidence": result.confidence,
-                "word_count": result.word_count,
-                "preprocessing": result.preprocessing,
-            }
-        )
+        for ocr_pass in result.passes:
+            if ocr_pass.image_png:
+                ctx.derived.write(
+                    self.name, f"ocr_input_{ocr_pass.variant}", f"{ocr_pass.variant}.png", ocr_pass.image_png
+                )
+            if ocr_pass.recognition is not None:
+                ctx.derived.write(
+                    self.name,
+                    f"tesseract_tsv_{ocr_pass.variant}",
+                    f"{ocr_pass.variant}.tsv",
+                    ocr_pass.recognition.tsv,
+                )
+        warnings = []
+        if result.variant_error is not None:
+            warnings.append(
+                StageError(
+                    type="OCR_VARIANT_FAILED",
+                    message=f"The threshold pass failed; the grayscale pass is used. {result.variant_error}",
+                )
+            )
+        return StageOutput(result.payload(), warnings=warnings)
 
 
 class DuplicatesStage(AnalysisStage):

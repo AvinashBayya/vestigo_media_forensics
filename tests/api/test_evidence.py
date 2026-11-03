@@ -81,7 +81,12 @@ def test_every_section_carries_complete_provenance(client: TestClient, fixtures:
         assert provenance["classification"] in ("OBSERVED", "DERIVED")
 
     assert [f["kind"] for f in report["metadata"]["provenance"]["derived_files"]] == ["exiftool_json"]
-    assert [f["kind"] for f in report["ocr"]["provenance"]["derived_files"]] == ["tesseract_tsv"]
+    assert [f["kind"] for f in report["ocr"]["provenance"]["derived_files"]] == [
+        "ocr_input_grayscale",
+        "tesseract_tsv_grayscale",
+        "ocr_input_threshold",
+        "tesseract_tsv_threshold",
+    ]
 
 
 def test_skipped_and_failed_stages_are_visible_in_the_report(

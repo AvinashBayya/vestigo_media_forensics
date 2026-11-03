@@ -40,7 +40,8 @@ def test_delete_removes_files_evidence_and_rows(
     assert response.json() == {
         "artifact_id": artifact_id,
         "original_files": 1,
-        "derived_files": 3,  # ExifTool metadata JSON, ExifTool C2PA JSON, Tesseract TSV
+        # ExifTool metadata JSON, ExifTool C2PA JSON, and for each OCR pass its input image and TSV.
+        "derived_files": 6,
         "jobs": 1,
         "evidence_records": 6,
     }
