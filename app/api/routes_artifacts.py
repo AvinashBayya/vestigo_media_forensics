@@ -8,13 +8,14 @@ from app.core.errors import AppError
 from app.schemas.artifact import (
     ArtifactDetail,
     ArtifactList,
+    ArtifactQuery,
     ArtifactUploadResponse,
     DeletionSummary,
     ReviewUpdate,
 )
 from app.schemas.common import ErrorCode, MediaType
 from app.schemas.evidence import EvidenceReport
-from app.services import artifacts, reports
+from app.services import artifacts, library, reports
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -38,13 +39,17 @@ def upload_artifact(
 
 
 @router.get("", response_model=ArtifactList)
-def list_artifacts(
-    services: Services,
-    limit: Annotated[int, Query(ge=1, le=200)] = 50,
-    offset: Annotated[int, Query(ge=0)] = 0,
-) -> ArtifactList:
-    items, total = artifacts.list_artifacts(services.db, limit, offset)
-    return ArtifactList(items=items, total=total, limit=limit, offset=offset)
+def list_artifacts(services: Services, query: Annotated[ArtifactQuery, Query()]) -> ArtifactList:
+    """Search, filter, sort, and page the artifact library (12-MILESTONE-2-PLAN.md §3)."""
+    with services.db.reader() as session:
+        page = library.list_artifacts(session, query)
+    return ArtifactList(
+        items=page.items,
+        total=page.total,
+        limit=query.limit,
+        offset=query.offset,
+        counts_by_review_state=page.counts_by_review_state,
+    )
 
 
 @router.get("/{artifact_id}", response_model=ArtifactDetail)

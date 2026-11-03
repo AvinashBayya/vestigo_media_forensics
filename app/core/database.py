@@ -17,9 +17,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core import migrations
 
 
+def _casefold(value: str | None) -> str | None:
+    return value.casefold() if isinstance(value, str) else value
+
+
 def _on_connect(dbapi_connection: Any, _: Any) -> None:
     # Let SQLAlchemy's "begin" event issue BEGIN instead of the sqlite3 driver.
     dbapi_connection.isolation_level = None
+    # SQLite's own lower() and LIKE only fold ASCII; Library search folds any Unicode text.
+    dbapi_connection.create_function("vestigo_casefold", 1, _casefold, deterministic=True)
     cursor = dbapi_connection.cursor()
     for pragma in (
         "PRAGMA foreign_keys=ON",

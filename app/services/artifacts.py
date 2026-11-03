@@ -19,7 +19,7 @@ from app.core.storage import Storage
 from app.models import AnalysisJob, Artifact, EvidenceRecord
 from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo, ReviewUpdate
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
-from app.services import analysis
+from app.services import analysis, library
 from app.services.errors import analysis_in_progress, artifact_not_found
 from app.services.hashing import CHUNK_SIZE, FileHasher, FileHashes
 from app.services.validation import (
@@ -167,16 +167,16 @@ def to_summary(artifact: Artifact, latest_job_status: str | None) -> ArtifactSum
 def get_artifact_detail(db: Database, artifact_id: str) -> ArtifactDetail:
     artifact = get_artifact(db, artifact_id)
     with db.reader() as session:
-        job = analysis.latest_job(session, artifact_id)
-    summary = to_summary(artifact, job.status if job else None)
+        item = library.list_item(session, artifact_id)
+    if item is None:
+        raise artifact_not_found(artifact_id)
     return ArtifactDetail(
-        **summary.model_dump(),
+        **item.model_dump(),
         sha256=artifact.sha256,
         md5=artifact.md5,
         width=artifact.width,
         height=artifact.height,
         review=to_review_info(artifact),
-        latest_job=analysis.to_job_summary(job) if job else None,
     )
 
 
@@ -186,27 +186,6 @@ def to_review_info(artifact: Artifact) -> ReviewInfo:
         analyst_notes=artifact.analyst_notes,
         updated_at=artifact.review_updated_at,
     )
-
-
-def list_artifacts(db: Database, limit: int, offset: int) -> tuple[list[ArtifactSummary], int]:
-    latest_status = (
-        select(AnalysisJob.status)
-        .where(AnalysisJob.artifact_id == Artifact.id)
-        .order_by(AnalysisJob.created_at.desc(), AnalysisJob.id.desc())
-        .limit(1)
-        .correlate(Artifact)
-        .scalar_subquery()
-    )
-    stmt = (
-        select(Artifact, latest_status)
-        .order_by(Artifact.created_at.desc(), Artifact.id.desc())
-        .limit(limit)
-        .offset(offset)
-    )
-    with db.reader() as session:
-        total = session.scalar(select(func.count()).select_from(Artifact)) or 0
-        rows = session.execute(stmt).all()
-    return [to_summary(artifact, status) for artifact, status in rows], total
 
 
 def update_review(db: Database, artifact_id: str, update: ReviewUpdate) -> None:

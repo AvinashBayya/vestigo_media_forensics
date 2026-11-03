@@ -1,6 +1,8 @@
 from datetime import datetime
+from enum import StrEnum
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.analysis import JobSummary
 from app.schemas.common import JobStatus, MediaType, ReviewState
@@ -33,20 +35,90 @@ class ArtifactSummary(BaseModel):
     latest_job_status: JobStatus | None
 
 
-class ArtifactDetail(ArtifactSummary):
+class ArtifactListItem(ArtifactSummary):
+    """An artifact with status indicators for its latest analysis job (see app/services/library.py)."""
+
+    latest_job: JobSummary | None
+    # Failed or partial stages in the latest job, plus one if the job itself failed. None if never analysed.
+    problem_count: int | None
+    # Matches in the latest job's duplicate search. None if that search produced no result.
+    duplicate_match_count: int | None
+    # Artifacts in the duplicate library uploaded after that search finished. None if no search result.
+    added_since_analysis: int | None
+    in_duplicate_library: bool
+
+
+class ArtifactDetail(ArtifactListItem):
     sha256: str
     md5: str
     width: int | None
     height: int | None
     review: ReviewInfo
-    latest_job: JobSummary | None
 
 
 class ArtifactList(BaseModel):
-    items: list[ArtifactSummary]
+    items: list[ArtifactListItem]
     total: int
     limit: int
     offset: int
+    # Matching artifacts per review state, ignoring the review-state and archive filters.
+    counts_by_review_state: dict[ReviewState, int]
+
+
+class AnalysisStatusFilter(StrEnum):
+    QUEUED = JobStatus.QUEUED.value
+    RUNNING = JobStatus.RUNNING.value
+    COMPLETED = JobStatus.COMPLETED.value
+    COMPLETED_WITH_ERRORS = JobStatus.COMPLETED_WITH_ERRORS.value
+    FAILED = JobStatus.FAILED.value
+    NOT_ANALYSED = "not_analysed"
+
+
+class ArtifactSort(StrEnum):
+    CREATED_AT = "created_at"
+    FILENAME = "filename"
+    SIZE_BYTES = "size_bytes"
+    REVIEW_STATE = "review_state"
+
+
+class SortOrder(StrEnum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+SupportedMimeType = Literal["image/jpeg", "image/png", "image/webp", "image/tiff"]
+
+
+class ArtifactQuery(BaseModel):
+    """Query parameters of GET /artifacts. Every parameter is optional; unknown parameters are rejected."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    q: str | None = Field(None, max_length=200)
+    review_state: list[ReviewState] = []
+    analysis_status: list[AnalysisStatusFilter] = []
+    has_problems: bool | None = None
+    has_duplicates: bool | None = None
+    mime_type: list[SupportedMimeType] = []
+    uploaded_from: AwareDatetime | None = None
+    uploaded_to: AwareDatetime | None = None
+    # True keeps the Milestone 1 behaviour of listing every artifact; the Library sends false.
+    include_archived: bool = True
+    sort: ArtifactSort = ArtifactSort.CREATED_AT
+    order: SortOrder = SortOrder.DESC
+    limit: int = Field(50, ge=1, le=200)
+    offset: int = Field(0, ge=0)
+
+    @field_validator("q")
+    @classmethod
+    def _blank_is_none(cls, value: str | None) -> str | None:
+        return value.strip() or None if value is not None else None
+
+    @model_validator(mode="after")
+    def _date_range(self) -> Self:
+        if self.uploaded_from and self.uploaded_to and self.uploaded_from > self.uploaded_to:
+            raise ValueError("uploaded_from must not be later than uploaded_to.")
+        return self
 
 
 class ReviewUpdate(BaseModel):

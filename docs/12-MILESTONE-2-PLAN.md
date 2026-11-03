@@ -82,7 +82,7 @@ Flows:
 
 | Endpoint | Change |
 |---|---|
-| `GET /artifacts` | Query: `q`, `review_state` (repeatable), `analysis_status` (repeatable; includes `not_analysed`), `has_problems`, `has_duplicates`, `mime_type`, `uploaded_from`, `uploaded_to`, `include_archived` (default false), `sort` (`created_at` · `filename` · `size_bytes` · `review_state`), `order` (`asc` · `desc`), `limit`, `offset`. Items add `latest_job`, `problem_count`, `duplicate_match_count`, `added_since_analysis`, `in_duplicate_library`. Response adds `counts_by_review_state`. Invalid parameters → 422 `VALIDATION_ERROR`. |
+| `GET /artifacts` | Query: `q`, `review_state` (repeatable), `analysis_status` (repeatable; includes `not_analysed`), `has_problems`, `has_duplicates`, `mime_type`, `uploaded_from`, `uploaded_to`, `include_archived` (default true, which keeps the M1 behaviour of listing every artifact; the Library sends false, so archived artifacts are hidden there by default), `sort` (`created_at` · `filename` · `size_bytes` · `review_state`), `order` (`asc` · `desc`), `limit`, `offset`. Items add `latest_job`, `problem_count`, `duplicate_match_count`, `added_since_analysis`, `in_duplicate_library`. Response adds `counts_by_review_state`. Invalid parameters → 422 `VALIDATION_ERROR`. |
 | `PATCH /artifacts/{id}/review` | Optional `expected_updated_at`; stale → 409 `REVIEW_CONFLICT` with current values. Writes a review event when state or notes change. |
 | `POST /artifacts/review` | Bulk `{artifact_ids (1–200), state}`; all-or-nothing; unknown IDs → 404 listing them. |
 | `GET /artifacts/{id}/review-history` | Review events (artifact and record level), newest first. |
