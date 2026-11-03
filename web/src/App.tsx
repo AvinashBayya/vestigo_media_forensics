@@ -1,19 +1,26 @@
-import { Link, Route, Routes } from "react-router";
+import { Link, Outlet, type RouteObject } from "react-router";
 
+import { Layout } from "./components/Layout";
 import { ArtifactPage } from "./pages/ArtifactPage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { UploadPage } from "./pages/UploadPage";
 
-export function AppRoutes() {
-  return (
-    <Routes>
-      <Route path="/" element={<LibraryPage />} />
-      <Route path="/upload" element={<UploadPage />} />
-      <Route path="/artifacts/:artifactId" element={<ArtifactPage />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  );
-}
+/** Route objects for a data router, which `useBlocker` (unsaved-changes guard) requires. */
+export const routes: RouteObject[] = [
+  {
+    element: (
+      <Layout>
+        <Outlet />
+      </Layout>
+    ),
+    children: [
+      { index: true, element: <LibraryPage /> },
+      { path: "upload", element: <UploadPage /> },
+      { path: "artifacts/:artifactId", element: <ArtifactPage /> },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+];
 
 function NotFound() {
   return (

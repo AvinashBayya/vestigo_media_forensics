@@ -1,15 +1,9 @@
 import { render } from "@testing-library/react";
-import { MemoryRouter } from "react-router";
+import { RouterProvider, createMemoryRouter } from "react-router";
 
-import { AppRoutes } from "../App";
-import { Layout } from "../components/Layout";
+import { routes } from "../App";
 
 export function renderApp(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Layout>
-        <AppRoutes />
-      </Layout>
-    </MemoryRouter>,
-  );
+  const router = createMemoryRouter(routes, { initialEntries: [path] });
+  return { ...render(<RouterProvider router={router} />), router };
 }
