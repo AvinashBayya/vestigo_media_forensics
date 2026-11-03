@@ -17,6 +17,10 @@
 - pytest
 - httpx
 
+## Backend — Milestone 2
+
+- Alembic (database migrations; decision M2-1). Brings in Mako.
+
 ## Frontend — Milestone 1
 
 - React

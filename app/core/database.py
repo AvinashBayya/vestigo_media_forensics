@@ -9,14 +9,12 @@ write transactions short and never hold one open while a tool runs.
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Connection
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.models import Base, SchemaMeta
-
-SCHEMA_VERSION = "1"
+from app.core import migrations
 
 
 def _on_connect(dbapi_connection: Any, _: Any) -> None:
@@ -56,24 +54,16 @@ class Database:
         """Use as `with db.writer() as session, session.begin(): ...`."""
         return self._writer()
 
-    def initialize(self) -> None:
+    def initialize(self) -> str:
+        """Create or migrate the database to the latest schema. Returns the schema revision."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        Base.metadata.create_all(self.engine)
-        with self.writer() as session, session.begin():
-            row = session.get(SchemaMeta, "schema_version")
-            if row is None:
-                session.add(SchemaMeta(key="schema_version", value=SCHEMA_VERSION))
-            elif row.value != SCHEMA_VERSION:
-                raise RuntimeError(
-                    f"Database schema version {row.value} does not match expected {SCHEMA_VERSION}."
-                )
+        return migrations.migrate(self.engine)
 
     def is_healthy(self) -> bool:
         try:
             with self.reader() as session:
-                stmt = select(SchemaMeta.value).where(SchemaMeta.key == "schema_version")
-                return session.scalar(stmt) == SCHEMA_VERSION
-        except SQLAlchemyError:
+                return migrations.current_revision(session.connection()) == migrations.head_revision()
+        except (SQLAlchemyError, migrations.SchemaError):
             return False
 
     def dispose(self) -> None:
