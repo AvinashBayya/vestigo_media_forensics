@@ -16,6 +16,10 @@ export function OCRPanel({ section }: { section: OCRSection | null }) {
     <Panel title="Text in image (OCR)" provenance={section?.provenance ?? null}>
       {section && (
         <>
+          <p className="rounded-md bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800">
+            <span className="font-medium">Provisional:</span> best-effort automatic OCR, not a verified
+            transcription. Text can be missed or misread; check it against the image.
+          </p>
           <ExtractedText section={section} />
           <Passes section={section} />
           <Preprocessing section={section} />

@@ -79,6 +79,54 @@ describe("ArtifactPage", () => {
     expect(within(ocr).queryByText(/accura/i)).not.toBeInTheDocument();
   });
 
+  it("labels OCR as provisional and keeps raw text, steps, pass, confidence, limitations and errors visible", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(
+          evidenceReport({
+            ocr: {
+              ...base.ocr!,
+              provenance: provenance("ocr", {
+                status: "partial",
+                tool: "Tesseract",
+                tool_version: "5.5.0; Pillow 13.0.0",
+                errors: [{ type: "OCR_VARIANT_FAILED", message: "The threshold pass failed." }],
+                limitations: ["Confidence is Tesseract's own estimate, not a measured accuracy."],
+              }),
+            },
+          }),
+        ),
+      ),
+    );
+    renderApp(PAGE);
+
+    const ocr = await screen.findByRole("region", { name: "Text in image (OCR)" });
+    expect(within(ocr).getByText("Provisional:")).toBeInTheDocument();
+    expect(within(ocr).getByText(/not a verified transcription/)).toBeInTheDocument();
+    expect(within(ocr).getByText("VESTIGO EVIDENCE SAMPLE 2026")).toBeInTheDocument();
+    expect(within(ocr).getByText("Converted to 8-bit greyscale.")).toBeInTheDocument();
+    expect(within(ocr).getByText("Used: Grayscale pass.")).toBeInTheDocument();
+    expect(within(ocr).getByText(/Tesseract confidence 91% \(the engine's own estimate\)/)).toBeInTheDocument();
+    expect(within(ocr).getByText("OCR_VARIANT_FAILED")).toBeInTheDocument();
+    expect(within(ocr).getByText("Method and limitations (1)")).toBeInTheDocument();
+    expect(within(ocr).getByText(/not a measured accuracy/)).toBeInTheDocument();
+  });
+
+  it("labels an empty OCR result as provisional too", async () => {
+    const base = evidenceReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
+        HttpResponse.json(evidenceReport({ ocr: { ...base.ocr!, text: "", confidence: null, word_count: 0 } })),
+      ),
+    );
+    renderApp(PAGE);
+
+    const ocr = await screen.findByRole("region", { name: "Text in image (OCR)" });
+    expect(within(ocr).getByText("No text detected.")).toBeInTheDocument();
+    expect(within(ocr).getByText("Provisional:")).toBeInTheDocument();
+  });
+
   it("shows cleaned OCR text with the raw output kept alongside", async () => {
     const base = evidenceReport();
     server.use(
