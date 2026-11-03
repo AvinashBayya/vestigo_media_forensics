@@ -49,11 +49,21 @@ Deleting an artifact removes its files, jobs, evidence, and database records.
 
 Claude Code must read all docs and produce a build plan before implementation.
 
-## D13 — OCR preprocessing: two Tesseract passes, conservative selection
+## D13 — OCR preprocessing is complete. The measured OCR result is approximately 55% on the current test set.
 
-OCR stays Tesseract, English only, local. Preprocessing uses Pillow only (no OpenCV, no new
-dependencies) and works on copies; the original upload is never modified, and the prepared images
-are stored only as derived files.
+Decision:
+- Accept current OCR as best-effort, English-only, local OCR for Milestone 1.
+- Do not continue tuning OCR now.
+- Do not add OpenCV, external OCR APIs, cloud OCR, additional languages, or new OCR engines.
+- Ensure the UI clearly labels OCR output as provisional and shows Tesseract confidence as the engine's own estimate.
+- Ensure raw OCR output, preprocessing steps, selected pass, confidence, limitations, and errors remain visible in the evidence report.
+- Add a decision record to docs/09-DECISIONS.md:
+  "OCR is best-effort in Milestone 1. OCR output is provisional evidence, not a verified transcription. Further OCR tuning is deferred."
+
+Then commit the documentation update with:
+"docs: record OCR as best-effort provisional evidence for Milestone 1"
+
+After that, stop. Do not begin Milestone 2 until I approve.
 
 - **Pass A (grayscale):** upright, greyscale, and upscaled with Lanczos by the largest whole-number
   factor up to 3x that keeps the longest side at or below 2000 px.
@@ -96,3 +106,16 @@ for clean and low-resolution text they assert no regression. The 9 px row is a m
 regression: upscaling read "4821" as "4822" while confidence went up. The 8 px gain is therefore not
 treated as stable, and the OCR limitations tell analysts to check numbers and names against the
 image.
+
+## D14 — OCR is best-effort provisional evidence in Milestone 1
+
+OCR is best-effort in Milestone 1. OCR output is provisional evidence, not a verified transcription.
+Further OCR tuning is deferred.
+
+- OCR remains Tesseract, English only, local, with the D13 preprocessing as implemented.
+- Not added in Milestone 1: OpenCV, external or cloud OCR services, additional languages, or other
+  OCR engines.
+- The UI labels OCR output as provisional (including when no text is detected) and shows Tesseract
+  confidence as the engine's own estimate, never as accuracy.
+- The evidence report keeps the raw OCR text, preprocessing steps and parameters, the selected pass
+  and the reason for it, confidence, limitations, and errors.
