@@ -18,14 +18,19 @@ The backend must:
 - Reject unsupported or dangerous file types
 - Enforce video duration, frame-size, and keyframe limits
 - Never execute uploaded media (ffprobe and ffmpeg run with argument lists and timeouts)
+- A playable preview re-encodes the stored original locally with ffmpeg, on demand only; the output
+  stays on the user's machine and the original is never modified
 
 ## 3. Allowed inputs
 
 Images (Milestone 1): JPEG, PNG, WebP, TIFF.
-Videos (Milestone 3): MP4, MOV, WebM, MKV — validated with ffprobe after byte sniffing; a video
-stream with readable dimensions and a container-reported duration within the limits is required.
+Videos (Milestone 3, extended by D19): MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, 3GP, M4V —
+validated with ffprobe after byte sniffing; a video stream with readable dimensions and a
+container-reported duration within the limits is required.
+Audio (D19): WAV, MP3, FLAC, OGG, M4A — validated with the same ffprobe pass; header-level
+inspection only, never decoding, transcription, or speaker identification.
 
-Audio files, documents, and archives are not accepted.
+Documents and archives are not accepted.
 
 ## 4. External-service policy
 

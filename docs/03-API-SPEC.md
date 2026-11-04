@@ -295,6 +295,23 @@ duplicate searches also cover video keyframes, and vice versa (M3-4).
 (`max_video_upload_bytes`, `max_video_duration_seconds`, `max_video_pixels`, `max_keyframes`,
 `scene_threshold`, `video_timeout_seconds`).
 
+## D19 additions (cross-media search, formats, audio, previews)
+
+- **Upload** also accepts AVI, MPEG-TS, WMV, FLV videos (3GP/3G2 and M4V now labelled correctly)
+  and WAV, MP3, FLAC, OGG, M4A audio (`media_type: "audio"`, dimensions null, duration
+  container-reported). New error codes: `INVALID_AUDIO`, `AUDIO_TOO_LONG`, `PREVIEW_FAILED`.
+- **`POST /analysis/audio`** queues `audio.v1` (hashes, media info, metadata, byte-identical
+  duplicate search); options `{metadata, duplicate_search}`; saved defaults in
+  `default_audio_analysis_options`. Audio duplicate matching is SHA-256 only, by design.
+- **Duplicate matches**: `frame_matches` entries add `rotation_degrees` (counter-clockwise) and
+  `mirrored`, recording the orientation under which the pair matched; 0/false is an upright match.
+- **Previews**: `POST /artifacts/{id}/preview` creates (idempotently) a re-encoded viewing copy for
+  a video; `GET …/preview` returns its facts; `GET …/preview/content` streams it with Range. The
+  copy is not evidence and never appears in the export package. `ArtifactDetail` adds
+  `has_playable_preview`; `DeletionSummary` adds `preview_files`; the library summary's storage
+  adds `preview_bytes`. Non-videos are refused with `WRONG_MEDIA_TYPE`.
+- **Settings environment** adds `max_audio_upload_bytes` and `max_audio_duration_seconds`.
+
 ## Review state values
 
 - `UNREVIEWED`

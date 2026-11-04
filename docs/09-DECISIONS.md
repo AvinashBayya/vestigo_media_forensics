@@ -187,3 +187,34 @@ Details settled while implementing D17, recorded so later work keeps them:
 - pHash pairs flat-field frames with same-position text across different scenes (a coarse-structure
   measure); the duplicate tests document this rather than hiding it.
 
+## D19 — Cross-media search, more formats, audio, and viewing previews
+
+Approved 2026-11-04 as one pass, all additive; nothing existing was removed or reshaped.
+
+- **Rotated and mirrored duplicate matching.** The pHash stages also hash each image and keyframe
+  under the seven non-upright dihedral orientations (rotations are counter-clockwise); duplicate
+  search compares the query's variants against the canonical indexes and records
+  `rotation_degrees`/`mirrored` per frame pair. Upright wins ties, image-to-image upright matches
+  keep the Milestone 1 payload shape, and the threshold stays 10 (correct orientations measured at
+  0–4; wrong orientations at 26+).
+- **Containers.** AVI, MPEG-TS, WMV/ASF, and FLV are sniffed by byte signature (the sniff window is
+  512 bytes for the three TS sync positions), and MP4-family brands label 3GP/3G2 and M4V honestly.
+  ExifTool's minor MPEG-TS advisory is surfaced as a metadata warning, never hidden.
+- **Audio, integrated.** WAV, MP3, FLAC, OGG, and M4A are accepted; one ffprobe run at upload
+  decides video vs audio (no real video stream → audio for audio-capable families; cover art does
+  not count). `audio.v1` reuses the existing hashes, media-info, and metadata stages; its duplicate
+  search is byte-identical SHA-256 only — no audio decoding, fingerprinting, transcription, or
+  speaker identification — and the evidence says a re-encoded copy will not match. Limits:
+  VESTIGO_MAX_AUDIO_UPLOAD_BYTES (200 MB), VESTIGO_MAX_AUDIO_DURATION_SECONDS (7200 s).
+- **Playable previews (amends M3-6).** On demand only, a video the browser cannot play can get one
+  re-encoded H.264/AAC viewing copy (longest side ≤ 1280, bounded by the video timeout), stored
+  read-only in `playable_previews` (Alembic 0004, schema_version 4). A preview is a viewing aid,
+  not evidence: labelled as such in the UI, excluded from the evidence package, counted separately
+  in storage and deletion summaries, and deleted with the artifact. The original is only ever read.
+- **Keyframe and OCR panel clarity.** Keyframe captions carry number, timestamp, and the exact
+  selection reason; fixed-aspect cells handle portrait and landscape; thumbnails get an inline
+  error with retry and an explicit empty state. The keyframe OCR panel shows a per-frame status for
+  every keyframe (ran / text found with the raw output expandable / failed with the recorded error /
+  outside the OCR limit), keeps the provisional (D14) labelling prominent, and words an empty result
+  as "no text was detected", never "the frame contains no text".
+

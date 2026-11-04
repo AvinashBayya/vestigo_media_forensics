@@ -170,7 +170,27 @@ with a codec fallback, media info / scene changes / keyframes / keyframe OCR / k
 panels, duplicate frame pairs, Library durations and video type filter, video defaults in
 Settings, and the read-only video limits.
 
-## 7. Container tests
+## 7. D19 tests (cross-media search, formats, audio, previews)
+
+- Rotated (display-matrix) and mirrored video copies match their original with the orientation
+  recorded; rotated and mirrored image copies match both ways; upright matches keep reporting as
+  upright and image-to-image keeps the Milestone 1 shape; no new false matches; the keyframe index
+  stays canonical.
+- Each new container classified from bytes with the right stored extension; AVI and MPEG-TS run the
+  full pipeline (TS pins ExifTool's minor advisory as a surfaced warning); a TS remux matches its
+  MP4 original.
+- Audio: each format classified; the audio pipeline runs exactly hashes, media info, metadata, and
+  duplicates; a byte-identical copy matches and a re-encode does not (with the limitation saying
+  so); exclusion honoured; limits enforced; endpoint guards in all directions; Library filters and
+  deletion.
+- Previews: created capped and H.264-playable with Range; idempotent; original untouched read-only;
+  refused for non-videos; failures leave nothing; deleted and counted with the artifact; never in
+  the evidence package; storage counted separately. Migrations v1–v3 → v4 without data loss.
+- Frontend: audio upload flow and player; preview create/swap flow with the viewing-copy label;
+  keyframe captions, orientations, empty, error+retry, and per-job keyframes; per-frame OCR status,
+  no-text wording, failure rows, disabled state, raw output.
+
+## 8. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

@@ -137,3 +137,14 @@ never silently left out.
   deleted with the artifact. Duplicate matches record frame pairs with both sides' timestamps.
 - Scene changes are ordinary editing; no stage claims a video is authentic, manipulated, or
   deceptive.
+
+## 10. Audio evidence and viewing previews (D19)
+
+- Audio artifacts carry the same evidence contract through the shared hashes, media-info, and
+  metadata stages. Audio duplicate search is byte-identical SHA-256 only, and its limitations state
+  plainly that a re-encoded copy of the same recording will not match; no audio content is ever
+  decoded or compared.
+- Duplicate frame pairs record the orientation (rotation/mirroring) under which they matched.
+- A playable preview is a re-encoded viewing copy, not evidence: it is excluded from the evidence
+  package, labelled in the UI, and deleted with the artifact. The original is never modified.
+

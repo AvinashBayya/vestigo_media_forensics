@@ -50,6 +50,14 @@ See `docs/12-MILESTONE-2-PLAN.md`.
 
 See `docs/13-MILESTONE-3-PLAN.md`.
 
+### D19 — Cross-media search, more formats, audio, and viewing previews
+
+- Duplicate search also finds rotated (90/180/270°) and mirrored copies of images and videos, recording how each pair matched
+- More video containers: AVI, MPEG-TS, WMV, FLV, plus correct 3GP and M4V labelling
+- Audio artifacts (WAV, MP3, FLAC, OGG, M4A): hashes, media information, and metadata through the same pipeline machinery; duplicate search is byte-identical only — no audio is decoded, fingerprinted, or transcribed
+- On-demand playable previews: a video the browser cannot play can get a re-encoded viewing copy, clearly labelled, never part of the evidence
+- Clearer keyframe and keyframe-OCR panels: per-frame numbers, reasons, statuses, raw OCR output, and honest empty states
+
 ## Later phases
 
 - Reverse-image search integrations
@@ -157,11 +165,22 @@ With both servers running, open http://localhost:5180.
 7. **Review, export, delete.** Review states, per-section review, history, and bulk review work on videos unchanged. "Download evidence package (ZIP)" includes the keyframes, raw ffprobe output, and scene-filter output with verified hashes (check with `sha256sum -c SHA256SUMS`). Deleting the video removes the original, every derived file, all evidence, and its keyframe fingerprints.
 8. **Settings.** Default video checks are editable; the video limits (size, duration, frame size, keyframes, scene threshold, ffmpeg timeout) are shown read-only and set with `VESTIGO_*` variables.
 
+## Manual test of the D19 additions
+
+1. **Rotated/mirrored duplicates.** Rotate a library video with `ffmpeg -display_rotation 90 -i in.mp4 -c copy rot.mp4` (or flip it with `-vf hflip`), upload, analyse: the duplicates panel lists the original with each frame pair marked "rotated 270°" or "mirrored". The same works for rotated or mirrored image copies.
+2. **More containers.** Upload an AVI, TS, WMV, FLV, or 3GP file: it is classified from its bytes and analysed like any video. Formats browsers refuse show the keyframes and offer a preview (next step).
+3. **Playable preview.** Open a video the browser cannot play (for example FFV1 or WMV): the preview box offers "Create playable preview". One click re-encodes a viewing copy and plays it, labelled "re-encoded viewing copy — not the original evidence". The export package never contains it; deleting the artifact removes it.
+4. **Audio.** Upload a WAV/MP3/FLAC/OGG/M4A: it plays in the built-in audio player, with media information (codec, channels, sample rate, container-reported duration) and ID3/container metadata as evidence. Upload the identical file again: duplicate search reports "Same file (identical bytes)". Re-encode it (e.g. WAV → MP3) and upload: no match, and the evidence's limitations explain that only byte-identical audio matches.
+5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
+6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
+
 ## Limitations
 
 - C2PA / Content Credentials are **detected, not validated**. Signatures, certificates, and hash bindings are not checked until Milestone 4 (video C2PA is also Milestone 4).
 - OCR is best-effort and English only; its output is provisional, not a verified transcription (D14). Keyframe OCR reads at most 10 sampled frames.
-- Duplicate search covers only artifacts in the local library, as it was when each analysis ran. Video matching compares sampled keyframes; content between keyframes is not searched.
+- Duplicate search covers only artifacts in the local library, as it was when each analysis ran. Video matching compares sampled keyframes (including rotated and mirrored variants); content between keyframes is not searched.
+- Audio duplicate search is byte-identical only: a re-encoded copy of the same recording will not match, because no audio content is ever decoded or compared.
+- A playable preview is a re-encoded viewing copy for the browser, clearly labelled; it is not evidence and is excluded from the evidence package.
 - Video duration, frame rate, and similar values are container-reported metadata, not decode-verified measurements. Audio is inspected from stream headers only — no decoding, transcription, or speaker identification.
 - Videos are never transcoded; a browser that cannot play a codec shows a fallback message.
 - Review conflicts are detected per artifact or record; there is no login, and the service is meant for a single analyst on their own machine.

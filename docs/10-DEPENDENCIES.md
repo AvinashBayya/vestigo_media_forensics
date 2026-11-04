@@ -51,6 +51,11 @@
 - No new Python dependencies: keyframe hashing and OCR reuse Pillow, imagehash, and Tesseract.
   OpenCV and PyAV, listed earlier as possible video dependencies, were not needed.
 
+## D19
+
+No new dependencies: the added formats, audio support, orientation-aware duplicate search, and
+playable previews all use the existing ffmpeg/ffprobe, ExifTool, Pillow, and imagehash toolchain.
+
 ## Future dependencies
 
 ### Reverse-image search
