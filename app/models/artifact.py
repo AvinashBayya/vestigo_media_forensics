@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Index, String, Text, text
+from sqlalchemy import CheckConstraint, Float, Index, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -36,3 +36,6 @@ class Artifact(Base):
     # False excludes the artifact from future duplicate searches (decision M2-7). Existing evidence is
     # never rewritten.
     in_duplicate_library: Mapped[bool] = mapped_column(default=True, server_default=text("1"))
+    # Container-reported duration for videos (decision M3-8), as ffprobe read it at upload. Not a
+    # decode-verified measurement. NULL for images.
+    duration_seconds: Mapped[float | None] = mapped_column(Float)

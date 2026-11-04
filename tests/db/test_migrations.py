@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "2")]
+    assert after.pop("schema_meta") == [("schema_version", "3")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -327,3 +327,84 @@ def test_review_events_are_append_only_until_the_artifact_is_deleted(tmp_path: P
         connection.commit()
         assert connection.execute("SELECT count(*) FROM review_events").fetchone() == (0,)
         assert connection.execute("SELECT count(*) FROM evidence_records").fetchone() == (0,)
+
+
+# --- Milestone 3 revision (0003_m3_video_foundation) ------------------------------------------------
+
+
+def build_m2_database(path: Path) -> None:
+    """A database as Milestone 2 left it: v1 data upgraded to revision 0002, plus M2 rows."""
+    build_m1_database(path)
+    db = Database(path)
+    with db.engine.connect() as connection, connection.begin():
+        command.stamp(migrations.alembic_config(connection), migrations.BASELINE_REVISION)
+        command.upgrade(migrations.alembic_config(connection), "0002_m2_analyst_workflow")
+    db.dispose()
+    with sqlite3.connect(path) as connection:
+        connection.execute("UPDATE artifacts SET in_duplicate_library = 0 WHERE id = ?", (ART_B,))
+        connection.execute(
+            "UPDATE evidence_records SET analyst_notes = 'hash checked', review_updated_at = ? WHERE id = ?",
+            (T1, EV_HASH),
+        )
+        _insert_review_event(connection, "rve_" + "3" * 32, EV_HASH)
+        connection.execute("INSERT INTO app_settings VALUES ('library_page_size', '50', ?)", (T1,))
+
+
+def m2_rows(path: Path) -> dict[str, list[tuple]]:
+    tables = dict(
+        M1_TABLES,
+        review_events="id, artifact_id, evidence_id, origin, from_state, to_state, notes_before, "
+        "notes_after, created_at",
+        app_settings="key, value_json, updated_at",
+    )
+    tables["artifacts"] += ", in_duplicate_library"
+    tables["evidence_records"] += ", analyst_notes, review_updated_at"
+    with sqlite3.connect(path) as connection:
+        return {
+            table: connection.execute(f"SELECT {columns} FROM {table} ORDER BY 1, 2").fetchall()
+            for table, columns in tables.items()
+        }
+
+
+def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m2_database(path)
+    assert revision_in(path) == "0002_m2_analyst_workflow"
+    before = m2_rows(path)
+
+    db = Database(path)
+    assert db.initialize() == migrations.head_revision()
+    assert db.is_healthy()
+    db.dispose()
+
+    after = m2_rows(path)
+    assert after.pop("schema_meta") == [("schema_version", "3")]
+    before.pop("schema_meta")
+    assert after == before
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_milestone_3_defaults_and_keyframe_cascade(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        assert connection.execute("SELECT DISTINCT duration_seconds FROM artifacts").fetchall() == [(None,)]
+        assert connection.execute("SELECT count(*) FROM keyframe_fingerprints").fetchone() == (0,)
+        connection.execute(
+            "INSERT INTO keyframe_fingerprints VALUES (?, 'phash64', 1, 3.02, 'ca13b1cc4cfd4ad2', ?, ?, ?)",
+            (ART_A, EV_PHASH, DF_A, T1),
+        )
+        # Rejected: the fingerprint must reference a real derived file and evidence record.
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO keyframe_fingerprints VALUES (?, 'phash64', 2, 6.02, 'ff', 'ev_nope', ?, ?)",
+                (ART_A, DF_A, T1),
+            )
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        assert connection.execute("SELECT count(*) FROM keyframe_fingerprints").fetchone() == (0,)

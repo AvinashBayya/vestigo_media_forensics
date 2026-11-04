@@ -5,6 +5,7 @@ import logging
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core import migrations
 from app.core.clock import utcnow
 from app.core.config import Settings
 from app.core.container import AppServices
@@ -29,7 +30,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
     assert env["duplicate_threshold"] == settings.phash_max_distance == 10
     assert env["max_upload_bytes"] == settings.max_upload_bytes
     assert env["ocr_languages"] == ["eng"]
-    assert env["schema_revision"] == "0002_m2_analyst_workflow"
+    assert env["schema_revision"] == migrations.head_revision()
     assert env["data_dir"] == str(settings.data_dir.resolve())
 
 
