@@ -94,7 +94,7 @@ describe("UploadPage", () => {
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile("notes.txt", "text/plain"));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, and MKV videos are supported.",
+      "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos are supported.",
     );
     expect(screen.getByRole("button", { name: "Upload and analyse" })).toBeDisabled();
   });

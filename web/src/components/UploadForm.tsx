@@ -8,10 +8,21 @@ import { useSettings } from "../lib/settings";
 import { ErrorBanner } from "./Messages";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/tiff"];
-const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska"];
+const VIDEO_TYPES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-matroska",
+  "video/x-msvideo",
+  "video/mp2t",
+  "video/x-ms-wmv",
+  "video/x-flv",
+  "video/3gpp",
+  "video/x-m4v",
+];
 const ACCEPTED_TYPES = [...IMAGE_TYPES, ...VIDEO_TYPES];
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|tiff?)$/i;
-const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv)$/i;
+const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv|avi|ts|wmv|flv|3gp|m4v)$/i;
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 
@@ -66,7 +77,7 @@ export function UploadForm() {
     const kind = kindOf(selected);
     if (kind === null) {
       setFile(null);
-      setError("Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, and MKV videos are supported.");
+      setError("Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos are supported.");
       return;
     }
     const limit = kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
@@ -141,7 +152,7 @@ export function UploadForm() {
         <span className="text-xs text-slate-600 dark:text-slate-400">
           {file
             ? formatBytes(file.size)
-            : "Images (JPEG, PNG, WebP, TIFF) up to 50 MB · videos (MP4, MOV, WebM, MKV) up to 500 MB"}
+            : "Images (JPEG, PNG, WebP, TIFF) up to 50 MB · videos (MP4, MOV, WebM, MKV, AVI, TS, WMV, FLV, 3GP) up to 500 MB"}
         </span>
         <input
           id="file-input"

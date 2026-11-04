@@ -72,6 +72,11 @@ class FixtureSet:
     video_mov: Path
     video_rotated: Path
     video_mirrored: Path
+    video_avi: Path
+    video_ts: Path
+    video_wmv: Path
+    video_flv: Path
+    video_3gp: Path
     video_no_audio: Path
     audio_only_mp4: Path
     truncated_mp4: Path
@@ -313,6 +318,28 @@ def build_video_fixtures(path) -> dict[str, Path]:
         path("mirrored.mp4"),
     )
     ffmpeg("-f", "lavfi", "-i", "color=c=green:s=320x240:d=4", "-c:v", "libx264", path("static.mp4"))
+    # The additional containers (D19), remuxed or re-encoded from the same sources.
+    ffmpeg("-i", scenes, "-c:v", "mpeg4", "-c:a", "mp2", path("scenes.avi"))
+    ffmpeg("-i", scenes, "-c", "copy", path("scenes.ts"))
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240:d=2", "-c:v", "wmv2", path("clip.wmv"))
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240:d=2", "-c:v", "flv1", path("clip.flv"))
+    ffmpeg(
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=s=352x288:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=duration=2",
+        "-c:v",
+        "h263",
+        "-c:a",
+        "aac",
+        "-f",
+        "3gp",
+        path("clip.3gp"),
+    )
     ffmpeg("-f", "lavfi", "-i", "color=c=gray:s=320x240:d=2", "-c:v", "libx264", path("no_audio.mp4"))
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "aac", path("audio_only.mp4"))
     # A still image taken from the video, for cross-media duplicate tests (M3-4).
@@ -328,6 +355,11 @@ def build_video_fixtures(path) -> dict[str, Path]:
         "video_mov": path("scenes.mov"),
         "video_rotated": path("rotated.mp4"),
         "video_mirrored": path("mirrored.mp4"),
+        "video_avi": path("scenes.avi"),
+        "video_ts": path("scenes.ts"),
+        "video_wmv": path("clip.wmv"),
+        "video_flv": path("clip.flv"),
+        "video_3gp": path("clip.3gp"),
         "video_no_audio": path("no_audio.mp4"),
         "audio_only_mp4": path("audio_only.mp4"),
         "truncated_mp4": path("truncated.mp4"),

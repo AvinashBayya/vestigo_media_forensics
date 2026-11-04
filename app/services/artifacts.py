@@ -195,7 +195,8 @@ def create_artifact(services: AppServices, stream: BinaryIO, filename: str | Non
             raise AppError(
                 415,
                 ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-                "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, and MKV videos are supported.",
+                "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, "
+                "FLV, and 3GP videos are supported.",
             )
         stored_path = storage.store_original(received.temp_path, artifact_id, media.extension)
     except BaseException:

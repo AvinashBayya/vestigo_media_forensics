@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import Settings
+from app.core.container import AppServices
 from app.main import create_app
 from tests.fixtures.make_fixtures import VIDEO_SCENES_DURATION, FixtureSet
 from tests.helpers import assert_error, upload, upload_ok
@@ -142,3 +143,59 @@ def test_video_limits_are_reported_read_only_in_settings(client: TestClient) -> 
         client.patch("/api/v1/settings", json={"max_video_duration_seconds": 10}), 422, "VALIDATION_ERROR"
     )
     assert "environment" in str(error["details"])
+
+
+# --- Additional containers (D19) ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("fixture", "mime_type", "extension"),
+    [
+        ("video_avi", "video/x-msvideo", "avi"),
+        ("video_ts", "video/mp2t", "ts"),
+        ("video_wmv", "video/x-ms-wmv", "wmv"),
+        ("video_flv", "video/x-flv", "flv"),
+        ("video_3gp", "video/3gpp", "3gp"),
+    ],
+)
+def test_additional_containers_are_classified_from_their_bytes(
+    client: TestClient, settings: Settings, fixtures: FixtureSet, fixture: str, mime_type: str, extension: str
+) -> None:
+    body = upload_ok(client, getattr(fixtures, fixture))
+    assert body["media_type"] == "video"
+    assert body["mime_type"] == mime_type
+    artifact_id = body["artifact_id"]
+    [original] = list((settings.data_dir / "artifacts" / artifact_id / "original").iterdir())
+    assert original.suffix == f".{extension}"
+
+
+def test_avi_and_ts_run_the_full_video_pipeline(client: TestClient, fixtures: FixtureSet) -> None:
+    for fixture in ("video_avi", "video_ts"):
+        artifact_id = upload_ok(client, getattr(fixtures, fixture))["artifact_id"]
+        assert client.post("/api/v1/analysis/video", json={"artifact_id": artifact_id}).status_code == 202
+        report = client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json()
+        assert report["media_info"]["video_streams"], fixture
+        assert report["keyframes"]["extracted"] >= 8, fixture
+        assert report["scene_changes"]["count"] == 2, fixture
+        if fixture == "video_ts":
+            # ExifTool notes a minor advisory on MPEG-TS; it is surfaced honestly, never hidden.
+            assert report["job"]["status"] == "completed_with_errors"
+            [error] = report["metadata"]["provenance"]["errors"]
+            assert error["type"] == "EXIFTOOL_WARNING"
+            assert "[minor]" in error["message"]
+            assert report["metadata"]["provenance"]["status"] == "partial"
+        else:
+            assert report["job"]["status"] == "completed", fixture
+
+
+def test_ts_and_avi_duplicates_match_the_mp4_original(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    from tests.pipeline.test_video_pipeline import analyse_video
+
+    original_id, _ = analyse_video(client, fixtures.video_scenes)
+    ts_id, _ = analyse_video(client, fixtures.video_ts)
+
+    report = client.get(f"/api/v1/artifacts/{ts_id}/evidence").json()
+    matches = {m["artifact_id"] for m in report["duplicates"]["matches"]}
+    assert original_id in matches  # a remux of the same stream matches frame for frame

@@ -25,7 +25,8 @@ JPEG = ImageFormat("jpeg", "image/jpeg", "jpg", "JPEG")
 PNG = ImageFormat("png", "image/png", "png", "PNG")
 WEBP = ImageFormat("webp", "image/webp", "webp", "WEBP")
 TIFF = ImageFormat("tiff", "image/tiff", "tiff", "TIFF")
-SNIFF_BYTES = 16
+# Enough for every signature below, including the three MPEG-TS sync bytes at 0/188/376.
+SNIFF_BYTES = 512
 
 
 class InvalidImageError(Exception):
@@ -88,6 +89,16 @@ MP4 = VideoFormat("mp4", "video/mp4", "mp4")
 MOV = VideoFormat("mov", "video/quicktime", "mov")
 WEBM = VideoFormat("webm", "video/webm", "webm")
 MKV = VideoFormat("mkv", "video/x-matroska", "mkv")
+# Additional containers (D19).
+AVI = VideoFormat("avi", "video/x-msvideo", "avi")
+WMV = VideoFormat("wmv", "video/x-ms-wmv", "wmv")
+FLV = VideoFormat("flv", "video/x-flv", "flv")
+MPEG_TS = VideoFormat("mpegts", "video/mp2t", "ts")
+THREE_GP = VideoFormat("3gp", "video/3gpp", "3gp")
+M4V = VideoFormat("m4v", "video/x-m4v", "m4v")
+
+# ASF (WMV/WMA) header object GUID.
+_ASF_GUID = bytes.fromhex("3026b2758e66cf11a6d900aa0062ce6c")
 
 # WebM is Matroska restricted to these codecs; anything else in an EBML file is plain Matroska.
 WEBM_VIDEO_CODECS = frozenset({"vp8", "vp9", "av1"})
@@ -121,17 +132,40 @@ class VideoInfo:
 
 
 def sniff_video_container(head: bytes) -> str | None:
-    """ "iso_media" (MP4/MOV family), "matroska" (WebM/MKV family), or None."""
+    """The container family from the file's bytes, or None.
+
+    "iso_media" (MP4/MOV/3GP/M4V family) and "matroska" (WebM/MKV) are resolved further after
+    ffprobe; the others map straight to one format. The weak MPEG-TS signature (0x47 sync bytes at
+    packet boundaries) is checked last.
+    """
     if len(head) >= 12 and head[4:8] == b"ftyp":
         return "iso_media"
     if head.startswith(b"\x1a\x45\xdf\xa3"):
         return "matroska"
+    if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"AVI ":
+        return "avi"
+    if head.startswith(_ASF_GUID):
+        return "asf"
+    if head.startswith(b"FLV\x01"):
+        return "flv"
+    if len(head) >= 377 and head[0] == 0x47 and head[188] == 0x47 and head[376] == 0x47:
+        return "mpeg_ts"
     return None
 
 
 def _resolve_format(container: str, head: bytes, streams: list[dict]) -> VideoFormat:
+    direct = {"avi": AVI, "asf": WMV, "flv": FLV, "mpeg_ts": MPEG_TS}
+    if container in direct:
+        return direct[container]
     if container == "iso_media":
-        return MOV if head[8:12] == b"qt  " else MP4
+        brand = head[8:12]
+        if brand == b"qt  ":
+            return MOV
+        if brand[:3] in (b"3gp", b"3g2"):
+            return THREE_GP
+        if brand == b"M4V ":
+            return M4V
+        return MP4
     codecs_fit_webm = all(
         (s.get("codec_type") == "video" and s.get("codec_name") in WEBM_VIDEO_CODECS)
         or (s.get("codec_type") == "audio" and s.get("codec_name") in WEBM_AUDIO_CODECS)

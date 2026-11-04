@@ -97,6 +97,12 @@ SupportedMimeType = Literal[
     "video/quicktime",
     "video/webm",
     "video/x-matroska",
+    "video/x-msvideo",
+    "video/mp2t",
+    "video/x-ms-wmv",
+    "video/x-flv",
+    "video/3gpp",
+    "video/x-m4v",
 ]
 
 

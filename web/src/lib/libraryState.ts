@@ -38,6 +38,12 @@ export const TYPE_CHOICES: { value: SupportedMimeType | ""; label: string }[] = 
   { value: "video/quicktime", label: "MOV video" },
   { value: "video/webm", label: "WebM video" },
   { value: "video/x-matroska", label: "MKV video" },
+  { value: "video/x-msvideo", label: "AVI video" },
+  { value: "video/mp2t", label: "MPEG-TS video" },
+  { value: "video/x-ms-wmv", label: "WMV video" },
+  { value: "video/x-flv", label: "FLV video" },
+  { value: "video/3gpp", label: "3GP video" },
+  { value: "video/x-m4v", label: "M4V video" },
 ];
 
 const SORTS: ArtifactSort[] = ["created_at", "filename", "size_bytes", "review_state"];
