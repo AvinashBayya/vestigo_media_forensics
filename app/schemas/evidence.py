@@ -180,6 +180,19 @@ class MediaInfoSection(BaseModel):
     provenance: Provenance
 
 
+class SceneChangeInfo(BaseModel):
+    # Presentation time in seconds and ffmpeg's frame-difference score (0-1).
+    time: float
+    score: float
+
+
+class SceneChangesSection(BaseModel):
+    threshold: float | None
+    count: int
+    changes: list[SceneChangeInfo]
+    provenance: Provenance
+
+
 class DuplicateMatch(BaseModel):
     artifact_id: str
     # Current filename, or None if the matched artifact has since been deleted.
@@ -219,6 +232,7 @@ class EvidenceReport(BaseModel):
     duplicates: DuplicatesSection | None
     # Video sections (Milestone 3); null for image jobs, as image sections are null for video jobs.
     media_info: MediaInfoSection | None = None
+    scene_changes: SceneChangesSection | None = None
     review: ReviewInfo
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

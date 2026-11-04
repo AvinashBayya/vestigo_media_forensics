@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.container import AppServices
-from tests.fixtures.make_fixtures import VIDEO_SCENES_DURATION, FixtureSet
+from tests.fixtures.make_fixtures import VIDEO_SCENE_CUTS, VIDEO_SCENES_DURATION, FixtureSet
 from tests.helpers import assert_error, upload_ok
 from tests.pipeline.test_runner import records_for
 
@@ -183,3 +183,54 @@ def test_video_jobs_appear_in_history_with_their_options(client: TestClient, fix
         "duplicate_search": True,
     }
     assert job["problem_count"] == 0
+
+
+# --- Scene changes (M3 step 5) ------------------------------------------------------------------
+
+
+def scene_payload(services: AppServices, job_id: str) -> dict:
+    record = next(r for r in records_for(services, job_id) if r.stage == "scene_changes")
+    assert record.status == "succeeded", record.errors
+    return record.payload
+
+
+def test_scene_changes_finds_both_cuts(
+    client: TestClient, services: AppServices, settings, fixtures: FixtureSet
+) -> None:
+    artifact_id, job_id = analyse_video(client, fixtures.video_scenes)
+
+    payload = scene_payload(services, job_id)
+    assert payload["threshold"] == 0.3
+    assert payload["count"] == 2
+    times = [change["time"] for change in payload["changes"]]
+    assert times == pytest.approx(list(VIDEO_SCENE_CUTS), abs=0.2)
+    assert all(change["score"] > 0.3 for change in payload["changes"])
+
+    raw = settings.data_dir / "artifacts" / artifact_id / "derived" / job_id / "scene_changes.ffmpeg.txt"
+    assert raw.is_file()
+    assert b"lavfi.scene_score" in raw.read_bytes()
+
+
+def test_static_video_has_no_scene_changes(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    _, job_id = analyse_video(client, fixtures.video_static)
+    payload = scene_payload(services, job_id)
+    assert payload["count"] == 0
+    assert payload["changes"] == []
+
+
+def test_scene_detection_can_be_disabled(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    _, job_id = analyse_video(client, fixtures.video_static, {"scene_detection": False})
+    record = next(r for r in records_for(services, job_id) if r.stage == "scene_changes")
+    assert record.status == "skipped"
+
+
+def test_scene_changes_report_section(client: TestClient, fixtures: FixtureSet) -> None:
+    artifact_id, _ = analyse_video(client, fixtures.video_scenes)
+    section = video_report(client, artifact_id)["scene_changes"]
+    assert section["count"] == 2
+    assert section["provenance"]["tool"] == "ffmpeg"
+    assert any("Scene changes are ordinary editing" in item for item in section["provenance"]["limitations"])

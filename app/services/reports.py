@@ -26,6 +26,7 @@ from app.schemas.evidence import (
     OCRSection,
     PerceptualHashSection,
     Provenance,
+    SceneChangesSection,
     StageError,
 )
 from app.services import review
@@ -125,6 +126,15 @@ def _media_info(payload: dict[str, Any], provenance: Provenance) -> MediaInfoSec
     )
 
 
+def _scene_changes(payload: dict[str, Any], provenance: Provenance) -> SceneChangesSection:
+    return SceneChangesSection(
+        threshold=payload.get("threshold"),
+        count=payload.get("count", 0),
+        changes=payload.get("changes", []),
+        provenance=provenance,
+    )
+
+
 def _duplicates(filenames: dict[str, str]) -> Callable[[dict[str, Any], Provenance], DuplicatesSection]:
     def build(payload: dict[str, Any], provenance: Provenance) -> DuplicatesSection:
         matches = [
@@ -206,6 +216,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "ocr": _ocr,
         "duplicates": _duplicates(filenames),
         "media_info": _media_info,
+        "scene_changes": _scene_changes,
     }
     sections = {
         stage: build(records[stage].payload, _provenance(records[stage], derived.get(stage, [])))

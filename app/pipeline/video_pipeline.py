@@ -9,6 +9,7 @@ from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFa
 from app.pipeline.image_pipeline import HashesStage, MetadataStage
 from app.schemas.common import EvidenceClassification, MediaType
 from app.services import media_info
+from app.services.scenes import detect_scene_changes
 from app.services.validation import InvalidVideoError, probe_video
 
 VIDEO_PIPELINE = "video.v1"
@@ -62,8 +63,50 @@ class MediaInfoStage(AnalysisStage):
         return StageOutput(media_info.summarize(probe.data))
 
 
+class SceneChangesStage(AnalysisStage):
+    name = "scene_changes"
+    media_type = MediaType.VIDEO
+    method = (
+        "ffmpeg's scene filter (select='gt(scene,threshold)') compares each decoded frame with the "
+        "previous one and scores how different they are, from 0 to 1. Frames scoring above the "
+        "threshold are listed with their presentation timestamps. The raw filter output is kept as a "
+        "derived file."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "artifact:original"
+    tool_name = "ffmpeg"
+    option = "scene_detection"
+    limitations = (
+        "The score is a frame-difference measure. Gradual transitions such as dissolves or fades may "
+        "score below the threshold and be missed, and fast motion or flashes can score above it "
+        "without a cut.",
+        "Scene changes are ordinary editing. They say nothing about whether the video is manipulated "
+        "or deceptive.",
+        "Timestamps are presentation times from decoding and can differ slightly between players.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return ctx.tools.require("ffmpeg").version or "unknown"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("ffmpeg")
+        threshold = ctx.settings.scene_threshold
+        result = detect_scene_changes(
+            tool, artifact.path, threshold, ctx.scratch_dir, ctx.settings.video_timeout_seconds
+        )
+        ctx.derived.write(self.name, "ffmpeg_scene_output", "ffmpeg.txt", result.raw_output)
+        return StageOutput(
+            {
+                "threshold": threshold,
+                "count": len(result.changes),
+                "changes": [{"time": change.time, "score": change.score} for change in result.changes],
+            }
+        )
+
+
 VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoHashesStage(),
     MediaInfoStage(),
     VideoMetadataStage(),
+    SceneChangesStage(),
 )
