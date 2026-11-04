@@ -166,8 +166,21 @@ export function ArtifactPage() {
               <p className="p-4 text-sm text-slate-600 dark:text-slate-400">
                 {artifact.media_type === "video"
                   ? "This video cannot be played in the browser (codec or container not supported). The keyframes below show its content."
-                  : "This format cannot be previewed in the browser."}
+                  : artifact.media_type === "audio"
+                    ? "This audio file cannot be played in the browser."
+                    : "This format cannot be previewed in the browser."}
               </p>
+            ) : artifact.media_type === "audio" ? (
+              <div className="p-3">
+                <audio
+                  src={contentUrl(artifact.artifact_id)}
+                  controls
+                  preload="metadata"
+                  aria-label={`Preview of ${artifact.filename}`}
+                  onError={() => setPreviewFailed(true)}
+                  className="w-full"
+                />
+              </div>
             ) : artifact.media_type === "video" ? (
               // No transcoding (M3-6): the original streams with HTTP Range, or the fallback shows.
               <video
@@ -247,7 +260,16 @@ export function ArtifactPage() {
               </div>
               <ProblemsSummary report={report} job={shownJob} />
               <HashesPanel section={report.hashes} />
-              {artifact.media_type === "video" ? (
+              {artifact.media_type === "audio" ? (
+                <>
+                  <MediaInfoPanel section={report.media_info} />
+                  <DuplicatesPanel
+                    section={report.duplicates}
+                    addedSince={viewingEarlier ? null : artifact.added_since_analysis}
+                    onRerun={analysing ? undefined : () => void runAnalysis()}
+                  />
+                </>
+              ) : artifact.media_type === "video" ? (
                 <>
                   <MediaInfoPanel section={report.media_info} />
                   <SceneChangesPanel section={report.scene_changes} />

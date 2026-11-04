@@ -54,6 +54,8 @@ def environment_settings(services: AppServices) -> EnvironmentSettings:
         max_keyframes=settings.max_keyframes,
         scene_threshold=settings.scene_threshold,
         video_timeout_seconds=settings.video_timeout_seconds,
+        max_audio_upload_bytes=settings.max_audio_upload_bytes,
+        max_audio_duration_seconds=settings.max_audio_duration_seconds,
         job_mode=settings.job_mode,
         job_workers=settings.job_workers,
         tool_timeout_seconds=settings.tool_timeout_seconds,

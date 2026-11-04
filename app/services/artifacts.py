@@ -23,14 +23,20 @@ from app.services import analysis, library
 from app.services.errors import analysis_in_progress, artifact_not_found
 from app.services.hashing import CHUNK_SIZE, FileHasher, FileHashes
 from app.services.validation import (
+    AUDIO_CAPABLE_FAMILIES,
     SNIFF_BYTES,
+    AudioTooLongError,
     ImageTooLargeError,
+    InvalidAudioError,
     InvalidImageError,
     InvalidVideoError,
     VideoResolutionError,
     VideoTooLongError,
+    has_real_video_stream,
+    inspect_audio,
     inspect_image,
     inspect_video,
+    probe_video,
     sniff_image_format,
     sniff_video_container,
 )
@@ -94,8 +100,8 @@ class ValidatedMedia:
     media_type: MediaType
     mime_type: str
     extension: str
-    width: int
-    height: int
+    width: int | None
+    height: int | None
     # Container-reported for videos (decision M3-8); None for images.
     duration_seconds: float | None
 
@@ -133,26 +139,45 @@ def _validate_image(services: AppServices, received: ReceivedUpload, image_forma
     )
 
 
-def _validate_video(services: AppServices, received: ReceivedUpload, container: str) -> ValidatedMedia:
+def _validate_av(services: AppServices, received: ReceivedUpload, container: str) -> ValidatedMedia:
+    """One ffprobe run decides whether an AV container is a video or an audio artifact (D19)."""
     settings = services.settings
-    if received.hashes.size_bytes > settings.max_video_upload_bytes:
-        raise _file_too_large(settings.max_video_upload_bytes)
     try:
-        info = inspect_video(
-            services.tools.require("ffprobe"),
-            received.temp_path,
-            container,
-            received.head,
-            max_pixels=settings.max_video_pixels,
-            max_duration_seconds=settings.max_video_duration_seconds,
-            timeout=settings.tool_timeout_seconds,
+        probe = probe_video(
+            services.tools.require("ffprobe"), received.temp_path, settings.tool_timeout_seconds
         )
     except InvalidVideoError as exc:
         raise AppError(
             422,
             ErrorCode.INVALID_VIDEO,
-            f"The file starts like a video container but could not be validated: {exc}.",
+            f"The file starts like a media container but could not be validated: {exc}.",
         ) from exc
+    if has_real_video_stream(probe.data.get("streams", [])):
+        return _validate_video(services, received, container, probe.data)
+    if container in AUDIO_CAPABLE_FAMILIES:
+        return _validate_audio(services, received, container, probe.data)
+    raise AppError(
+        422,
+        ErrorCode.INVALID_VIDEO,
+        "The file starts like a video container but could not be validated: the file contains no "
+        "video stream.",
+    )
+
+
+def _validate_video(
+    services: AppServices, received: ReceivedUpload, container: str, probe: dict
+) -> ValidatedMedia:
+    settings = services.settings
+    if received.hashes.size_bytes > settings.max_video_upload_bytes:
+        raise _file_too_large(settings.max_video_upload_bytes)
+    try:
+        info = inspect_video(
+            probe,
+            container,
+            received.head,
+            max_pixels=settings.max_video_pixels,
+            max_duration_seconds=settings.max_video_duration_seconds,
+        )
     except VideoTooLongError as exc:
         raise AppError(
             422,
@@ -169,6 +194,12 @@ def _validate_video(services: AppServices, received: ReceivedUpload, container: 
             f"{settings.max_video_pixels:,} pixels.",
             {"max_pixels": settings.max_video_pixels},
         ) from exc
+    except InvalidVideoError as exc:
+        raise AppError(
+            422,
+            ErrorCode.INVALID_VIDEO,
+            f"The file starts like a video container but could not be validated: {exc}.",
+        ) from exc
     return ValidatedMedia(
         MediaType.VIDEO,
         info.format.mime_type,
@@ -176,6 +207,33 @@ def _validate_video(services: AppServices, received: ReceivedUpload, container: 
         info.width,
         info.height,
         info.duration_seconds,
+    )
+
+
+def _validate_audio(
+    services: AppServices, received: ReceivedUpload, container: str, probe: dict
+) -> ValidatedMedia:
+    settings = services.settings
+    if received.hashes.size_bytes > settings.max_audio_upload_bytes:
+        raise _file_too_large(settings.max_audio_upload_bytes)
+    try:
+        info = inspect_audio(probe, container, max_duration_seconds=settings.max_audio_duration_seconds)
+    except AudioTooLongError as exc:
+        raise AppError(
+            422,
+            ErrorCode.AUDIO_TOO_LONG,
+            f"Audio duration {exc.duration_seconds:g} s exceeds the maximum of "
+            f"{settings.max_audio_duration_seconds:g} s.",
+            {"max_duration_seconds": settings.max_audio_duration_seconds},
+        ) from exc
+    except InvalidAudioError as exc:
+        raise AppError(
+            422,
+            ErrorCode.INVALID_AUDIO,
+            f"The file starts like an audio container but could not be validated: {exc}.",
+        ) from exc
+    return ValidatedMedia(
+        MediaType.AUDIO, info.format.mime_type, info.format.extension, None, None, info.duration_seconds
     )
 
 
@@ -190,13 +248,13 @@ def create_artifact(services: AppServices, stream: BinaryIO, filename: str | Non
         if image_format is not None:
             media = _validate_image(services, received, image_format)
         elif video_container is not None:
-            media = _validate_video(services, received, video_container)
+            media = _validate_av(services, received, video_container)
         else:
             raise AppError(
                 415,
                 ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-                "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, "
-                "FLV, and 3GP videos are supported.",
+                "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, "
+                "FLV, and 3GP videos, and WAV, MP3, FLAC, OGG, and M4A audio files are supported.",
             )
         stored_path = storage.store_original(received.temp_path, artifact_id, media.extension)
     except BaseException:

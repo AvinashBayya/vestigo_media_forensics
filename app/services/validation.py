@@ -100,6 +100,18 @@ M4V = VideoFormat("m4v", "video/x-m4v", "m4v")
 # ASF (WMV/WMA) header object GUID.
 _ASF_GUID = bytes.fromhex("3026b2758e66cf11a6d900aa0062ce6c")
 
+# Audio formats (D19). The same container machinery validates them; only header-level facts are
+# ever read from audio (M3-7).
+WAV = VideoFormat("wav", "audio/wav", "wav")
+MP3 = VideoFormat("mp3", "audio/mpeg", "mp3")
+FLAC = VideoFormat("flac", "audio/flac", "flac")
+OGG_AUDIO = VideoFormat("ogg", "audio/ogg", "ogg")
+OGG_VIDEO = VideoFormat("ogv", "video/ogg", "ogv")
+M4A = VideoFormat("m4a", "audio/mp4", "m4a")
+
+# Families that may resolve to an audio artifact when ffprobe finds no real video stream.
+AUDIO_CAPABLE_FAMILIES = frozenset({"wav", "mp3", "flac", "ogg", "iso_media"})
+
 # WebM is Matroska restricted to these codecs; anything else in an EBML file is plain Matroska.
 WEBM_VIDEO_CODECS = frozenset({"vp8", "vp9", "av1"})
 WEBM_AUDIO_CODECS = frozenset({"vorbis", "opus"})
@@ -107,6 +119,40 @@ WEBM_AUDIO_CODECS = frozenset({"vorbis", "opus"})
 
 class InvalidVideoError(Exception):
     """The file sniffed as a video container but could not be read as a valid video."""
+
+
+class NoVideoStreamError(InvalidVideoError):
+    """The container parsed but holds no real video stream (it may still be a valid audio file)."""
+
+
+class InvalidAudioError(Exception):
+    """The file sniffed as an audio container but could not be read as valid audio."""
+
+
+class AudioTooLongError(Exception):
+    def __init__(self, duration_seconds: float) -> None:
+        super().__init__(f"{duration_seconds:g} s")
+        self.duration_seconds = duration_seconds
+
+
+@dataclass(frozen=True)
+class AudioInfo:
+    format: VideoFormat
+    # As reported by the container (decision M3-8); not a decode-verified measurement.
+    duration_seconds: float
+
+
+def inspect_audio(probe: dict, container: str, *, max_duration_seconds: float) -> AudioInfo:
+    """Confirm an already-probed, video-less container holds audio within the limits (D19)."""
+    streams = probe.get("streams", [])
+    if not any(s.get("codec_type") == "audio" for s in streams):
+        raise InvalidAudioError("the file contains no audio stream")
+    duration = _duration_seconds(probe)
+    if duration is None or duration <= 0:
+        raise InvalidAudioError("the container reports no readable duration")
+    if duration > max_duration_seconds:
+        raise AudioTooLongError(duration)
+    return AudioInfo(resolve_audio_format(container), round(duration, 3))
 
 
 class VideoTooLongError(Exception):
@@ -148,13 +194,32 @@ def sniff_video_container(head: bytes) -> str | None:
         return "asf"
     if head.startswith(b"FLV\x01"):
         return "flv"
+    if len(head) >= 12 and head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "wav"
+    if head.startswith(b"fLaC"):
+        return "flac"
+    if head.startswith(b"OggS"):
+        return "ogg"
+    if head.startswith(b"ID3") or (len(head) >= 2 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
+        return "mp3"
     if len(head) >= 377 and head[0] == 0x47 and head[188] == 0x47 and head[376] == 0x47:
         return "mpeg_ts"
     return None
 
 
+def has_real_video_stream(streams: list[dict]) -> bool:
+    """A video stream that is not attached cover art (album covers in MP3/M4A do not count)."""
+    return any(
+        s.get("codec_type") == "video" and not s.get("disposition", {}).get("attached_pic") for s in streams
+    )
+
+
+def resolve_audio_format(container: str) -> VideoFormat:
+    return {"wav": WAV, "mp3": MP3, "flac": FLAC, "ogg": OGG_AUDIO, "iso_media": M4A}[container]
+
+
 def _resolve_format(container: str, head: bytes, streams: list[dict]) -> VideoFormat:
-    direct = {"avi": AVI, "asf": WMV, "flv": FLV, "mpeg_ts": MPEG_TS}
+    direct = {"avi": AVI, "asf": WMV, "flv": FLV, "mpeg_ts": MPEG_TS, "ogg": OGG_VIDEO}
     if container in direct:
         return direct[container]
     if container == "iso_media":
@@ -208,17 +273,14 @@ def probe_video(ffprobe: ToolStatus, path: Path, timeout: float) -> ProbeResult:
 
 
 def inspect_video(
-    ffprobe: ToolStatus,
-    path: Path,
+    probe: dict,
     container: str,
     head: bytes,
     *,
     max_pixels: int,
     max_duration_seconds: float,
-    timeout: float,
 ) -> VideoInfo:
-    """Confirm the sniffed container holds a decodable video within the limits (M3-2)."""
-    probe = probe_video(ffprobe, path, timeout).data
+    """Confirm an already-probed container holds a video within the limits (M3-2)."""
     streams = probe["streams"]
     video_streams = [
         s
@@ -226,7 +288,7 @@ def inspect_video(
         if s.get("codec_type") == "video" and not s.get("disposition", {}).get("attached_pic")
     ]
     if not video_streams:
-        raise InvalidVideoError("the file contains no video stream")
+        raise NoVideoStreamError("the file contains no video stream")
     first = video_streams[0]
     width, height = int(first.get("width") or 0), int(first.get("height") or 0)
     if width <= 0 or height <= 0:

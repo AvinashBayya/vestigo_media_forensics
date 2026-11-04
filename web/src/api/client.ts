@@ -21,6 +21,7 @@ import type {
   SettingsResponse,
   EditableSettings,
   VideoAnalysisOptions,
+  AudioAnalysisOptions,
   ReviewState,
 } from "./types";
 
@@ -109,9 +110,18 @@ export function startVideoAnalysis(artifactId: string, options?: VideoAnalysisOp
   );
 }
 
+/** Without `options`, the backend uses the saved default audio analysis options. */
+export function startAudioAnalysis(artifactId: string, options?: AudioAnalysisOptions): Promise<JobCreated> {
+  return call(
+    http.post<JobCreated>("/analysis/audio", { artifact_id: artifactId, ...(options ? { options } : {}) }),
+  );
+}
+
 /** Starts the pipeline matching the artifact's media type, with the saved defaults. */
 export function startAnalysis(artifactId: string, mediaType: MediaType): Promise<JobCreated> {
-  return mediaType === "video" ? startVideoAnalysis(artifactId) : startImageAnalysis(artifactId);
+  if (mediaType === "video") return startVideoAnalysis(artifactId);
+  if (mediaType === "audio") return startAudioAnalysis(artifactId);
+  return startImageAnalysis(artifactId);
 }
 
 /** A derived file's content (for example a keyframe thumbnail). */

@@ -44,6 +44,11 @@ export const TYPE_CHOICES: { value: SupportedMimeType | ""; label: string }[] = 
   { value: "video/x-flv", label: "FLV video" },
   { value: "video/3gpp", label: "3GP video" },
   { value: "video/x-m4v", label: "M4V video" },
+  { value: "audio/wav", label: "WAV audio" },
+  { value: "audio/mpeg", label: "MP3 audio" },
+  { value: "audio/flac", label: "FLAC audio" },
+  { value: "audio/ogg", label: "OGG audio" },
+  { value: "audio/mp4", label: "M4A audio" },
 ];
 
 const SORTS: ArtifactSort[] = ["created_at", "filename", "size_bytes", "review_state"];

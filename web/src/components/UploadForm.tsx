@@ -1,8 +1,8 @@
 import { useEffect, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 
-import { errorMessage, startImageAnalysis, startVideoAnalysis, uploadArtifact } from "../api/client";
-import type { AnalysisOptions, VideoAnalysisOptions } from "../api/types";
+import { errorMessage, startAudioAnalysis, startImageAnalysis, startVideoAnalysis, uploadArtifact } from "../api/client";
+import type { AnalysisOptions, AudioAnalysisOptions, VideoAnalysisOptions } from "../api/types";
 import { formatBytes } from "../lib/format";
 import { useSettings } from "../lib/settings";
 import { ErrorBanner } from "./Messages";
@@ -20,17 +20,23 @@ const VIDEO_TYPES = [
   "video/3gpp",
   "video/x-m4v",
 ];
-const ACCEPTED_TYPES = [...IMAGE_TYPES, ...VIDEO_TYPES];
+
 const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|tiff?)$/i;
 const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv|avi|ts|wmv|flv|3gp|m4v)$/i;
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 
-type MediaKind = "image" | "video";
+const AUDIO_TYPES = ["audio/wav", "audio/x-wav", "audio/mpeg", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a"];
+const AUDIO_EXTENSIONS = /\.(wav|mp3|flac|ogg|m4a)$/i;
+const ACCEPTED_TYPES = [...IMAGE_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES];
+const MAX_AUDIO_BYTES = 200 * 1024 * 1024;
+
+type MediaKind = "image" | "video" | "audio";
 
 function kindOf(file: File): MediaKind | null {
   if (IMAGE_TYPES.includes(file.type) || IMAGE_EXTENSIONS.test(file.name)) return "image";
   if (VIDEO_TYPES.includes(file.type) || VIDEO_EXTENSIONS.test(file.name)) return "video";
+  if (AUDIO_TYPES.includes(file.type) || AUDIO_EXTENSIONS.test(file.name)) return "audio";
   return null;
 }
 
@@ -39,6 +45,11 @@ export const OPTION_LABELS: Record<keyof AnalysisOptions, string> = {
   c2pa: "Content Credentials (C2PA) detection",
   ocr: "Text in image (OCR, English)",
   duplicate_search: "Duplicate search in the local library",
+};
+
+export const AUDIO_OPTION_LABELS: Record<keyof AudioAnalysisOptions, string> = {
+  metadata: "Embedded metadata (ID3 and container tags)",
+  duplicate_search: "Duplicate search (byte-identical files only)",
 };
 
 export const VIDEO_OPTION_LABELS: Record<keyof VideoAnalysisOptions, string> = {
@@ -57,6 +68,7 @@ export function UploadForm() {
   const autoAnalyze = settings.auto_analyze_after_upload;
   const [options, setOptions] = useState<AnalysisOptions>(settings.default_analysis_options);
   const [videoOptions, setVideoOptions] = useState<VideoAnalysisOptions>(settings.default_video_analysis_options);
+  const [audioOptions, setAudioOptions] = useState<AudioAnalysisOptions>(settings.default_audio_analysis_options);
   const [optionsTouched, setOptionsTouched] = useState(false);
 
   // Start from the saved defaults once they arrive, unless the analyst already changed the options.
@@ -64,6 +76,7 @@ export function UploadForm() {
     if (settingsLoaded && !optionsTouched) {
       setOptions(settings.default_analysis_options);
       setVideoOptions(settings.default_video_analysis_options);
+      setAudioOptions(settings.default_audio_analysis_options);
     }
   }, [settingsLoaded, optionsTouched, settings.default_analysis_options, settings.default_video_analysis_options]);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -77,13 +90,16 @@ export function UploadForm() {
     const kind = kindOf(selected);
     if (kind === null) {
       setFile(null);
-      setError("Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos are supported.");
+      setError(
+        "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos, and WAV, MP3, FLAC, OGG, and M4A audio files are supported.",
+      );
       return;
     }
-    const limit = kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+    const limit = kind === "video" ? MAX_VIDEO_BYTES : kind === "audio" ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES;
+    const limitLabel = kind === "video" ? "500" : kind === "audio" ? "200" : "50";
     if (selected.size > limit) {
       setFile(null);
-      setError(`The file is larger than the ${kind === "video" ? "500" : "50"} MB limit for ${kind}s.`);
+      setError(`The file is larger than the ${limitLabel} MB limit for ${kind} files.`);
       return;
     }
     setFile(selected);
@@ -120,6 +136,7 @@ export function UploadForm() {
     setPhase("starting");
     try {
       if (fileKind === "video") await startVideoAnalysis(artifactId, videoOptions);
+      else if (fileKind === "audio") await startAudioAnalysis(artifactId, audioOptions);
       else await startImageAnalysis(artifactId, options);
       navigate(`/artifacts/${artifactId}`);
     } catch (err) {
@@ -152,7 +169,7 @@ export function UploadForm() {
         <span className="text-xs text-slate-600 dark:text-slate-400">
           {file
             ? formatBytes(file.size)
-            : "Images (JPEG, PNG, WebP, TIFF) up to 50 MB · videos (MP4, MOV, WebM, MKV, AVI, TS, WMV, FLV, 3GP) up to 500 MB"}
+            : "Images up to 50 MB · videos (MP4, MOV, WebM, MKV, AVI, TS, WMV, FLV, 3GP) up to 500 MB · audio (WAV, MP3, FLAC, OGG, M4A) up to 200 MB"}
         </span>
         <input
           id="file-input"
@@ -171,6 +188,20 @@ export function UploadForm() {
       )}
       <fieldset className="space-y-1" disabled={busy} hidden={!autoAnalyze}>
         <legend className="mb-1 text-sm font-medium">Checks to run</legend>
+        {fileKind === "audio" &&
+          (Object.keys(AUDIO_OPTION_LABELS) as (keyof AudioAnalysisOptions)[]).map((key) => (
+            <label key={key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={audioOptions[key]}
+                onChange={(event) => {
+                  setOptionsTouched(true);
+                  setAudioOptions({ ...audioOptions, [key]: event.target.checked });
+                }}
+              />
+              {AUDIO_OPTION_LABELS[key]}
+            </label>
+          ))}
         {fileKind === "video"
           ? (Object.keys(VIDEO_OPTION_LABELS) as (keyof VideoAnalysisOptions)[]).map((key) => (
               <label key={key} className="flex items-center gap-2 text-sm">
@@ -185,7 +216,9 @@ export function UploadForm() {
                 {VIDEO_OPTION_LABELS[key]}
               </label>
             ))
-          : (Object.keys(OPTION_LABELS) as (keyof AnalysisOptions)[]).map((key) => (
+          : fileKind === "audio"
+            ? null
+            : (Object.keys(OPTION_LABELS) as (keyof AnalysisOptions)[]).map((key) => (
               <label key={key} className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -201,7 +234,9 @@ export function UploadForm() {
         <p className="text-xs text-slate-600 dark:text-slate-400">
           {fileKind === "video"
             ? "File hashes, media information, keyframes, and keyframe perceptual hashes always run."
-            : "File hashes and the perceptual hash always run."}
+            : fileKind === "audio"
+              ? "File hashes and media information always run. No audio is decoded or transcribed."
+              : "File hashes and the perceptual hash always run."}
         </p>
       </fieldset>
 

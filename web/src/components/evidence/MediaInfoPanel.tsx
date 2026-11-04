@@ -32,6 +32,7 @@ export function MediaInfoPanel({ section }: { section: MediaInfoSection | null }
           {section.audio_streams.map((stream) => (
             <AudioStreamRow key={`a${stream.index}`} stream={stream} />
           ))}
+          {section.video_streams.length === 0 && <p className={MUTED}>No video stream.</p>}
           {section.audio_streams.length === 0 && <p className={MUTED}>No audio stream.</p>}
           <p className={MUTED}>
             Values are read from the container and stream headers as written. Audio is inspected from its

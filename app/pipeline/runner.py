@@ -13,6 +13,7 @@ from app.core.clock import utcnow
 from app.core.container import AppServices
 from app.core.logging import exception_location, get_logger, log_event
 from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord
+from app.pipeline.audio_pipeline import AUDIO_PIPELINE, AUDIO_STAGES
 from app.pipeline.base import (
     AnalysisStage,
     ArtifactView,
@@ -23,13 +24,21 @@ from app.pipeline.base import (
 )
 from app.pipeline.image_pipeline import IMAGE_PIPELINE, IMAGE_STAGES
 from app.pipeline.video_pipeline import VIDEO_PIPELINE, VIDEO_STAGES
-from app.schemas.analysis import AnalysisOptions, VideoAnalysisOptions
+from app.schemas.analysis import AnalysisOptions, AudioAnalysisOptions, VideoAnalysisOptions
 from app.schemas.common import ErrorCode, JobStatus, ReviewState, StageStatus
 
 logger = get_logger("pipeline")
 
-PIPELINES: dict[str, Sequence[AnalysisStage]] = {IMAGE_PIPELINE: IMAGE_STAGES, VIDEO_PIPELINE: VIDEO_STAGES}
-OPTIONS_MODELS = {IMAGE_PIPELINE: AnalysisOptions, VIDEO_PIPELINE: VideoAnalysisOptions}
+PIPELINES: dict[str, Sequence[AnalysisStage]] = {
+    IMAGE_PIPELINE: IMAGE_STAGES,
+    VIDEO_PIPELINE: VIDEO_STAGES,
+    AUDIO_PIPELINE: AUDIO_STAGES,
+}
+OPTIONS_MODELS = {
+    IMAGE_PIPELINE: AnalysisOptions,
+    VIDEO_PIPELINE: VideoAnalysisOptions,
+    AUDIO_PIPELINE: AudioAnalysisOptions,
+}
 
 
 @dataclass(frozen=True)

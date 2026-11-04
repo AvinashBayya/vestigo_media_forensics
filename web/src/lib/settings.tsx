@@ -10,9 +10,12 @@ export const DEFAULT_VIDEO_OPTIONS = {
   duplicate_search: true,
 } as const;
 
+export const DEFAULT_AUDIO_OPTIONS = { metadata: true, duplicate_search: true } as const;
+
 export const DEFAULT_SETTINGS: EditableSettings = {
   default_analysis_options: DEFAULT_OPTIONS,
   default_video_analysis_options: { ...DEFAULT_VIDEO_OPTIONS },
+  default_audio_analysis_options: { ...DEFAULT_AUDIO_OPTIONS },
   library_page_size: 25,
   auto_analyze_after_upload: true,
 };

@@ -1,6 +1,6 @@
 // Mirrors the Pydantic schemas in app/schemas/.
 
-export type MediaType = "image" | "video";
+export type MediaType = "image" | "video" | "audio";
 
 export type ReviewState = "UNREVIEWED" | "IN_REVIEW" | "REVIEWED" | "FLAGGED" | "ARCHIVED";
 export const REVIEW_STATES: ReviewState[] = ["UNREVIEWED", "IN_REVIEW", "REVIEWED", "FLAGGED", "ARCHIVED"];
@@ -97,7 +97,13 @@ export type SupportedMimeType =
   | "video/x-ms-wmv"
   | "video/x-flv"
   | "video/3gpp"
-  | "video/x-m4v";
+  | "video/x-m4v"
+  | "video/ogg"
+  | "audio/wav"
+  | "audio/mpeg"
+  | "audio/flac"
+  | "audio/ogg"
+  | "audio/mp4";
 
 /** Query parameters of GET /artifacts. All optional. */
 export interface ArtifactQuery {
@@ -168,6 +174,12 @@ export interface VideoAnalysisOptions {
   metadata: boolean;
   scene_detection: boolean;
   keyframe_ocr: boolean;
+  duplicate_search: boolean;
+}
+
+/** Audio options (D19): header-level stages only; no audio is ever decoded. */
+export interface AudioAnalysisOptions {
+  metadata: boolean;
   duplicate_search: boolean;
 }
 
@@ -443,6 +455,7 @@ export const LIBRARY_PAGE_SIZES: LibraryPageSize[] = [10, 25, 50, 100];
 export interface EditableSettings {
   default_analysis_options: AnalysisOptions;
   default_video_analysis_options: VideoAnalysisOptions;
+  default_audio_analysis_options: AudioAnalysisOptions;
   library_page_size: LibraryPageSize;
   auto_analyze_after_upload: boolean;
 }
@@ -459,6 +472,8 @@ export interface EnvironmentSettings {
   max_keyframes: number;
   scene_threshold: number;
   video_timeout_seconds: number;
+  max_audio_upload_bytes: number;
+  max_audio_duration_seconds: number;
   job_mode: string;
   job_workers: number;
   tool_timeout_seconds: number;

@@ -62,6 +62,42 @@ describe("UploadPage", () => {
     });
   });
 
+  it("uploads an audio file with the audio checks and starts the audio pipeline", async () => {
+    let posted: unknown = null;
+    server.use(
+      http.post(`${API}/artifacts/upload`, () =>
+        HttpResponse.json(
+          {
+            artifact_id: ARTIFACT_ID,
+            filename: "tone.wav",
+            size_bytes: 8,
+            media_type: "audio",
+            mime_type: "audio/wav",
+            sha256: "a".repeat(64),
+            created_at: "2026-11-04T09:00:00Z",
+          },
+          { status: 201 },
+        ),
+      ),
+      http.post(`${API}/analysis/audio`, async ({ request }) => {
+        posted = ((await request.json()) as { options: unknown }).options;
+        return HttpResponse.json({ job_id: JOB_ID, artifact_id: ARTIFACT_ID, status: "queued" }, { status: 202 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp("/upload");
+
+    const wav = new File([new Uint8Array([0x52, 0x49, 0x46, 0x46])], "tone.wav", { type: "audio/wav" });
+    await user.upload(screen.getByLabelText(/choose an image/i), wav);
+    expect(screen.getByRole("checkbox", { name: "Duplicate search (byte-identical files only)" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Scene-change detection" })).not.toBeInTheDocument();
+    expect(screen.getByText(/No audio is decoded or transcribed/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
+    await screen.findByRole("heading", { name: "harbour.jpg" });
+    expect(posted).toEqual({ metadata: true, duplicate_search: true });
+  });
+
   it("rejects a video over the 500 MB limit without uploading", async () => {
     const user = userEvent.setup();
     renderApp("/upload");
@@ -70,7 +106,7 @@ describe("UploadPage", () => {
     Object.defineProperty(big, "size", { value: 501 * 1024 * 1024 });
     await user.upload(screen.getByLabelText(/choose an image/i), big);
 
-    expect(screen.getByRole("alert")).toHaveTextContent("larger than the 500 MB limit for videos");
+    expect(screen.getByRole("alert")).toHaveTextContent("larger than the 500 MB limit for video files");
     expect(screen.getByRole("button", { name: "Upload and analyse" })).toBeDisabled();
   });
 
@@ -94,7 +130,7 @@ describe("UploadPage", () => {
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile("notes.txt", "text/plain"));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos are supported.",
+      "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos, and WAV, MP3, FLAC, OGG, and M4A audio files are supported.",
     );
     expect(screen.getByRole("button", { name: "Upload and analyse" })).toBeDisabled();
   });

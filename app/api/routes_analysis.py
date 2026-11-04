@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.deps import Jobs, Services
 from app.schemas.analysis import (
+    AudioAnalysisRequest,
     ImageAnalysisRequest,
     JobCreated,
     JobStatusResponse,
@@ -23,6 +24,13 @@ def start_image_analysis(services: Services, jobs: Jobs, request: ImageAnalysisR
 def start_video_analysis(services: Services, jobs: Jobs, request: VideoAnalysisRequest) -> JobCreated:
     """Queue the Milestone 3 video pipeline (video.v1)."""
     job = analysis.start_video_analysis(services.db, jobs, request)
+    return JobCreated(job_id=job.id, artifact_id=job.artifact_id, status=JobStatus(job.status))
+
+
+@router.post("/audio", status_code=202, response_model=JobCreated)
+def start_audio_analysis(services: Services, jobs: Jobs, request: AudioAnalysisRequest) -> JobCreated:
+    """Queue the audio pipeline (audio.v1): hashes, media info, metadata, byte-identical duplicates."""
+    job = analysis.start_audio_analysis(services.db, jobs, request)
     return JobCreated(job_id=job.id, artifact_id=job.artifact_id, status=JobStatus(job.status))
 
 

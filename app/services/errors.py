@@ -21,9 +21,10 @@ def analysis_in_progress(job: AnalysisJob) -> AppError:
 
 
 def wrong_media_type(artifact_id: str, actual: str, endpoint: str) -> AppError:
+    # The analysis endpoints are named after the media types, so the right endpoint is the actual type.
     return AppError(
         422,
         ErrorCode.WRONG_MEDIA_TYPE,
-        f"This artifact is a {actual}. Use POST /analysis/{endpoint} for {actual}s.",
+        f"This artifact's media type is {actual}. Use POST /analysis/{actual}.",
         {"artifact_id": artifact_id, "media_type": actual},
     )

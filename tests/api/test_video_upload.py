@@ -64,9 +64,11 @@ def test_content_endpoint_supports_range_requests_for_video_seeking(
     assert response.content[4:8] == b"ftyp"
 
 
-def test_audio_only_file_is_rejected(client: TestClient, fixtures: FixtureSet) -> None:
-    error = assert_error(upload(client, fixtures.audio_only_mp4), 422, "INVALID_VIDEO")
-    assert "no video stream" in error["message"]
+def test_audio_only_mp4_is_accepted_as_audio(client: TestClient, fixtures: FixtureSet) -> None:
+    # Since D19 an MP4-family file without a video stream is a valid audio artifact (M4A).
+    body = upload_ok(client, fixtures.audio_only_mp4)
+    assert body["media_type"] == "audio"
+    assert body["mime_type"] == "audio/mp4"
 
 
 def test_truncated_video_is_rejected(client: TestClient, fixtures: FixtureSet) -> None:

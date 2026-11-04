@@ -62,6 +62,7 @@ describe("SettingsPage", () => {
         keyframe_ocr: false,
         duplicate_search: true,
       },
+      default_audio_analysis_options: { metadata: true, duplicate_search: true },
       library_page_size: 50,
       auto_analyze_after_upload: false,
     });

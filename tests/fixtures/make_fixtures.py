@@ -79,6 +79,11 @@ class FixtureSet:
     video_3gp: Path
     video_no_audio: Path
     audio_only_mp4: Path
+    audio_wav: Path
+    audio_mp3: Path
+    audio_flac: Path
+    audio_ogg: Path
+    audio_m4a: Path
     truncated_mp4: Path
     html_named_mp4: Path
 
@@ -342,6 +347,12 @@ def build_video_fixtures(path) -> dict[str, Path]:
     )
     ffmpeg("-f", "lavfi", "-i", "color=c=gray:s=320x240:d=2", "-c:v", "libx264", path("no_audio.mp4"))
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "aac", path("audio_only.mp4"))
+    # Audio fixtures (D19): the same two-second tone in each supported audio container.
+    ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", path("tone.wav"))
+    ffmpeg("-i", path("tone.wav"), "-c:a", "libmp3lame", "-metadata", "title=Vestigo tone", path("tone.mp3"))
+    ffmpeg("-i", path("tone.wav"), "-c:a", "flac", path("tone.flac"))
+    ffmpeg("-i", path("tone.wav"), "-c:a", "libvorbis", path("tone.ogg"))
+    ffmpeg("-i", path("tone.wav"), "-c:a", "aac", "-f", "ipod", path("tone.m4a"))
     # A still image taken from the video, for cross-media duplicate tests (M3-4).
     ffmpeg("-ss", "1.0", "-i", scenes, "-frames:v", "1", "-q:v", "2", path("frame_from_video.jpg"))
     path("truncated.mp4").write_bytes(scenes.read_bytes()[:400])
@@ -362,6 +373,11 @@ def build_video_fixtures(path) -> dict[str, Path]:
         "video_3gp": path("clip.3gp"),
         "video_no_audio": path("no_audio.mp4"),
         "audio_only_mp4": path("audio_only.mp4"),
+        "audio_wav": path("tone.wav"),
+        "audio_mp3": path("tone.mp3"),
+        "audio_flac": path("tone.flac"),
+        "audio_ogg": path("tone.ogg"),
+        "audio_m4a": path("tone.m4a"),
         "truncated_mp4": path("truncated.mp4"),
         "html_named_mp4": path("page.mp4"),
     }

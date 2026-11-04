@@ -17,11 +17,12 @@ import {
   type EnvironmentSettings,
   type LibraryArtifactRef,
   type LibraryPageSize,
+  type AudioAnalysisOptions,
   type VideoAnalysisOptions,
 } from "../api/types";
 import { ErrorBanner } from "../components/Messages";
 import { ErrorState, TableSkeleton } from "../components/States";
-import { OPTION_LABELS, VIDEO_OPTION_LABELS } from "../components/UploadForm";
+import { AUDIO_OPTION_LABELS, OPTION_LABELS, VIDEO_OPTION_LABELS } from "../components/UploadForm";
 import { formatBytes, formatDateTime } from "../lib/format";
 import { useSettings } from "../lib/settings";
 import { useApiResource } from "../lib/useApiResource";
@@ -123,6 +124,30 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
           is off by default.
         </p>
       </fieldset>
+      <fieldset className="space-y-1">
+        <legend className="mb-1 font-medium">Checks to run by default on audio</legend>
+        {(Object.keys(AUDIO_OPTION_LABELS) as (keyof AudioAnalysisOptions)[]).map((key) => (
+          <label key={key} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.default_audio_analysis_options[key]}
+              onChange={(event) =>
+                change({
+                  ...form,
+                  default_audio_analysis_options: {
+                    ...form.default_audio_analysis_options,
+                    [key]: event.target.checked,
+                  },
+                })
+              }
+            />
+            {AUDIO_OPTION_LABELS[key]}
+          </label>
+        ))}
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          File hashes and media information always run. No audio is decoded or transcribed.
+        </p>
+      </fieldset>
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
@@ -179,6 +204,8 @@ function EnvironmentSection({ environment }: { environment: EnvironmentSettings 
     ["Maximum keyframes per analysis", String(environment.max_keyframes)],
     ["Scene-change threshold", String(environment.scene_threshold)],
     ["Video tool timeout (per ffmpeg run)", `${environment.video_timeout_seconds} s`],
+    ["Maximum audio upload size", formatBytes(environment.max_audio_upload_bytes)],
+    ["Maximum audio duration", `${environment.max_audio_duration_seconds} s`],
     ["Tool timeout", `${environment.tool_timeout_seconds} s`],
     ["OCR timeout (per pass)", `${environment.ocr_timeout_seconds} s`],
     ["Analysis workers", `${environment.job_workers} (${environment.job_mode})`],

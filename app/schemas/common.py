@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class MediaType(StrEnum):
     IMAGE = "image"
     VIDEO = "video"
+    AUDIO = "audio"
 
 
 class ReviewState(StrEnum):
@@ -55,6 +56,8 @@ class ErrorCode(StrEnum):
     INVALID_IMAGE = "INVALID_IMAGE"
     IMAGE_TOO_LARGE = "IMAGE_TOO_LARGE"
     INVALID_VIDEO = "INVALID_VIDEO"
+    INVALID_AUDIO = "INVALID_AUDIO"
+    AUDIO_TOO_LONG = "AUDIO_TOO_LONG"
     VIDEO_TOO_LONG = "VIDEO_TOO_LONG"
     VIDEO_RESOLUTION_TOO_LARGE = "VIDEO_RESOLUTION_TOO_LARGE"
     WRONG_MEDIA_TYPE = "WRONG_MEDIA_TYPE"

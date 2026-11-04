@@ -22,6 +22,7 @@ DEFAULT_VIDEO_OPTIONS = {
     "keyframe_ocr": False,
     "duplicate_search": True,
 }
+DEFAULT_AUDIO_OPTIONS = {"metadata": True, "duplicate_search": True}
 
 
 def test_defaults_and_environment(client: TestClient, settings: Settings) -> None:
@@ -30,6 +31,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
     assert body["editable"] == {
         "default_analysis_options": DEFAULT_OPTIONS,
         "default_video_analysis_options": DEFAULT_VIDEO_OPTIONS,
+        "default_audio_analysis_options": DEFAULT_AUDIO_OPTIONS,
         "library_page_size": 25,
         "auto_analyze_after_upload": True,
     }
@@ -61,6 +63,7 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
     assert editable == {
         "default_analysis_options": {**DEFAULT_OPTIONS, "ocr": False},
         "default_video_analysis_options": DEFAULT_VIDEO_OPTIONS,
+        "default_audio_analysis_options": DEFAULT_AUDIO_OPTIONS,
         "library_page_size": 50,
         "auto_analyze_after_upload": False,
     }

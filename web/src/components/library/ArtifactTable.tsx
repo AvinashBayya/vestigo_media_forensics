@@ -71,7 +71,9 @@ export function ArtifactTable({ items, sort, order, onSort, selected, onSelect }
                   {item.filename}
                 </Link>
                 {item.duration_seconds !== null && (
-                  <p className={MUTED}>Video · {formatSeconds(item.duration_seconds)}</p>
+                  <p className={MUTED}>
+                    {item.media_type === "audio" ? "Audio" : "Video"} · {formatSeconds(item.duration_seconds)}
+                  </p>
                 )}
                 {!item.in_duplicate_library && <p className={MUTED}>Excluded from duplicate search</p>}
               </td>

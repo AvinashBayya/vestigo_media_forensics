@@ -35,6 +35,23 @@ class VideoAnalysisOptions(BaseModel):
     duplicate_search: bool = True
 
 
+class AudioAnalysisOptions(BaseModel):
+    """Optional audio stages (D19). Hashing, media info, and duplicate search by SHA-256 cover the
+    rest; no audio is ever decoded."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    metadata: bool = True
+    duplicate_search: bool = True
+
+
+class AudioAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: str
+    options: AudioAnalysisOptions = Field(default_factory=AudioAnalysisOptions)
+
+
 class VideoAnalysisRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

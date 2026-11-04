@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     max_keyframes: int = Field(40, ge=1, le=500)
     scene_threshold: float = Field(0.3, gt=0, lt=1)
     video_timeout_seconds: float = Field(600.0, gt=0)
+    # Audio limits (D19), read-only in the Settings UI.
+    max_audio_upload_bytes: int = Field(200 * MIB, gt=0)
+    max_audio_duration_seconds: float = Field(7200.0, gt=0)
     phash_max_distance: int = Field(10, ge=0, le=64)
     job_mode: Literal["thread", "inline"] = "thread"
     job_workers: int = Field(2, ge=1)

@@ -103,6 +103,12 @@ SupportedMimeType = Literal[
     "video/x-flv",
     "video/3gpp",
     "video/x-m4v",
+    "video/ogg",
+    "audio/wav",
+    "audio/mpeg",
+    "audio/flac",
+    "audio/ogg",
+    "audio/mp4",
 ]
 
 
