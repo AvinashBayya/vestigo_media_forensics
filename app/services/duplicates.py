@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from app.core.database import Database
 from app.models import Artifact, ImageFingerprint, KeyframeFingerprint
-from app.services.phash import BITS, hamming_distance
+from app.services.phash import BITS, hamming_distance, orientation_of
 
 MatchType = Literal["exact_file", "visually_identical", "near"]
 
@@ -26,6 +26,9 @@ class FrameHash:
     value: str
     frame_seq: int | None = None
     timestamp_seconds: float | None = None
+    # The query side's rotated and mirrored hashes (D19). The library side stays canonical, so a
+    # pair matches whichever of the two artifacts is analysed later.
+    variants: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -110,6 +113,10 @@ class FrameMatch:
     query_timestamp: float | None = None
     matched_seq: int | None = None
     matched_timestamp: float | None = None
+    # How the query frame was oriented for the best pairing (D19): degrees counter-clockwise and
+    # whether it was mirrored. 0/False means the upright frames matched.
+    rotation_degrees: int = 0
+    mirrored: bool = False
 
 
 @dataclass(frozen=True)
@@ -141,26 +148,38 @@ def _similarity(distance: int) -> float:
 def _match_entry(own: Sequence[FrameHash], entry: LibraryEntry, threshold: int) -> DuplicateCandidate | None:
     pairs: list[FrameMatch] = []
     for query in own:
+        # The upright hash first, then the rotated and mirrored variants (D19). The upright
+        # orientation wins ties, so existing matches keep reporting as upright.
+        orientations: list[tuple[str | None, str]] = [(None, query.value)]
+        orientations += list((query.variants or {}).items())
         best: FrameMatch | None = None
         for candidate in entry.hashes:
-            distance = hamming_distance(query.value, candidate.value)
-            if distance <= threshold and (best is None or distance < best.distance):
-                best = FrameMatch(
-                    distance=distance,
-                    similarity=_similarity(distance),
-                    query_seq=query.frame_seq,
-                    query_timestamp=query.timestamp_seconds,
-                    matched_seq=candidate.frame_seq,
-                    matched_timestamp=candidate.timestamp_seconds,
-                )
+            for variant_name, query_value in orientations:
+                distance = hamming_distance(query_value, candidate.value)
+                if distance <= threshold and (best is None or distance < best.distance):
+                    degrees, mirrored = orientation_of(variant_name)
+                    best = FrameMatch(
+                        distance=distance,
+                        similarity=_similarity(distance),
+                        query_seq=query.frame_seq,
+                        query_timestamp=query.timestamp_seconds,
+                        matched_seq=candidate.frame_seq,
+                        matched_timestamp=candidate.timestamp_seconds,
+                        rotation_degrees=degrees,
+                        mirrored=mirrored,
+                    )
         if best is not None:
             pairs.append(best)
     if not pairs:
         return None
     distance = min(pair.distance for pair in pairs)
     match_type: MatchType = "visually_identical" if distance == 0 else "near"
+    # Image-to-image matches between upright images keep the Milestone 1 shape.
     plain_images = (
-        len(own) == 1 and own[0].frame_seq is None and all(pair.matched_seq is None for pair in pairs)
+        len(own) == 1
+        and own[0].frame_seq is None
+        and all(pair.matched_seq is None for pair in pairs)
+        and all(pair.rotation_degrees == 0 and not pair.mirrored for pair in pairs)
     )
     if plain_images:
         return DuplicateCandidate(entry.artifact_id, distance, _similarity(distance), match_type)

@@ -24,7 +24,13 @@ from app.services.ocr import (
     pillow_version,
     run_ocr,
 )
-from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
+from app.services.phash import (
+    BITS,
+    FINGERPRINT_ALGORITHM,
+    compute_orientation_phashes,
+    compute_phash,
+    imagehash_version,
+)
 
 IMAGE_PIPELINE = "image.v1"
 
@@ -158,8 +164,9 @@ class PerceptualHashStage(AnalysisStage):
     limitations = (
         "A perceptual hash summarises coarse visual structure. Similar hashes mean similar-looking "
         "images, not a shared source or history.",
-        "It tolerates resizing and recompression but not significant crops, rotations (other than EXIF "
-        "orientation), mirroring, or heavy edits.",
+        "It tolerates resizing and recompression but not significant crops or heavy edits. Rotated "
+        "and mirrored copies are found through separately computed variant hashes in duplicate "
+        "search, not by the hash itself.",
         "Transparency is ignored. Animated or multi-page images are hashed from the first frame only.",
     )
 
@@ -168,11 +175,15 @@ class PerceptualHashStage(AnalysisStage):
 
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         result = compute_phash(artifact.path)
+        # Rotated and mirrored variants (D19) let duplicate search find reoriented copies. The
+        # canonical value and the fingerprint index are unchanged.
+        orientations = compute_orientation_phashes(artifact.path)
         return StageOutput(
             {
                 "algorithm": "pHash",
                 "bits": BITS,
                 "value": result.value,
+                "orientation_values": orientations.variants,
                 "frames": result.frames,
                 "normalization": result.normalization,
             }
@@ -261,11 +272,12 @@ class DuplicatesStage(AnalysisStage):
     name = "duplicates"
     media_type = MediaType.IMAGE
     method = (
-        "Compares this image's pHash with the stored pHash of every other image and with the keyframe "
-        "pHashes of every analysed video in the local library using Hamming distance, and lists "
-        "artifacts with a hash at or below the threshold. Byte-identical files are found by SHA-256. "
-        "Artifacts the analyst excluded from duplicate search are not compared; their number is "
-        "recorded."
+        "Compares this image's pHash — and its rotated (90/180/270 degrees) and mirrored variants — "
+        "with the stored pHash of every other image and with the keyframe pHashes of every analysed "
+        "video in the local library using Hamming distance, and lists artifacts with a hash at or "
+        "below the threshold, recording which orientation matched. Byte-identical files are found by "
+        "SHA-256. Artifacts the analyst excluded from duplicate search are not compared; their number "
+        "is recorded."
     )
     classification = EvidenceClassification.DERIVED
     source = "stage:perceptual_hash + local library"
@@ -290,7 +302,8 @@ class DuplicatesStage(AnalysisStage):
 
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         threshold = ctx.settings.phash_max_distance
-        own_hash = FrameHash(ctx.results["perceptual_hash"].output["value"])
+        phash_output = ctx.results["perceptual_hash"].output
+        own_hash = FrameHash(phash_output["value"], variants=phash_output.get("orientation_values"))
         library = ctx.library.snapshot(artifact.id, FINGERPRINT_ALGORITHM)
         search = find_matches(artifact.sha256, [own_hash], library.entries, threshold)
         return StageOutput(

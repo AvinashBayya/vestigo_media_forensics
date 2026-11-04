@@ -31,7 +31,12 @@ from app.services.keyframes import (
     select_keyframes,
 )
 from app.services.ocr import LANGUAGES, PAGE_SEGMENTATION_MODE, pillow_version, run_ocr
-from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
+from app.services.phash import (
+    BITS,
+    FINGERPRINT_ALGORITHM,
+    compute_orientation_phashes,
+    imagehash_version,
+)
 from app.services.scenes import SceneChange, detect_scene_changes
 from app.services.validation import InvalidVideoError, probe_video
 
@@ -237,8 +242,9 @@ class KeyframePHashStage(AnalysisStage):
         "A perceptual hash summarises coarse visual structure. Similar hashes mean similar-looking "
         "frames, not a shared source or history.",
         "Only the selected keyframes are hashed. Content between them is not represented.",
-        "It tolerates re-encoding and resizing but not significant crops, rotations beyond the "
-        "container's display rotation, mirroring, or heavy edits.",
+        "It tolerates re-encoding and resizing but not significant crops or heavy edits. Rotated "
+        "and mirrored copies are found through separately computed variant hashes in duplicate "
+        "search, not by the hash itself.",
     )
 
     def tool_version(self, ctx: StageContext) -> str:
@@ -249,12 +255,15 @@ class KeyframePHashStage(AnalysisStage):
         frames = []
         for frame in keyframes.get("frames", []):
             path = ctx.derived.stored_file("keyframes", f"{frame['seq']:04d}_t{frame['timestamp']:.3f}.jpg")
-            result = compute_phash(path)
+            result = compute_orientation_phashes(path)
             frames.append(
                 {
                     "seq": frame["seq"],
                     "timestamp": frame["timestamp"],
                     "value": result.value,
+                    # Rotated and mirrored variants (D19), used by duplicate search only; the
+                    # fingerprint index keeps the canonical value.
+                    "orientations": result.variants,
                     "derived_file_id": frame["derived_file_id"],
                 }
             )
@@ -390,10 +399,11 @@ class VideoDuplicatesStage(AnalysisStage):
     name = "duplicates"
     media_type = MediaType.VIDEO
     method = (
-        "Compares each keyframe's pHash with the stored pHash of every other image and with the "
-        "keyframe pHashes of every analysed video in the local library using Hamming distance. "
-        "Artifacts with a hash at or below the threshold are listed with, per matching keyframe, its "
-        "best counterpart and that pair's distance. Byte-identical files are found by SHA-256. "
+        "Compares each keyframe's pHash — and its rotated (90/180/270 degrees) and mirrored "
+        "variants — with the stored pHash of every other image and with the keyframe pHashes of "
+        "every analysed video in the local library using Hamming distance. Artifacts with a hash at "
+        "or below the threshold are listed with, per matching keyframe, its best counterpart, that "
+        "pair's distance, and which orientation matched. Byte-identical files are found by SHA-256. "
         "Artifacts the analyst excluded from duplicate search are not compared; their number is "
         "recorded."
     )
@@ -421,7 +431,7 @@ class VideoDuplicatesStage(AnalysisStage):
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         threshold = ctx.settings.phash_max_distance
         own_hashes = [
-            FrameHash(frame["value"], frame["seq"], frame["timestamp"])
+            FrameHash(frame["value"], frame["seq"], frame["timestamp"], frame.get("orientations"))
             for frame in ctx.results["keyframe_phash"].output.get("frames", [])
         ]
         library = ctx.library.snapshot(artifact.id, FINGERPRINT_ALGORITHM)

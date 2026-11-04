@@ -71,6 +71,7 @@ class FixtureSet:
     video_mkv: Path
     video_mov: Path
     video_rotated: Path
+    video_mirrored: Path
     video_no_audio: Path
     audio_only_mp4: Path
     truncated_mp4: Path
@@ -295,6 +296,22 @@ def build_video_fixtures(path) -> dict[str, Path]:
     ffmpeg("-i", scenes, "-c", "copy", path("scenes.mkv"))
     ffmpeg("-i", scenes, "-c", "copy", path("scenes.mov"))
     ffmpeg("-display_rotation", "90", "-i", scenes, "-c", "copy", path("rotated.mp4"))
+    # A left-right mirrored re-encode: the mirrored duplicate-search case (D19).
+    ffmpeg(
+        "-i",
+        scenes,
+        "-vf",
+        "hflip",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "30",
+        "-c:a",
+        "copy",
+        path("mirrored.mp4"),
+    )
     ffmpeg("-f", "lavfi", "-i", "color=c=green:s=320x240:d=4", "-c:v", "libx264", path("static.mp4"))
     ffmpeg("-f", "lavfi", "-i", "color=c=gray:s=320x240:d=2", "-c:v", "libx264", path("no_audio.mp4"))
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "aac", path("audio_only.mp4"))
@@ -310,6 +327,7 @@ def build_video_fixtures(path) -> dict[str, Path]:
         "video_mkv": path("scenes.mkv"),
         "video_mov": path("scenes.mov"),
         "video_rotated": path("rotated.mp4"),
+        "video_mirrored": path("mirrored.mp4"),
         "video_no_audio": path("no_audio.mp4"),
         "audio_only_mp4": path("audio_only.mp4"),
         "truncated_mp4": path("truncated.mp4"),

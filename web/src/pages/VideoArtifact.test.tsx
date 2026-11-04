@@ -81,7 +81,9 @@ describe("Video artifact page", () => {
     expect(duplicates).toHaveTextContent("Video · Similar · distance 2/64");
     await user.click(within(duplicates).getByText("2 matching frame pairs"));
     expect(duplicates).toHaveTextContent("this video at 0:00 ↔ matched video at 0:00 · distance 0/64");
-    expect(duplicates).toHaveTextContent("this video at 0:03 ↔ matched video at 0:03.1 · distance 2/64");
+    expect(duplicates).toHaveTextContent(
+      "this video at 0:03 ↔ matched video at 0:03.1 · distance 2/64 · rotated 270°",
+    );
   });
 
   it("falls back to a message when the browser cannot play the codec", async () => {

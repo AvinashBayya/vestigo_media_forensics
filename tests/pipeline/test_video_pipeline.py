@@ -670,3 +670,104 @@ def test_video_evidence_package_contains_keyframes_and_raw_tool_output(
         assert entry["sha256"] == hashlib.sha256(package.read(entry["path"])).hexdigest()
     report = json.loads(package.read("report.json"))
     assert report["media_info"]["container"]["duration_seconds"] == pytest.approx(9.0, abs=0.1)
+
+
+# --- Rotated and mirrored duplicate matching (D19) ----------------------------------------------
+
+
+def test_display_rotated_copy_now_matches_with_the_rotation_recorded(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    original_id, _ = analyse_video(client, fixtures.video_scenes)
+    _, rotated_job = analyse_video(client, fixtures.video_rotated)
+
+    payload = duplicates_payload(services, rotated_job)
+    [match] = payload["matches"]
+    assert match["artifact_id"] == original_id
+    assert match["distance"] <= 4
+    assert match["matched_frame_count"] >= 6
+    for pair in match["frame_matches"]:
+        assert (pair["rotation_degrees"], pair["mirrored"]) == (270, False)
+    assert payload["threshold"] == 10  # unchanged
+
+
+def test_mirrored_copy_matches_with_mirrored_recorded(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    original_id, _ = analyse_video(client, fixtures.video_scenes)
+    _, mirrored_job = analyse_video(client, fixtures.video_mirrored)
+
+    [match] = duplicates_payload(services, mirrored_job)["matches"]
+    assert match["artifact_id"] == original_id
+    assert all(pair["mirrored"] for pair in match["frame_matches"])
+    assert all(pair["distance"] <= 10 for pair in match["frame_matches"])
+
+
+def test_upright_matches_still_report_as_upright(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    analyse_video(client, fixtures.video_scenes)
+    _, copy_job = analyse_video(client, fixtures.video_webm)
+    [match] = duplicates_payload(services, copy_job)["matches"]
+    best = min(match["frame_matches"], key=lambda pair: pair["distance"])
+    assert (best["rotation_degrees"], best["mirrored"]) == (0, False)
+
+
+def test_orientation_variants_add_no_false_matches(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    analyse_video(client, fixtures.video_scenes)
+    _, static_job = analyse_video(client, fixtures.video_static)
+    assert duplicates_payload(services, static_job)["matches"] == []
+
+
+def test_rotated_image_copy_matches_its_original(
+    client: TestClient, services: AppServices, fixtures: FixtureSet, tmp_path
+) -> None:
+    from PIL import Image
+
+    rotated = tmp_path / "rotated.png"
+    mirrored = tmp_path / "mirrored.png"
+    with Image.open(fixtures.png) as image:
+        image.rotate(90, expand=True).save(rotated)
+        image.transpose(Image.Transpose.FLIP_LEFT_RIGHT).save(mirrored)
+
+    original_id = upload_ok(client, fixtures.png)["artifact_id"]
+    assert client.post("/api/v1/analysis/image", json={"artifact_id": original_id}).status_code == 202
+
+    for path, expect_mirrored in ((rotated, False), (mirrored, True)):
+        artifact_id = upload_ok(client, path)["artifact_id"]
+        assert client.post("/api/v1/analysis/image", json={"artifact_id": artifact_id}).status_code == 202
+        report = video_report(client, artifact_id)
+        matches = {m["artifact_id"]: m for m in report["duplicates"]["matches"]}
+        assert original_id in matches, path.name
+        match = matches[original_id]
+        [pair] = match["frame_matches"]  # oriented image matches carry the pair detail
+        assert pair["mirrored"] is expect_mirrored
+        assert pair["distance"] <= 4
+        if not expect_mirrored:
+            assert pair["rotation_degrees"] in (90, 270)
+
+    # The evidence records why: the method text names the variants.
+    method = report["duplicates"]["provenance"]["method"]
+    assert "rotated (90/180/270 degrees) and mirrored variants" in method
+
+
+def test_keyframe_phash_payload_records_orientation_variants(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    _, job_id = analyse_video(client, fixtures.video_static)
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframe_phash")
+    frame = record.payload["frames"][0]
+    assert set(frame["orientations"]) == {
+        "rot90",
+        "rot180",
+        "rot270",
+        "mirror",
+        "mirror_rot90",
+        "mirror_rot180",
+        "mirror_rot270",
+    }
+    with services.db.reader() as session:
+        row = session.scalars(select(KeyframeFingerprint)).first()
+    assert row.value_hex == frame["value"]  # the index still stores only the canonical hash

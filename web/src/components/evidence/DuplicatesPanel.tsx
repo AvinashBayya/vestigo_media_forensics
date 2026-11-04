@@ -58,6 +58,14 @@ export function DuplicatesPanel({ section, addedSince, onRerun }: DuplicatesPane
   );
 }
 
+/** " · rotated 90°", " · mirrored", or both; empty for an upright match. */
+function orientationLabel(pair: { rotation_degrees?: number; mirrored?: boolean }): string {
+  const parts = [];
+  if (pair.mirrored) parts.push("mirrored");
+  if (pair.rotation_degrees) parts.push(`rotated ${pair.rotation_degrees}°`);
+  return parts.length ? ` · ${parts.join(" + ")}` : "";
+}
+
 function MatchRow({ match }: { match: DuplicateMatch }) {
   return (
     <li className="flex items-center gap-3 py-2">
@@ -94,6 +102,7 @@ function MatchRow({ match }: { match: DuplicateMatch }) {
                   {" ↔ "}
                   {pair.matched_timestamp === null ? "matched image" : `matched video at ${formatSeconds(pair.matched_timestamp)}`}
                   {` · distance ${pair.distance}/64`}
+                  {orientationLabel(pair)}
                 </li>
               ))}
             </ul>

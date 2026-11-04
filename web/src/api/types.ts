@@ -328,6 +328,9 @@ export interface FrameMatchInfo {
   query_timestamp: number | null;
   matched_seq: number | null;
   matched_timestamp: number | null;
+  /** How the query frame was oriented for the pairing (D19); 0/false = upright match. */
+  rotation_degrees: number;
+  mirrored: boolean;
 }
 
 export interface DuplicateMatch {

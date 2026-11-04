@@ -262,6 +262,10 @@ class FrameMatchInfo(BaseModel):
     query_timestamp: float | None = None
     matched_seq: int | None = None
     matched_timestamp: float | None = None
+    # How the query frame was oriented for the pairing (D19): degrees counter-clockwise plus
+    # mirroring; 0/false means the upright frames matched. Absent on records made before D19.
+    rotation_degrees: int = 0
+    mirrored: bool = False
 
 
 class DuplicateMatch(BaseModel):
