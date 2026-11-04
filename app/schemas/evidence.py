@@ -214,6 +214,21 @@ class KeyframesSection(BaseModel):
     provenance: Provenance
 
 
+class KeyframeHashInfo(BaseModel):
+    seq: int
+    timestamp: float
+    value: str
+    derived_file_id: str | None = None
+
+
+class KeyframePHashSection(BaseModel):
+    algorithm: Literal["pHash"] = "pHash"
+    bits: int
+    count: int
+    frames: list[KeyframeHashInfo]
+    provenance: Provenance
+
+
 class DuplicateMatch(BaseModel):
     artifact_id: str
     # Current filename, or None if the matched artifact has since been deleted.
@@ -255,6 +270,7 @@ class EvidenceReport(BaseModel):
     media_info: MediaInfoSection | None = None
     scene_changes: SceneChangesSection | None = None
     keyframes: KeyframesSection | None = None
+    keyframe_phash: KeyframePHashSection | None = None
     review: ReviewInfo
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

@@ -6,7 +6,10 @@ step by step per 13-MILESTONE-3-PLAN.md §11.
 """
 
 from PIL import Image
+from sqlalchemy import delete
+from sqlalchemy.orm import Session
 
+from app.models import EvidenceRecord, KeyframeFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.pipeline.image_pipeline import HashesStage, MetadataStage
 from app.schemas.common import EvidenceClassification, MediaType
@@ -20,6 +23,7 @@ from app.services.keyframes import (
     extract_keyframe,
     select_keyframes,
 )
+from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
 from app.services.scenes import SceneChange, detect_scene_changes
 from app.services.validation import InvalidVideoError, probe_video
 
@@ -208,10 +212,76 @@ class KeyframesStage(AnalysisStage):
         )
 
 
+class KeyframePHashStage(AnalysisStage):
+    name = "keyframe_phash"
+    media_type = MediaType.VIDEO
+    method = (
+        "64-bit perceptual hash (pHash) of each extracted keyframe: the frame is converted to "
+        "greyscale and reduced to 32x32 pixels; a discrete cosine transform is applied and each of "
+        "the 8x8 lowest-frequency coefficients is compared with their median. The hashes feed "
+        "duplicate search across videos and images."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "stage:keyframes"
+    tool_name = "imagehash"
+    depends_on = ("keyframes",)
+    limitations = (
+        "A perceptual hash summarises coarse visual structure. Similar hashes mean similar-looking "
+        "frames, not a shared source or history.",
+        "Only the selected keyframes are hashed. Content between them is not represented.",
+        "It tolerates re-encoding and resizing but not significant crops, rotations beyond the "
+        "container's display rotation, mirroring, or heavy edits.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return imagehash_version()
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        keyframes = ctx.results["keyframes"].output
+        frames = []
+        for frame in keyframes.get("frames", []):
+            path = ctx.derived.stored_file("keyframes", f"{frame['seq']:04d}_t{frame['timestamp']:.3f}.jpg")
+            result = compute_phash(path)
+            frames.append(
+                {
+                    "seq": frame["seq"],
+                    "timestamp": frame["timestamp"],
+                    "value": result.value,
+                    "derived_file_id": frame["derived_file_id"],
+                }
+            )
+        return StageOutput({"algorithm": "pHash", "bits": BITS, "count": len(frames), "frames": frames})
+
+    def on_recorded(self, record: EvidenceRecord, session: Session) -> None:
+        # The keyframe fingerprint index holds the artifact's most recent successful hashes.
+        if record.status not in ("succeeded", "partial") or not record.payload.get("frames"):
+            return
+        session.execute(
+            delete(KeyframeFingerprint).where(
+                KeyframeFingerprint.artifact_id == record.artifact_id,
+                KeyframeFingerprint.algorithm == FINGERPRINT_ALGORITHM,
+            )
+        )
+        for frame in record.payload["frames"]:
+            session.add(
+                KeyframeFingerprint(
+                    artifact_id=record.artifact_id,
+                    algorithm=FINGERPRINT_ALGORITHM,
+                    frame_seq=frame["seq"],
+                    timestamp_seconds=frame["timestamp"],
+                    value_hex=frame["value"],
+                    evidence_id=record.id,
+                    derived_file_id=frame["derived_file_id"],
+                    created_at=record.completed_at,
+                )
+            )
+
+
 VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoHashesStage(),
     MediaInfoStage(),
     VideoMetadataStage(),
     SceneChangesStage(),
     KeyframesStage(),
+    KeyframePHashStage(),
 )

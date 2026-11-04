@@ -20,6 +20,7 @@ from app.schemas.evidence import (
     DuplicatesSection,
     EvidenceReport,
     HashesSection,
+    KeyframePHashSection,
     KeyframesSection,
     MediaInfoSection,
     MetadataSection,
@@ -146,6 +147,15 @@ def _keyframes(payload: dict[str, Any], provenance: Provenance) -> KeyframesSect
     )
 
 
+def _keyframe_phash(payload: dict[str, Any], provenance: Provenance) -> KeyframePHashSection:
+    return KeyframePHashSection(
+        bits=payload.get("bits", BITS),
+        count=payload.get("count", 0),
+        frames=payload.get("frames", []),
+        provenance=provenance,
+    )
+
+
 def _duplicates(filenames: dict[str, str]) -> Callable[[dict[str, Any], Provenance], DuplicatesSection]:
     def build(payload: dict[str, Any], provenance: Provenance) -> DuplicatesSection:
         matches = [
@@ -229,6 +239,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "media_info": _media_info,
         "scene_changes": _scene_changes,
         "keyframes": _keyframes,
+        "keyframe_phash": _keyframe_phash,
     }
     sections = {
         stage: build(records[stage].payload, _provenance(records[stage], derived.get(stage, [])))

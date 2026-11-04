@@ -106,6 +106,10 @@ class DerivedFileWriter:
         self._pending.setdefault(stage, []).append(PendingDerivedFile(info, self._storage.relative(path)))
         return info
 
+    def stored_file(self, stage: str, suffix: str) -> Path:
+        """Where `write(stage, …, suffix, …)` put the file, for later stages of the same job."""
+        return self._directory / f"{stage}.{suffix}"
+
     def written(self, stage: str) -> list[DerivedFileInfo]:
         return [pending.info for pending in self._pending.get(stage, [])]
 

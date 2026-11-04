@@ -1,9 +1,14 @@
 """The video.v1 pipeline (M3): job flow, media info, and evidence completeness."""
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
 
 from app.core.container import AppServices
+from app.models import KeyframeFingerprint
+from app.services.phash import hamming_distance
 from tests.fixtures.make_fixtures import VIDEO_SCENE_CUTS, VIDEO_SCENES_DURATION, FixtureSet
 from tests.helpers import assert_error, upload_ok
 from tests.pipeline.test_runner import records_for
@@ -345,3 +350,76 @@ def test_keyframes_report_section(client: TestClient, fixtures: FixtureSet) -> N
     assert section["provenance"]["stage"] == "keyframes"
     assert all(frame["derived_file_id"].startswith("df_") for frame in section["frames"])
     assert any("bounded sample" in item for item in section["provenance"]["limitations"])
+
+
+# --- Keyframe perceptual hashes (M3 step 7) -----------------------------------------------------
+
+
+def test_keyframe_hashes_are_recorded_and_indexed(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    artifact_id, job_id = analyse_video(client, fixtures.video_scenes)
+
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframe_phash")
+    assert record.status == "succeeded"
+    payload = record.payload
+    assert payload["count"] == 8
+    assert all(re.fullmatch(r"[0-9a-f]{16}", frame["value"]) for frame in payload["frames"])
+
+    with services.db.reader() as session:
+        rows = session.scalars(
+            select(KeyframeFingerprint).where(KeyframeFingerprint.artifact_id == artifact_id)
+        ).all()
+    assert len(rows) == 8
+    by_seq = {row.frame_seq: row for row in rows}
+    for frame in payload["frames"]:
+        row = by_seq[frame["seq"]]
+        assert row.value_hex == frame["value"]
+        assert row.timestamp_seconds == frame["timestamp"]
+        assert row.evidence_id == record.id
+        assert row.derived_file_id == frame["derived_file_id"]
+
+    section = video_report(client, artifact_id)["keyframe_phash"]
+    assert section["bits"] == 64
+    assert section["count"] == 8
+
+
+def test_keyframe_index_is_replaced_on_reanalysis_and_deleted_with_the_artifact(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    artifact_id, _ = analyse_video(client, fixtures.video_static)
+
+    def index_rows():
+        with services.db.reader() as session:
+            return session.scalars(
+                select(KeyframeFingerprint).where(KeyframeFingerprint.artifact_id == artifact_id)
+            ).all()
+
+    first_evidence_ids = {row.evidence_id for row in index_rows()}
+    start_video_analysis(client, artifact_id)
+    rows = index_rows()
+    assert len(rows) == 8
+    assert {row.evidence_id for row in rows}.isdisjoint(first_evidence_ids)  # replaced, not appended
+
+    assert client.delete(f"/api/v1/artifacts/{artifact_id}").status_code == 200
+    with services.db.reader() as session:
+        remaining = session.scalar(select(func.count()).select_from(KeyframeFingerprint))
+    assert remaining == 0
+
+
+def test_reencoded_copy_has_matching_keyframe_hashes(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    # The measured basis for video duplicate search: a half-resolution VP9 re-encode of the same
+    # video hashes within the existing threshold, frame for frame.
+    _, original_job = analyse_video(client, fixtures.video_scenes)
+    _, copy_job = analyse_video(client, fixtures.video_webm)
+
+    def hashes(job_id: str) -> dict[int, str]:
+        record = next(r for r in records_for(services, job_id) if r.stage == "keyframe_phash")
+        return {frame["seq"]: frame["value"] for frame in record.payload["frames"]}
+
+    original, copy = hashes(original_job), hashes(copy_job)
+    distances = [hamming_distance(original[seq], copy[seq]) for seq in sorted(set(original) & set(copy))]
+    assert distances, "no comparable keyframes"
+    assert max(distances) <= 10
