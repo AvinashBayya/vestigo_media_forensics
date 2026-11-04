@@ -327,7 +327,11 @@ export function ArtifactPage() {
                     addedSince={viewingEarlier ? null : artifact.added_since_analysis}
                     onRerun={analysing ? undefined : () => void runAnalysis()}
                   />
-                  <KeyframeOCRPanel section={report.keyframe_ocr} />
+                  <KeyframeOCRPanel
+                    artifactId={artifact.artifact_id}
+                    section={report.keyframe_ocr}
+                    keyframes={report.keyframes}
+                  />
                   <KeyframePHashPanel section={report.keyframe_phash} />
                 </>
               ) : (

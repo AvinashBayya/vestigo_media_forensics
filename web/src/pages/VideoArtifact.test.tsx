@@ -66,9 +66,9 @@ describe("Video artifact page", () => {
     const ocr = await screen.findByRole("region", { name: "Text in keyframes (OCR)" });
     expect(ocr).toHaveTextContent("Provisional:");
     expect(ocr).toHaveTextContent("best-effort automatic OCR of 2 sampled keyframes (limit 10)");
-    expect(within(ocr).getByText("SCENE ONE")).toBeInTheDocument();
+    expect(within(ocr).getAllByText("SCENE ONE").length).toBeGreaterThanOrEqual(1); // cleaned + raw
     expect(ocr).toHaveTextContent("Tesseract confidence 96% (the engine's own estimate)");
-    expect(ocr).toHaveTextContent("1 analysed frame had no readable text.");
+    expect(ocr).toHaveTextContent("No text was detected in this frame. This does not mean the frame contains no text.");
   });
 
   it("shows duplicate frame pairs against the matched video", async () => {
