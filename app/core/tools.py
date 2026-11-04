@@ -23,7 +23,7 @@ class ToolSpec:
     version_args: tuple[str, ...]
     version_pattern: str
     used_in: str
-    required_in_m1: bool
+    required: bool
     required_languages: tuple[str, ...] = ()
 
 
@@ -32,8 +32,10 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     for spec in (
         ToolSpec("exiftool", ("-ver",), r"^\s*(\S+)", "M1: metadata, C2PA detection", True),
         ToolSpec("tesseract", ("--version",), r"tesseract\s+v?(\S+)", "M1: OCR", True, ("eng",)),
-        ToolSpec("ffmpeg", ("-version",), r"ffmpeg version (\S+)", "M3: video (not invoked in M1)", False),
-        ToolSpec("ffprobe", ("-version",), r"ffprobe version (\S+)", "M3: video (not invoked in M1)", False),
+        ToolSpec("ffmpeg", ("-version",), r"ffmpeg version (\S+)", "M3: keyframes, scene detection", True),
+        ToolSpec(
+            "ffprobe", ("-version",), r"ffprobe version (\S+)", "M3: video validation, media info", True
+        ),
     )
 }
 

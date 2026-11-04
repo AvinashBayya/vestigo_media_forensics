@@ -26,8 +26,13 @@ from app.services.validation import (
     SNIFF_BYTES,
     ImageTooLargeError,
     InvalidImageError,
+    InvalidVideoError,
+    VideoResolutionError,
+    VideoTooLongError,
     inspect_image,
+    inspect_video,
     sniff_image_format,
+    sniff_video_container,
 )
 
 logger = get_logger("artifacts")
@@ -82,34 +87,117 @@ def receive_upload(stream: BinaryIO, storage: Storage, max_bytes: int) -> Receiv
     return ReceivedUpload(temp_path, hasher.result(), head)
 
 
+@dataclass(frozen=True)
+class ValidatedMedia:
+    """What upload validation established from the file's own bytes."""
+
+    media_type: MediaType
+    mime_type: str
+    extension: str
+    width: int
+    height: int
+    # Container-reported for videos (decision M3-8); None for images.
+    duration_seconds: float | None
+
+
+def _file_too_large(max_bytes: int) -> AppError:
+    return AppError(
+        413,
+        ErrorCode.FILE_TOO_LARGE,
+        f"File exceeds the maximum upload size of {max_bytes // (1024 * 1024)} MB.",
+        {"max_bytes": max_bytes},
+    )
+
+
+def _validate_image(services: AppServices, received: ReceivedUpload, image_format: object) -> ValidatedMedia:
+    settings = services.settings
+    if received.hashes.size_bytes > settings.max_upload_bytes:
+        raise _file_too_large(settings.max_upload_bytes)
+    try:
+        info = inspect_image(received.temp_path, image_format, settings.max_image_pixels)
+    except ImageTooLargeError as exc:
+        raise AppError(
+            422,
+            ErrorCode.IMAGE_TOO_LARGE,
+            f"Image exceeds the maximum of {settings.max_image_pixels:,} pixels.",
+            {"max_pixels": settings.max_image_pixels},
+        ) from exc
+    except InvalidImageError as exc:
+        raise AppError(
+            422,
+            ErrorCode.INVALID_IMAGE,
+            f"The file starts like a {image_format.name.upper()} image but could not be read as one.",
+        ) from exc
+    return ValidatedMedia(
+        MediaType.IMAGE, image_format.mime_type, image_format.extension, info.width, info.height, None
+    )
+
+
+def _validate_video(services: AppServices, received: ReceivedUpload, container: str) -> ValidatedMedia:
+    settings = services.settings
+    if received.hashes.size_bytes > settings.max_video_upload_bytes:
+        raise _file_too_large(settings.max_video_upload_bytes)
+    try:
+        info = inspect_video(
+            services.tools.require("ffprobe"),
+            received.temp_path,
+            container,
+            received.head,
+            max_pixels=settings.max_video_pixels,
+            max_duration_seconds=settings.max_video_duration_seconds,
+            timeout=settings.tool_timeout_seconds,
+        )
+    except InvalidVideoError as exc:
+        raise AppError(
+            422,
+            ErrorCode.INVALID_VIDEO,
+            f"The file starts like a video container but could not be validated: {exc}.",
+        ) from exc
+    except VideoTooLongError as exc:
+        raise AppError(
+            422,
+            ErrorCode.VIDEO_TOO_LONG,
+            f"Video duration {exc.duration_seconds:g} s exceeds the maximum of "
+            f"{settings.max_video_duration_seconds:g} s.",
+            {"max_duration_seconds": settings.max_video_duration_seconds},
+        ) from exc
+    except VideoResolutionError as exc:
+        raise AppError(
+            422,
+            ErrorCode.VIDEO_RESOLUTION_TOO_LARGE,
+            f"Video frames of {exc.width}x{exc.height} exceed the maximum of "
+            f"{settings.max_video_pixels:,} pixels.",
+            {"max_pixels": settings.max_video_pixels},
+        ) from exc
+    return ValidatedMedia(
+        MediaType.VIDEO,
+        info.format.mime_type,
+        info.format.extension,
+        info.width,
+        info.height,
+        info.duration_seconds,
+    )
+
+
 def create_artifact(services: AppServices, stream: BinaryIO, filename: str | None) -> Artifact:
     settings, storage = services.settings, services.storage
-    received = receive_upload(stream, storage, settings.max_upload_bytes)
+    stream_cap = max(settings.max_upload_bytes, settings.max_video_upload_bytes)
+    received = receive_upload(stream, storage, stream_cap)
     artifact_id = ids.new_id(ids.ARTIFACT)
     try:
         image_format = sniff_image_format(received.head)
-        if image_format is None:
+        video_container = sniff_video_container(received.head) if image_format is None else None
+        if image_format is not None:
+            media = _validate_image(services, received, image_format)
+        elif video_container is not None:
+            media = _validate_video(services, received, video_container)
+        else:
             raise AppError(
                 415,
                 ErrorCode.UNSUPPORTED_MEDIA_TYPE,
-                "Only JPEG, PNG, WebP, and TIFF images are supported in Milestone 1.",
+                "Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, and MKV videos are supported.",
             )
-        try:
-            info = inspect_image(received.temp_path, image_format, settings.max_image_pixels)
-        except ImageTooLargeError as exc:
-            raise AppError(
-                422,
-                ErrorCode.IMAGE_TOO_LARGE,
-                f"Image exceeds the maximum of {settings.max_image_pixels:,} pixels.",
-                {"max_pixels": settings.max_image_pixels},
-            ) from exc
-        except InvalidImageError as exc:
-            raise AppError(
-                422,
-                ErrorCode.INVALID_IMAGE,
-                f"The file starts like a {image_format.name.upper()} image but could not be read as one.",
-            ) from exc
-        stored_path = storage.store_original(received.temp_path, artifact_id, image_format.extension)
+        stored_path = storage.store_original(received.temp_path, artifact_id, media.extension)
     except BaseException:
         received.temp_path.unlink(missing_ok=True)
         raise
@@ -118,13 +206,14 @@ def create_artifact(services: AppServices, stream: BinaryIO, filename: str | Non
     artifact = Artifact(
         id=artifact_id,
         original_filename=sanitize_filename(filename),
-        media_type=MediaType.IMAGE,
-        mime_type=image_format.mime_type,
+        media_type=media.media_type,
+        mime_type=media.mime_type,
         size_bytes=received.hashes.size_bytes,
         sha256=received.hashes.sha256,
         md5=received.hashes.md5,
-        width=info.width,
-        height=info.height,
+        width=media.width,
+        height=media.height,
+        duration_seconds=media.duration_seconds,
         stored_path=stored_path,
         review_state=ReviewState.UNREVIEWED,
         analyst_notes="",
@@ -159,6 +248,7 @@ def to_summary(artifact: Artifact, latest_job_status: str | None) -> ArtifactSum
         mime_type=artifact.mime_type,
         size_bytes=artifact.size_bytes,
         created_at=artifact.created_at,
+        duration_seconds=artifact.duration_seconds,
         review_state=ReviewState(artifact.review_state),
         latest_job_status=JobStatus(latest_job_status) if latest_job_status else None,
     )

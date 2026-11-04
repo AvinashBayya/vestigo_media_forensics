@@ -29,6 +29,13 @@ class EnvironmentSettings(BaseModel):
     max_image_pixels: int
     # The pHash Hamming-distance threshold for duplicate matches (read-only in the UI).
     duplicate_threshold: int
+    # Video limits (decision M3-2), all read-only here.
+    max_video_upload_bytes: int
+    max_video_duration_seconds: float
+    max_video_pixels: int
+    max_keyframes: int
+    scene_threshold: float
+    video_timeout_seconds: float
     job_mode: str
     job_workers: int
     tool_timeout_seconds: float

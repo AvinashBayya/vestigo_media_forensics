@@ -19,9 +19,16 @@ from app.schemas.analysis import (
     JobSummary,
     StageProgress,
 )
-from app.schemas.common import ACTIVE_JOB_STATUSES, ErrorBody, ErrorCode, JobStatus, StageStatus
+from app.schemas.common import (
+    ACTIVE_JOB_STATUSES,
+    ErrorBody,
+    ErrorCode,
+    JobStatus,
+    MediaType,
+    StageStatus,
+)
 from app.services.app_settings import editable_settings
-from app.services.errors import analysis_in_progress, artifact_not_found, job_not_found
+from app.services.errors import analysis_in_progress, artifact_not_found, job_not_found, wrong_media_type
 
 
 def latest_job(session: Session, artifact_id: str) -> AnalysisJob | None:
@@ -56,8 +63,11 @@ def start_image_analysis(db: Database, executor: JobExecutor, request: ImageAnal
     if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
         raise artifact_not_found(artifact_id)
     with db.writer() as session, session.begin():
-        if session.get(Artifact, artifact_id) is None:
+        artifact = session.get(Artifact, artifact_id)
+        if artifact is None:
             raise artifact_not_found(artifact_id)
+        if artifact.media_type != MediaType.IMAGE:
+            raise wrong_media_type(artifact_id, artifact.media_type, "video")
         existing = active_job(session, artifact_id)
         if existing is not None:
             raise analysis_in_progress(existing)

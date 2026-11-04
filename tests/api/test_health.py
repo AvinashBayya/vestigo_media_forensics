@@ -41,7 +41,9 @@ def test_health_is_degraded_when_an_m1_tool_is_missing(settings: Settings) -> No
     }
 
 
-def test_missing_m3_tool_does_not_degrade_health(settings: Settings) -> None:
+def test_missing_video_tool_degrades_health(settings: Settings) -> None:
+    # ffprobe validates video uploads and ffmpeg runs the video pipeline (Milestone 3), so a missing
+    # video tool degrades health just like a missing image tool.
     def which(name: str) -> str | None:
         return None if name == "ffprobe" else f"/usr/bin/{name}"
 
@@ -49,7 +51,7 @@ def test_missing_m3_tool_does_not_degrade_health(settings: Settings) -> None:
     with TestClient(app) as client:
         body = client.get("/api/v1/health").json()
 
-    assert body["status"] == "ok"
+    assert body["status"] == "degraded"
     assert body["tools"]["ffprobe"]["status"] == "missing"
 
 

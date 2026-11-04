@@ -73,7 +73,7 @@ def create_app(
     app.add_middleware(
         UploadSizeLimitMiddleware,
         path=f"{API_PREFIX}/artifacts/upload",
-        max_file_bytes=settings.max_upload_bytes,
+        max_file_bytes=max(settings.max_upload_bytes, settings.max_video_upload_bytes),
     )
 
     api = APIRouter(prefix=API_PREFIX)

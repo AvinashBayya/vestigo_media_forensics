@@ -15,7 +15,7 @@ def health(services: Services) -> JSONResponse:
     storage = "ok" if services.storage.is_healthy() else "error"
 
     tools: dict[str, ToolHealth] = {}
-    m1_tools_ok = True
+    required_tools_ok = True
     for name, tool in services.tools.all_statuses().items():
         spec = services.tools.specs[name]
         tools[name] = ToolHealth(
@@ -25,12 +25,12 @@ def health(services: Services) -> JSONResponse:
             languages=list(tool.languages) if spec.required_languages else None,
             detail=tool.detail,
         )
-        if spec.required_in_m1 and tool.status != "ok":
-            m1_tools_ok = False
+        if spec.required and tool.status != "ok":
+            required_tools_ok = False
 
     if database == "error" or storage == "error":
         status, status_code = "error", 503
-    elif not m1_tools_ok:
+    elif not required_tools_ok:
         status, status_code = "degraded", 200
     else:
         status, status_code = "ok", 200

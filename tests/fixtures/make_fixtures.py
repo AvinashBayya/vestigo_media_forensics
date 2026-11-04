@@ -21,6 +21,13 @@ FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
 FONT_PATH = FONT_DIR / "DejaVuSans.ttf"
 OCR_TEXT = "VESTIGO EVIDENCE SAMPLE 2026"
 
+# Drawn into the scene video's first and last scenes (keyframe OCR tests).
+VIDEO_TEXT_SCENE_1 = "SCENE ONE"
+VIDEO_TEXT_SCENE_3 = "SCENE THREE"
+# The scene video: three 3-second scenes with cuts at 3.0 s and 6.0 s, 640x360, with audio.
+VIDEO_SCENE_CUTS = (3.0, 6.0)
+VIDEO_SCENES_DURATION = 9.0
+
 # Words drawn into the OCR fixtures, used by tests to count how many were recovered.
 OCR_SCREENSHOT_WORDS = (
     "Case", "Dashboard", "Artifact", "uploaded", "Status", "analysis", "complete",
@@ -57,6 +64,16 @@ class FixtureSet:
     truncated_jpeg: Path
     oversized_dimensions: Path
     bomb_dimensions: Path
+    video_scenes: Path
+    video_static: Path
+    video_webm: Path
+    video_mkv: Path
+    video_mov: Path
+    video_rotated: Path
+    video_no_audio: Path
+    audio_only_mp4: Path
+    truncated_mp4: Path
+    html_named_mp4: Path
 
 
 def textured_image(seed: int, size: tuple[int, int] = (640, 480)) -> Image.Image:
@@ -213,6 +230,89 @@ def noisy_text_image() -> Image.Image:
     return image.filter(ImageFilter.GaussianBlur(1.2)).convert("RGB")
 
 
+def ffmpeg(*args: str | Path) -> None:
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *map(str, args)], check=True)
+
+
+def build_video_fixtures(path) -> dict[str, Path]:
+    """Deterministic test videos, generated from ffmpeg lavfi sources (no committed binaries)."""
+    draw = f"drawtext=fontfile={FONT_PATH}:text='{{text}}':fontsize=56:fontcolor={{color}}:x=40:y=120"
+    scenes = path("scenes.mp4")
+    ffmpeg(
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=red:s=640x360:d=3",
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc2=s=640x360:d=3",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=640x360:d=3",
+        "-f",
+        "lavfi",
+        "-i",
+        "sine=frequency=440:duration=9",
+        "-filter_complex",
+        f"[0:v]{draw.format(text=VIDEO_TEXT_SCENE_1, color='white')},format=yuv420p[v0];"
+        f"[1:v]format=yuv420p[v1];"
+        f"[2:v]{draw.format(text=VIDEO_TEXT_SCENE_3, color='yellow')},format=yuv420p[v2];"
+        "[v0][v1][v2]concat=n=3:v=1:a=0[v]",
+        "-map",
+        "[v]",
+        "-map",
+        "3:a",
+        "-c:v",
+        "libx264",
+        "-c:a",
+        "aac",
+        "-shortest",
+        scenes,
+    )
+    # A re-encoded, downscaled copy: the duplicate-search test case. WebM requires Opus/Vorbis audio.
+    ffmpeg(
+        "-i",
+        scenes,
+        "-vf",
+        "scale=320:-2",
+        "-c:v",
+        "libvpx-vp9",
+        "-crf",
+        "35",
+        "-b:v",
+        "0",
+        "-deadline",
+        "realtime",
+        "-cpu-used",
+        "8",
+        "-c:a",
+        "libopus",
+        path("recoded.webm"),
+    )
+    ffmpeg("-i", scenes, "-c", "copy", path("scenes.mkv"))
+    ffmpeg("-i", scenes, "-c", "copy", path("scenes.mov"))
+    ffmpeg("-display_rotation", "90", "-i", scenes, "-c", "copy", path("rotated.mp4"))
+    ffmpeg("-f", "lavfi", "-i", "color=c=green:s=320x240:d=4", "-c:v", "libx264", path("static.mp4"))
+    ffmpeg("-f", "lavfi", "-i", "color=c=gray:s=320x240:d=2", "-c:v", "libx264", path("no_audio.mp4"))
+    ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "aac", path("audio_only.mp4"))
+    path("truncated.mp4").write_bytes(scenes.read_bytes()[:400])
+    path("page.mp4").write_bytes(b"<!doctype html><html><body>not a video</body></html>")
+    return {
+        "video_scenes": scenes,
+        "video_static": path("static.mp4"),
+        "video_webm": path("recoded.webm"),
+        "video_mkv": path("scenes.mkv"),
+        "video_mov": path("scenes.mov"),
+        "video_rotated": path("rotated.mp4"),
+        "video_no_audio": path("no_audio.mp4"),
+        "audio_only_mp4": path("audio_only.mp4"),
+        "truncated_mp4": path("truncated.mp4"),
+        "html_named_mp4": path("page.mp4"),
+    }
+
+
 def build_fixtures(target: Path) -> FixtureSet:
     target.mkdir(parents=True, exist_ok=True)
     base = textured_image(seed=1)
@@ -262,7 +362,10 @@ def build_fixtures(target: Path) -> FixtureSet:
     path("oversized.png").write_bytes(png_with_dimensions(11_000, 10_000))
     path("bomb.png").write_bytes(png_with_dimensions(20_000, 20_000))
 
+    videos = build_video_fixtures(path)
+
     return FixtureSet(
+        **videos,
         jpeg=path("base.jpg"),
         png=path("base.png"),
         webp=path("base.webp"),

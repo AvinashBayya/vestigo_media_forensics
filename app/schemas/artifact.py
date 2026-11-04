@@ -31,6 +31,8 @@ class ArtifactSummary(BaseModel):
     mime_type: str
     size_bytes: int
     created_at: datetime
+    # Container-reported duration for videos (decision M3-8); None for images.
+    duration_seconds: float | None = None
     review_state: ReviewState
     latest_job_status: JobStatus | None
 
@@ -86,7 +88,16 @@ class SortOrder(StrEnum):
     DESC = "desc"
 
 
-SupportedMimeType = Literal["image/jpeg", "image/png", "image/webp", "image/tiff"]
+SupportedMimeType = Literal[
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/tiff",
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+    "video/x-matroska",
+]
 
 
 class ArtifactQuery(BaseModel):

@@ -215,6 +215,7 @@ def _to_items(session: Session, rows: list[Any]) -> list[ArtifactListItem]:
                 mime_type=artifact.mime_type,
                 size_bytes=artifact.size_bytes,
                 created_at=artifact.created_at,
+                duration_seconds=artifact.duration_seconds,
                 review_state=ReviewState(artifact.review_state),
                 latest_job_status=JobStatus(job.status) if job else None,
                 latest_job=JobSummary(

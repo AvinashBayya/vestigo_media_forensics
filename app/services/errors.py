@@ -18,3 +18,12 @@ def analysis_in_progress(job: AnalysisJob) -> AppError:
         "An analysis is already queued or running for this artifact.",
         {"job_id": job.id, "status": job.status},
     )
+
+
+def wrong_media_type(artifact_id: str, actual: str, endpoint: str) -> AppError:
+    return AppError(
+        422,
+        ErrorCode.WRONG_MEDIA_TYPE,
+        f"This artifact is a {actual}. Use POST /analysis/{endpoint} for {actual}s.",
+        {"artifact_id": artifact_id, "media_type": actual},
+    )
