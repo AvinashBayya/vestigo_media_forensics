@@ -10,7 +10,7 @@ import {
   getEvidence,
   getJob,
   getJobHistory,
-  startImageAnalysis,
+  startAnalysis,
 } from "../api/client";
 import type { ArtifactDetail, EvidenceReport, JobHistoryItem, JobStatusResponse } from "../api/types";
 import { AnalysisHistory } from "../components/AnalysisHistory";
@@ -19,6 +19,11 @@ import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
 import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
+import { KeyframeOCRPanel } from "../components/evidence/KeyframeOCRPanel";
+import { KeyframePHashPanel } from "../components/evidence/KeyframePHashPanel";
+import { KeyframesPanel } from "../components/evidence/KeyframesPanel";
+import { MediaInfoPanel } from "../components/evidence/MediaInfoPanel";
+import { SceneChangesPanel } from "../components/evidence/SceneChangesPanel";
 import { HashesPanel } from "../components/evidence/HashesPanel";
 import { MetadataPanel } from "../components/evidence/MetadataPanel";
 import { OCRPanel } from "../components/evidence/OCRPanel";
@@ -30,7 +35,7 @@ import { ErrorBanner, EvidenceNotice, InfoBanner } from "../components/Messages"
 import { ReviewPanel } from "../components/ReviewPanel";
 import { ReviewProvider } from "../components/review/ReviewContext";
 import { StatusBadge } from "../components/StatusBadge";
-import { REVIEW_LABELS, formatBytes, formatDateTime, isActive } from "../lib/format";
+import { REVIEW_LABELS, formatBytes, formatDateTime, formatSeconds, isActive } from "../lib/format";
 
 export const POLL_INTERVAL_MS = 1000;
 
@@ -101,7 +106,7 @@ export function ArtifactPage() {
   async function runAnalysis() {
     setError(null);
     try {
-      const created = await startImageAnalysis(artifactId);
+      const created = await startAnalysis(artifactId, artifact?.media_type ?? "image");
       setReport(null);
       setJob(await getJob(created.job_id));
     } catch (err) {
@@ -142,7 +147,8 @@ export function ArtifactPage() {
         <h1 className="text-xl font-semibold break-all">{artifact.filename}</h1>
         <p className="text-sm text-slate-600 dark:text-slate-400">
           {artifact.mime_type} · {formatBytes(artifact.size_bytes)}
-          {artifact.width && artifact.height ? ` · ${artifact.width}×${artifact.height} px` : ""} · uploaded{" "}
+          {artifact.width && artifact.height ? ` · ${artifact.width}×${artifact.height} px` : ""}
+          {artifact.duration_seconds !== null ? ` · ${formatSeconds(artifact.duration_seconds)}` : ""} · uploaded{" "}
           {formatDateTime(artifact.created_at)} · review: {REVIEW_LABELS[artifact.review_state]}
         </p>
         <p className="font-mono text-xs text-slate-500">{artifact.artifact_id}</p>
@@ -158,8 +164,20 @@ export function ArtifactPage() {
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             {previewFailed ? (
               <p className="p-4 text-sm text-slate-600 dark:text-slate-400">
-                This format cannot be previewed in the browser.
+                {artifact.media_type === "video"
+                  ? "This video cannot be played in the browser (codec or container not supported). The keyframes below show its content."
+                  : "This format cannot be previewed in the browser."}
               </p>
+            ) : artifact.media_type === "video" ? (
+              // No transcoding (M3-6): the original streams with HTTP Range, or the fallback shows.
+              <video
+                src={contentUrl(artifact.artifact_id)}
+                controls
+                preload="metadata"
+                aria-label={`Preview of ${artifact.filename}`}
+                onError={() => setPreviewFailed(true)}
+                className="max-h-80 w-full bg-black object-contain"
+              />
             ) : (
               <img
                 src={contentUrl(artifact.artifact_id)}
@@ -229,14 +247,31 @@ export function ArtifactPage() {
               </div>
               <ProblemsSummary report={report} job={shownJob} />
               <HashesPanel section={report.hashes} />
-              <C2PAPanel section={report.c2pa} />
-              <DuplicatesPanel
-                section={report.duplicates}
-                addedSince={viewingEarlier ? null : artifact.added_since_analysis}
-                onRerun={analysing ? undefined : () => void runAnalysis()}
-              />
-              <OCRPanel section={report.ocr} />
-              <PHashPanel section={report.perceptual_hash} />
+              {artifact.media_type === "video" ? (
+                <>
+                  <MediaInfoPanel section={report.media_info} />
+                  <SceneChangesPanel section={report.scene_changes} />
+                  <KeyframesPanel artifactId={artifact.artifact_id} section={report.keyframes} />
+                  <DuplicatesPanel
+                    section={report.duplicates}
+                    addedSince={viewingEarlier ? null : artifact.added_since_analysis}
+                    onRerun={analysing ? undefined : () => void runAnalysis()}
+                  />
+                  <KeyframeOCRPanel section={report.keyframe_ocr} />
+                  <KeyframePHashPanel section={report.keyframe_phash} />
+                </>
+              ) : (
+                <>
+                  <C2PAPanel section={report.c2pa} />
+                  <DuplicatesPanel
+                    section={report.duplicates}
+                    addedSince={viewingEarlier ? null : artifact.added_since_analysis}
+                    onRerun={analysing ? undefined : () => void runAnalysis()}
+                  />
+                  <OCRPanel section={report.ocr} />
+                  <PHashPanel section={report.perceptual_hash} />
+                </>
+              )}
               <MetadataPanel section={report.metadata} />
             </div>
           )}

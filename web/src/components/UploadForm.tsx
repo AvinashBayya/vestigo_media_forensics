@@ -1,20 +1,39 @@
 import { useEffect, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 
-import { errorMessage, startImageAnalysis, uploadArtifact } from "../api/client";
-import type { AnalysisOptions } from "../api/types";
+import { errorMessage, startImageAnalysis, startVideoAnalysis, uploadArtifact } from "../api/client";
+import type { AnalysisOptions, VideoAnalysisOptions } from "../api/types";
 import { formatBytes } from "../lib/format";
 import { useSettings } from "../lib/settings";
 import { ErrorBanner } from "./Messages";
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/tiff"];
-const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|tiff?)$/i;
-const MAX_BYTES = 50 * 1024 * 1024;
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/tiff"];
+const VIDEO_TYPES = ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska"];
+const ACCEPTED_TYPES = [...IMAGE_TYPES, ...VIDEO_TYPES];
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|webp|tiff?)$/i;
+const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv)$/i;
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+
+type MediaKind = "image" | "video";
+
+function kindOf(file: File): MediaKind | null {
+  if (IMAGE_TYPES.includes(file.type) || IMAGE_EXTENSIONS.test(file.name)) return "image";
+  if (VIDEO_TYPES.includes(file.type) || VIDEO_EXTENSIONS.test(file.name)) return "video";
+  return null;
+}
 
 export const OPTION_LABELS: Record<keyof AnalysisOptions, string> = {
   metadata: "Embedded metadata (EXIF, XMP, IPTC)",
   c2pa: "Content Credentials (C2PA) detection",
   ocr: "Text in image (OCR, English)",
+  duplicate_search: "Duplicate search in the local library",
+};
+
+export const VIDEO_OPTION_LABELS: Record<keyof VideoAnalysisOptions, string> = {
+  metadata: "Embedded metadata (QuickTime, Matroska, XMP)",
+  scene_detection: "Scene-change detection",
+  keyframe_ocr: "Text in keyframes (OCR, English, up to 10 frames)",
   duplicate_search: "Duplicate search in the local library",
 };
 
@@ -26,12 +45,16 @@ export function UploadForm() {
   const { settings, loaded: settingsLoaded } = useSettings();
   const autoAnalyze = settings.auto_analyze_after_upload;
   const [options, setOptions] = useState<AnalysisOptions>(settings.default_analysis_options);
+  const [videoOptions, setVideoOptions] = useState<VideoAnalysisOptions>(settings.default_video_analysis_options);
   const [optionsTouched, setOptionsTouched] = useState(false);
 
   // Start from the saved defaults once they arrive, unless the analyst already changed the options.
   useEffect(() => {
-    if (settingsLoaded && !optionsTouched) setOptions(settings.default_analysis_options);
-  }, [settingsLoaded, optionsTouched, settings.default_analysis_options]);
+    if (settingsLoaded && !optionsTouched) {
+      setOptions(settings.default_analysis_options);
+      setVideoOptions(settings.default_video_analysis_options);
+    }
+  }, [settingsLoaded, optionsTouched, settings.default_analysis_options, settings.default_video_analysis_options]);
   const [phase, setPhase] = useState<Phase>("idle");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -40,18 +63,22 @@ export function UploadForm() {
   function selectFile(selected: File | undefined) {
     setError(null);
     if (!selected) return;
-    if (!ACCEPTED_TYPES.includes(selected.type) && !ACCEPTED_EXTENSIONS.test(selected.name)) {
+    const kind = kindOf(selected);
+    if (kind === null) {
       setFile(null);
-      setError("Only JPEG, PNG, WebP, and TIFF images are supported.");
+      setError("Only JPEG, PNG, WebP, and TIFF images and MP4, MOV, WebM, and MKV videos are supported.");
       return;
     }
-    if (selected.size > MAX_BYTES) {
+    const limit = kind === "video" ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+    if (selected.size > limit) {
       setFile(null);
-      setError("The file is larger than the 50 MB limit.");
+      setError(`The file is larger than the ${kind === "video" ? "500" : "50"} MB limit for ${kind}s.`);
       return;
     }
     setFile(selected);
   }
+
+  const fileKind: MediaKind = file ? (kindOf(file) ?? "image") : "image";
 
   function onDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
@@ -81,7 +108,8 @@ export function UploadForm() {
     }
     setPhase("starting");
     try {
-      await startImageAnalysis(artifactId, options);
+      if (fileKind === "video") await startVideoAnalysis(artifactId, videoOptions);
+      else await startImageAnalysis(artifactId, options);
       navigate(`/artifacts/${artifactId}`);
     } catch (err) {
       // The upload worked; the artifact page lets the analyst retry the analysis.
@@ -111,7 +139,9 @@ export function UploadForm() {
       >
         <span className="font-medium">{file ? file.name : "Choose an image or drop it here"}</span>
         <span className="text-xs text-slate-600 dark:text-slate-400">
-          {file ? formatBytes(file.size) : "JPEG, PNG, WebP, or TIFF, up to 50 MB"}
+          {file
+            ? formatBytes(file.size)
+            : "Images (JPEG, PNG, WebP, TIFF) up to 50 MB · videos (MP4, MOV, WebM, MKV) up to 500 MB"}
         </span>
         <input
           id="file-input"
@@ -130,20 +160,38 @@ export function UploadForm() {
       )}
       <fieldset className="space-y-1" disabled={busy} hidden={!autoAnalyze}>
         <legend className="mb-1 text-sm font-medium">Checks to run</legend>
-        {(Object.keys(OPTION_LABELS) as (keyof AnalysisOptions)[]).map((key) => (
-          <label key={key} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={options[key]}
-              onChange={(event) => {
-                setOptionsTouched(true);
-                setOptions({ ...options, [key]: event.target.checked });
-              }}
-            />
-            {OPTION_LABELS[key]}
-          </label>
-        ))}
-        <p className="text-xs text-slate-600 dark:text-slate-400">File hashes and the perceptual hash always run.</p>
+        {fileKind === "video"
+          ? (Object.keys(VIDEO_OPTION_LABELS) as (keyof VideoAnalysisOptions)[]).map((key) => (
+              <label key={key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={videoOptions[key]}
+                  onChange={(event) => {
+                    setOptionsTouched(true);
+                    setVideoOptions({ ...videoOptions, [key]: event.target.checked });
+                  }}
+                />
+                {VIDEO_OPTION_LABELS[key]}
+              </label>
+            ))
+          : (Object.keys(OPTION_LABELS) as (keyof AnalysisOptions)[]).map((key) => (
+              <label key={key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={options[key]}
+                  onChange={(event) => {
+                    setOptionsTouched(true);
+                    setOptions({ ...options, [key]: event.target.checked });
+                  }}
+                />
+                {OPTION_LABELS[key]}
+              </label>
+            ))}
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          {fileKind === "video"
+            ? "File hashes, media information, keyframes, and keyframe perceptual hashes always run."
+            : "File hashes and the perceptual hash always run."}
+        </p>
       </fieldset>
 
       {error && <ErrorBanner message={error} />}

@@ -2,7 +2,7 @@ import { Link } from "react-router";
 
 import { contentUrl } from "../../api/client";
 import type { DuplicateMatch, DuplicatesSection, MatchType } from "../../api/types";
-import { formatDateTime, formatPercent } from "../../lib/format";
+import { formatDateTime, formatPercent, formatSeconds } from "../../lib/format";
 import { Panel } from "../Panel";
 
 const MATCH_LABELS: Record<MatchType, string> = {
@@ -79,8 +79,26 @@ function MatchRow({ match }: { match: DuplicateMatch }) {
           <span className="text-slate-600 dark:text-slate-400">Deleted artifact</span>
         )}
         <p className="text-xs text-slate-600 dark:text-slate-400">
+          {match.media_type === "video" && "Video · "}
           {MATCH_LABELS[match.match_type]} · distance {match.distance}/64 · similarity {formatPercent(match.similarity)}
         </p>
+        {match.frame_matches && match.frame_matches.length > 0 && (
+          <details className="text-xs text-slate-600 dark:text-slate-400">
+            <summary className="cursor-pointer">
+              {match.matched_frame_count === 1 ? "1 matching frame pair" : `${match.matched_frame_count} matching frame pairs`}
+            </summary>
+            <ul className="mt-1 space-y-0.5 font-mono">
+              {match.frame_matches.map((pair, index) => (
+                <li key={index}>
+                  {pair.query_timestamp === null ? "this image" : `this video at ${formatSeconds(pair.query_timestamp)}`}
+                  {" ↔ "}
+                  {pair.matched_timestamp === null ? "matched image" : `matched video at ${formatSeconds(pair.matched_timestamp)}`}
+                  {` · distance ${pair.distance}/64`}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
     </li>
   );

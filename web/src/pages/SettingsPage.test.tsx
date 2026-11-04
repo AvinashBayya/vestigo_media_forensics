@@ -56,6 +56,12 @@ describe("SettingsPage", () => {
     expect(await within(form).findByRole("status")).toHaveTextContent("Saved");
     expect(sent).toEqual({
       default_analysis_options: { metadata: true, c2pa: true, ocr: false, duplicate_search: true },
+      default_video_analysis_options: {
+        metadata: true,
+        scene_detection: true,
+        keyframe_ocr: false,
+        duplicate_search: true,
+      },
       library_page_size: 50,
       auto_analyze_after_upload: false,
     });

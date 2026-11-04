@@ -47,6 +47,7 @@ export function artifactDetail(overrides: Partial<ArtifactDetail> = {}): Artifac
     mime_type: "image/jpeg",
     size_bytes: 36_000,
     created_at: NOW,
+    duration_seconds: null,
     review_state: "UNREVIEWED",
     latest_job_status: "completed",
     sha256: "a".repeat(64),
@@ -76,6 +77,7 @@ export function listItem(overrides: Partial<ArtifactListItem> = {}): ArtifactLis
     mime_type: "image/jpeg",
     size_bytes: 36_000,
     created_at: NOW,
+    duration_seconds: null,
     review_state: "UNREVIEWED",
     latest_job_status: "completed",
     latest_job: { job_id: JOB_ID, status: "completed", created_at: NOW, started_at: NOW, completed_at: NOW },
@@ -115,7 +117,7 @@ export function jobStatus(status: JobStatusResponse["status"], stages: StageStat
 
 export function evidenceReport(overrides: Partial<EvidenceReport> = {}): EvidenceReport {
   return {
-    schema_version: "1.1",
+    schema_version: "1.2",
     artifact_id: ARTIFACT_ID,
     job_id: JOB_ID,
     created_at: NOW,
@@ -206,13 +208,21 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
           artifact_id: OTHER_ARTIFACT_ID,
           filename: "harbour-copy.jpg",
           available: true,
+          media_type: "image",
           similarity: 1,
           distance: 0,
           match_type: "exact_file",
+          matched_frame_count: null,
+          frame_matches: null,
         },
       ],
       provenance: provenance("duplicates"),
     },
+    media_info: null,
+    scene_changes: null,
+    keyframes: null,
+    keyframe_phash: null,
+    keyframe_ocr: null,
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
     review_history: [],
     ...overrides,
@@ -252,6 +262,12 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
   return {
     editable: {
       default_analysis_options: { metadata: true, c2pa: true, ocr: true, duplicate_search: true },
+      default_video_analysis_options: {
+        metadata: true,
+        scene_detection: true,
+        keyframe_ocr: false,
+        duplicate_search: true,
+      },
       library_page_size: 25,
       auto_analyze_after_upload: true,
       ...editable,
@@ -261,6 +277,12 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
       max_upload_bytes: 52_428_800,
       max_image_pixels: 100_000_000,
       duplicate_threshold: 10,
+      max_video_upload_bytes: 524_288_000,
+      max_video_duration_seconds: 900,
+      max_video_pixels: 8_294_400,
+      max_keyframes: 40,
+      scene_threshold: 0.3,
+      video_timeout_seconds: 600,
       job_mode: "thread",
       job_workers: 2,
       tool_timeout_seconds: 60,
@@ -272,4 +294,152 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
     },
     updated_at: null,
   };
+}
+
+export const DERIVED_KF_1 = "df_" + "1".repeat(32);
+export const DERIVED_KF_2 = "df_" + "2".repeat(32);
+
+/** An analysed video artifact with every video section filled. */
+export function videoDetail(overrides: Partial<ArtifactDetail> = {}): ArtifactDetail {
+  return artifactDetail({
+    filename: "scenes.mp4",
+    media_type: "video",
+    mime_type: "video/mp4",
+    size_bytes: 388_000,
+    width: 640,
+    height: 360,
+    duration_seconds: 9.0,
+    ...overrides,
+  });
+}
+
+export function videoReport(overrides: Partial<EvidenceReport> = {}): EvidenceReport {
+  const base = evidenceReport({
+    c2pa: null,
+    perceptual_hash: null,
+    ocr: null,
+    media_info: {
+      container: {
+        format_name: "mov,mp4,m4a,3gp,3g2,mj2",
+        format_long_name: "QuickTime / MOV",
+        duration_seconds: 9.0,
+        size_bytes: 388_000,
+        bit_rate: 344_000,
+        stream_count: 2,
+      },
+      video_streams: [
+        {
+          index: 0,
+          codec: "h264",
+          profile: "High",
+          width: 640,
+          height: 360,
+          frame_rate: 25,
+          bit_rate: 240_000,
+          pixel_format: "yuv420p",
+          rotation: null,
+        },
+      ],
+      audio_streams: [
+        {
+          index: 1,
+          codec: "aac",
+          profile: "LC",
+          channels: 1,
+          channel_layout: "mono",
+          sample_rate: 44_100,
+          bit_rate: 69_000,
+        },
+      ],
+      other_streams: [],
+      provenance: provenance("media_info", { classification: "OBSERVED", tool: "ffprobe", tool_version: "7.1.5" }),
+    },
+    scene_changes: {
+      threshold: 0.3,
+      count: 2,
+      changes: [
+        { time: 3.023, score: 0.5788 },
+        { time: 6.023, score: 0.8158 },
+      ],
+      provenance: provenance("scene_changes", { tool: "ffmpeg", tool_version: "7.1.5" }),
+    },
+    keyframes: {
+      policy: { min_keyframes: 8, max_keyframes: 40, dedupe_seconds: 0.25, thumbnail_max_side: 1920 },
+      requested: 8,
+      extracted: 8,
+      frames: [
+        { seq: 1, timestamp: 0, reason: "first_frame", scene_score: null, derived_file_id: DERIVED_KF_1, width: 640, height: 360 },
+        { seq: 2, timestamp: 3.023, reason: "scene_change", scene_score: 0.5788, derived_file_id: DERIVED_KF_2, width: 640, height: 360 },
+      ],
+      provenance: provenance("keyframes", { tool: "ffmpeg", tool_version: "7.1.5" }),
+    },
+    keyframe_phash: {
+      algorithm: "pHash",
+      bits: 64,
+      count: 2,
+      frames: [
+        { seq: 1, timestamp: 0, value: "c4c4c4c43b3b3b3b", derived_file_id: DERIVED_KF_1 },
+        { seq: 2, timestamp: 3.023, value: "8469a2964f8f9b17", derived_file_id: DERIVED_KF_2 },
+      ],
+      provenance: provenance("keyframe_phash", { tool: "imagehash", tool_version: "4.3.2" }),
+    },
+    keyframe_ocr: {
+      engine: "tesseract",
+      languages: ["eng"],
+      frame_limit: 10,
+      analyzed: 2,
+      frames: [
+        {
+          seq: 1,
+          timestamp: 0,
+          text: "SCENE ONE",
+          cleaned_text: null,
+          cleaning: [],
+          confidence: 0.96,
+          word_count: 2,
+          preprocessing: [],
+          candidates: [],
+          selected: { variant: "grayscale", reason: "The threshold pass was not used." },
+        },
+        {
+          seq: 2,
+          timestamp: 3.023,
+          text: "",
+          cleaned_text: null,
+          cleaning: [],
+          confidence: null,
+          word_count: 0,
+          preprocessing: [],
+          candidates: [],
+          selected: { variant: "grayscale", reason: "Neither pass found words with enough confidence." },
+        },
+      ],
+      provenance: provenance("keyframe_ocr", { tool: "Tesseract", tool_version: "5.5.0; Pillow 13.0.0" }),
+    },
+    duplicates: {
+      algorithm: "pHash",
+      threshold: 10,
+      library_size: 2,
+      compared: 1,
+      excluded_count: 0,
+      matches: [
+        {
+          artifact_id: OTHER_ARTIFACT_ID,
+          filename: "recoded.webm",
+          available: true,
+          media_type: "video",
+          similarity: 0.9688,
+          distance: 2,
+          match_type: "near",
+          matched_frame_count: 2,
+          frame_matches: [
+            { distance: 0, similarity: 1, query_seq: 1, query_timestamp: 0, matched_seq: 1, matched_timestamp: 0 },
+            { distance: 2, similarity: 0.9688, query_seq: 2, query_timestamp: 3.023, matched_seq: 2, matched_timestamp: 3.1 },
+          ],
+        },
+      ],
+      provenance: provenance("duplicates"),
+    },
+  });
+  return { ...base, ...overrides };
 }

@@ -1,6 +1,6 @@
 // Mirrors the Pydantic schemas in app/schemas/.
 
-export type MediaType = "image";
+export type MediaType = "image" | "video";
 
 export type ReviewState = "UNREVIEWED" | "IN_REVIEW" | "REVIEWED" | "FLAGGED" | "ARCHIVED";
 export const REVIEW_STATES: ReviewState[] = ["UNREVIEWED", "IN_REVIEW", "REVIEWED", "FLAGGED", "ARCHIVED"];
@@ -46,6 +46,8 @@ export interface ArtifactSummary {
   mime_type: string;
   size_bytes: number;
   created_at: string;
+  /** Container-reported duration for videos (M3-8); null for images. */
+  duration_seconds: number | null;
   review_state: ReviewState;
   latest_job_status: JobStatus | null;
 }
@@ -81,7 +83,15 @@ export interface ArtifactList {
 export type AnalysisStatusFilter = JobStatus | "not_analysed";
 export type ArtifactSort = "created_at" | "filename" | "size_bytes" | "review_state";
 export type SortOrder = "asc" | "desc";
-export type SupportedMimeType = "image/jpeg" | "image/png" | "image/webp" | "image/tiff";
+export type SupportedMimeType =
+  | "image/jpeg"
+  | "image/png"
+  | "image/webp"
+  | "image/tiff"
+  | "video/mp4"
+  | "video/quicktime"
+  | "video/webm"
+  | "video/x-matroska";
 
 /** Query parameters of GET /artifacts. All optional. */
 export interface ArtifactQuery {
@@ -145,6 +155,14 @@ export interface BulkReviewResult {
   state: ReviewState;
   updated: string[];
   unchanged: string[];
+}
+
+/** Video analysis options; keyframe OCR is off by default (M3-3). */
+export interface VideoAnalysisOptions {
+  metadata: boolean;
+  scene_detection: boolean;
+  keyframe_ocr: boolean;
+  duplicate_search: boolean;
 }
 
 export interface AnalysisOptions {
@@ -302,13 +320,27 @@ export interface OCRSection {
 
 export type MatchType = "exact_file" | "visually_identical" | "near";
 
+/** One matching hash pair (M3-4). Frame fields are null for the whole-image side. */
+export interface FrameMatchInfo {
+  distance: number;
+  similarity: number;
+  query_seq: number | null;
+  query_timestamp: number | null;
+  matched_seq: number | null;
+  matched_timestamp: number | null;
+}
+
 export interface DuplicateMatch {
   artifact_id: string;
   filename: string | null;
   available: boolean;
+  media_type: MediaType | null;
   similarity: number;
   distance: number;
   match_type: MatchType;
+  /** Frame detail when either side is a video; null for image-to-image and exact-file matches. */
+  matched_frame_count: number | null;
+  frame_matches: FrameMatchInfo[] | null;
 }
 
 export interface DuplicatesSection {
@@ -323,7 +355,7 @@ export interface DuplicatesSection {
 }
 
 export interface EvidenceReport {
-  schema_version: "1.1";
+  schema_version: "1.2";
   artifact_id: string;
   job_id: string;
   created_at: string;
@@ -336,6 +368,11 @@ export interface EvidenceReport {
   perceptual_hash: PerceptualHashSection | null;
   ocr: OCRSection | null;
   duplicates: DuplicatesSection | null;
+  media_info: MediaInfoSection | null;
+  scene_changes: SceneChangesSection | null;
+  keyframes: KeyframesSection | null;
+  keyframe_phash: KeyframePHashSection | null;
+  keyframe_ocr: KeyframeOCRSection | null;
   review: ReviewInfo;
   /** Newest first. */
   review_history: ReviewEvent[];
@@ -396,6 +433,7 @@ export const LIBRARY_PAGE_SIZES: LibraryPageSize[] = [10, 25, 50, 100];
 
 export interface EditableSettings {
   default_analysis_options: AnalysisOptions;
+  default_video_analysis_options: VideoAnalysisOptions;
   library_page_size: LibraryPageSize;
   auto_analyze_after_upload: boolean;
 }
@@ -406,6 +444,12 @@ export interface EnvironmentSettings {
   max_upload_bytes: number;
   max_image_pixels: number;
   duplicate_threshold: number;
+  max_video_upload_bytes: number;
+  max_video_duration_seconds: number;
+  max_video_pixels: number;
+  max_keyframes: number;
+  scene_threshold: number;
+  video_timeout_seconds: number;
   job_mode: string;
   job_workers: number;
   tool_timeout_seconds: number;
@@ -420,4 +464,115 @@ export interface SettingsResponse {
   editable: EditableSettings;
   environment: EnvironmentSettings;
   updated_at: string | null;
+}
+
+// --- Video sections (Milestone 3) ---------------------------------------------------------------
+
+export interface ContainerInfo {
+  format_name: string | null;
+  format_long_name: string | null;
+  /** As written in the container (M3-8), not measured by decoding. */
+  duration_seconds: number | null;
+  size_bytes: number | null;
+  bit_rate: number | null;
+  stream_count: number;
+}
+
+export interface VideoStreamInfo {
+  index: number | null;
+  codec: string | null;
+  profile: string | null;
+  width: number | null;
+  height: number | null;
+  frame_rate: number | null;
+  bit_rate: number | null;
+  pixel_format: string | null;
+  rotation: number | null;
+}
+
+/** Header-level audio facts only (M3-7): nothing is decoded or transcribed. */
+export interface AudioStreamInfo {
+  index: number | null;
+  codec: string | null;
+  profile: string | null;
+  channels: number | null;
+  channel_layout: string | null;
+  sample_rate: number | null;
+  bit_rate: number | null;
+}
+
+export interface MediaInfoSection {
+  container: ContainerInfo;
+  video_streams: VideoStreamInfo[];
+  audio_streams: AudioStreamInfo[];
+  other_streams: { index: number | null; codec_type: string | null; codec: string | null }[];
+  provenance: Provenance;
+}
+
+export interface SceneChangeInfo {
+  time: number;
+  score: number;
+}
+
+export interface SceneChangesSection {
+  threshold: number | null;
+  count: number;
+  changes: SceneChangeInfo[];
+  provenance: Provenance;
+}
+
+export interface KeyframeInfo {
+  seq: number;
+  timestamp: number;
+  reason: "first_frame" | "scene_change" | "uniform_sample" | string;
+  scene_score: number | null;
+  derived_file_id: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+export interface KeyframesSection {
+  policy: Record<string, unknown>;
+  requested: number;
+  extracted: number;
+  frames: KeyframeInfo[];
+  provenance: Provenance;
+}
+
+export interface KeyframeHashInfo {
+  seq: number;
+  timestamp: number;
+  value: string;
+  derived_file_id: string | null;
+}
+
+export interface KeyframePHashSection {
+  algorithm: "pHash";
+  bits: number;
+  count: number;
+  frames: KeyframeHashInfo[];
+  provenance: Provenance;
+}
+
+/** One analysed keyframe's OCR result, with the image OCR stage's detail (D13). */
+export interface KeyframeOCRFrame {
+  seq: number;
+  timestamp: number;
+  text: string;
+  cleaned_text: string | null;
+  cleaning: OCRCleaningRule[];
+  confidence: number | null;
+  word_count: number;
+  preprocessing: OCRPreprocessingStep[];
+  candidates: OCRCandidate[];
+  selected: { variant: OCRVariant; reason: string } | null;
+}
+
+export interface KeyframeOCRSection {
+  engine: "tesseract";
+  languages: string[];
+  frame_limit: number;
+  analyzed: number;
+  frames: KeyframeOCRFrame[];
+  provenance: Provenance;
 }

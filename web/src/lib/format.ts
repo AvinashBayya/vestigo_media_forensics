@@ -13,6 +13,11 @@ export const STAGE_LABELS: Record<string, string> = {
   perceptual_hash: "Perceptual hash",
   ocr: "Text in image (OCR)",
   duplicates: "Duplicate search",
+  media_info: "Media information",
+  scene_changes: "Scene changes",
+  keyframes: "Keyframes",
+  keyframe_phash: "Keyframe perceptual hashes",
+  keyframe_ocr: "Text in keyframes (OCR)",
 };
 
 export const REVIEW_LABELS: Record<ReviewState, string> = {
@@ -64,4 +69,15 @@ export function formatValue(value: unknown): string {
 
 export function countTags(groups: Record<string, Record<string, unknown>>): number {
   return Object.values(groups).reduce((total, tags) => total + Object.keys(tags).length, 0);
+}
+
+/** Seconds as m:ss (or m:ss.t when there are tenths) for video timestamps and durations. */
+export function formatSeconds(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || Number.isNaN(seconds)) return "—";
+  const totalTenths = Math.round(seconds * 10);
+  const minutes = Math.floor(totalTenths / 600);
+  const wholeSeconds = Math.floor((totalTenths - minutes * 600) / 10);
+  const tenths = totalTenths % 10;
+  const base = `${minutes}:${String(wholeSeconds).padStart(2, "0")}`;
+  return tenths > 0 ? `${base}.${tenths}` : base;
 }

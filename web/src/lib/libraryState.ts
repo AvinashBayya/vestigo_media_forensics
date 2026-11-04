@@ -34,6 +34,10 @@ export const TYPE_CHOICES: { value: SupportedMimeType | ""; label: string }[] = 
   { value: "image/png", label: "PNG" },
   { value: "image/webp", label: "WebP" },
   { value: "image/tiff", label: "TIFF" },
+  { value: "video/mp4", label: "MP4 video" },
+  { value: "video/quicktime", label: "MOV video" },
+  { value: "video/webm", label: "WebM video" },
+  { value: "video/x-matroska", label: "MKV video" },
 ];
 
 const SORTS: ArtifactSort[] = ["created_at", "filename", "size_bytes", "review_state"];

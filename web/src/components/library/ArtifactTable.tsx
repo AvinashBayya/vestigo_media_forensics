@@ -1,7 +1,7 @@
 import { Link } from "react-router";
 
 import type { ArtifactListItem, ArtifactSort, SortOrder } from "../../api/types";
-import { formatBytes, formatDateTime } from "../../lib/format";
+import { formatBytes, formatDateTime, formatSeconds } from "../../lib/format";
 import { ReviewBadge } from "../ReviewBadge";
 import { StatusBadge } from "../StatusBadge";
 
@@ -70,6 +70,9 @@ export function ArtifactTable({ items, sort, order, onSort, selected, onSelect }
                 <Link to={`/artifacts/${item.artifact_id}`} className="break-all text-sky-700 underline dark:text-sky-400">
                   {item.filename}
                 </Link>
+                {item.duration_seconds !== null && (
+                  <p className={MUTED}>Video · {formatSeconds(item.duration_seconds)}</p>
+                )}
                 {!item.in_duplicate_library && <p className={MUTED}>Excluded from duplicate search</p>}
               </td>
               <td className="py-2 pr-3 whitespace-nowrap">{formatDateTime(item.created_at)}</td>

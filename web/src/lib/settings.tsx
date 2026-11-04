@@ -3,8 +3,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { DEFAULT_OPTIONS, getSettings } from "../api/client";
 import type { EditableSettings } from "../api/types";
 
+export const DEFAULT_VIDEO_OPTIONS = {
+  metadata: true,
+  scene_detection: true,
+  keyframe_ocr: false, // off by default (M3-3)
+  duplicate_search: true,
+} as const;
+
 export const DEFAULT_SETTINGS: EditableSettings = {
   default_analysis_options: DEFAULT_OPTIONS,
+  default_video_analysis_options: { ...DEFAULT_VIDEO_OPTIONS },
   library_page_size: 25,
   auto_analyze_after_upload: true,
 };

@@ -15,10 +15,12 @@ import type {
   LibrarySummary,
   JobCreated,
   JobStatusResponse,
+  MediaType,
   RecordReview,
   ReviewHistory,
   SettingsResponse,
   EditableSettings,
+  VideoAnalysisOptions,
   ReviewState,
 } from "./types";
 
@@ -98,6 +100,23 @@ export function startImageAnalysis(artifactId: string, options?: AnalysisOptions
   return call(
     http.post<JobCreated>("/analysis/image", { artifact_id: artifactId, ...(options ? { options } : {}) }),
   );
+}
+
+/** Without `options`, the backend uses the saved default video analysis options. */
+export function startVideoAnalysis(artifactId: string, options?: VideoAnalysisOptions): Promise<JobCreated> {
+  return call(
+    http.post<JobCreated>("/analysis/video", { artifact_id: artifactId, ...(options ? { options } : {}) }),
+  );
+}
+
+/** Starts the pipeline matching the artifact's media type, with the saved defaults. */
+export function startAnalysis(artifactId: string, mediaType: MediaType): Promise<JobCreated> {
+  return mediaType === "video" ? startVideoAnalysis(artifactId) : startImageAnalysis(artifactId);
+}
+
+/** A derived file's content (for example a keyframe thumbnail). */
+export function derivedContentUrl(artifactId: string, derivedFileId: string): string {
+  return `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}/derived/${encodeURIComponent(derivedFileId)}/content`;
 }
 
 export function getJob(jobId: string): Promise<JobStatusResponse> {

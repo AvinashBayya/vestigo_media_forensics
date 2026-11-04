@@ -72,6 +72,29 @@ describe("LibraryPage", () => {
     expect(screen.getByText("Showing 1–2 of 2 artifacts")).toBeInTheDocument();
   });
 
+  it("shows a video's duration and filters by video type", async () => {
+    const list = captureList((params) =>
+      artifactList(
+        params.getAll("mime_type").includes("video/mp4")
+          ? [listItem({ filename: "scenes.mp4", mime_type: "video/mp4", media_type: "video", duration_seconds: 9 })]
+          : [
+              listItem({ filename: "scenes.mp4", mime_type: "video/mp4", media_type: "video", duration_seconds: 9 }),
+              listItem({ filename: "harbour.jpg" }),
+            ],
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp("/");
+
+    const table = await screen.findByRole("table");
+    const row = within(table).getByRole("link", { name: "scenes.mp4" }).closest("tr")!;
+    expect(row).toHaveTextContent("Video · 0:09");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "File type" }), "video/mp4");
+    await waitFor(() => expect(list.last().getAll("mime_type")).toEqual(["video/mp4"]));
+    expect(within(screen.getByRole("table")).queryByText("harbour.jpg")).not.toBeInTheDocument();
+  });
+
   it("hides archived artifacts by default and sends the default query", async () => {
     const list = captureList(() => artifactList([listItem()]));
     renderApp("/");

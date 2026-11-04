@@ -17,10 +17,11 @@ import {
   type EnvironmentSettings,
   type LibraryArtifactRef,
   type LibraryPageSize,
+  type VideoAnalysisOptions,
 } from "../api/types";
 import { ErrorBanner } from "../components/Messages";
 import { ErrorState, TableSkeleton } from "../components/States";
-import { OPTION_LABELS } from "../components/UploadForm";
+import { OPTION_LABELS, VIDEO_OPTION_LABELS } from "../components/UploadForm";
 import { formatBytes, formatDateTime } from "../lib/format";
 import { useSettings } from "../lib/settings";
 import { useApiResource } from "../lib/useApiResource";
@@ -97,6 +98,31 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
           Used on the upload page and by “Run analysis”. File hashes and the perceptual hash always run.
         </p>
       </fieldset>
+      <fieldset className="space-y-1">
+        <legend className="mb-1 font-medium">Checks to run by default on videos</legend>
+        {(Object.keys(VIDEO_OPTION_LABELS) as (keyof VideoAnalysisOptions)[]).map((key) => (
+          <label key={key} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.default_video_analysis_options[key]}
+              onChange={(event) =>
+                change({
+                  ...form,
+                  default_video_analysis_options: {
+                    ...form.default_video_analysis_options,
+                    [key]: event.target.checked,
+                  },
+                })
+              }
+            />
+            {VIDEO_OPTION_LABELS[key]}
+          </label>
+        ))}
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          File hashes, media information, keyframes, and keyframe perceptual hashes always run. Keyframe OCR
+          is off by default.
+        </p>
+      </fieldset>
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
@@ -144,6 +170,15 @@ function EnvironmentSection({ environment }: { environment: EnvironmentSettings 
     ["Maximum upload size", formatBytes(environment.max_upload_bytes)],
     ["Maximum image size", `${(environment.max_image_pixels / 1_000_000).toLocaleString()} megapixels`],
     ["OCR languages", environment.ocr_languages.join(", ")],
+    ["Maximum video upload size", formatBytes(environment.max_video_upload_bytes)],
+    ["Maximum video duration", `${environment.max_video_duration_seconds} s`],
+    [
+      "Maximum video frame size",
+      `${(environment.max_video_pixels / 1_000_000).toLocaleString()} megapixels`,
+    ],
+    ["Maximum keyframes per analysis", String(environment.max_keyframes)],
+    ["Scene-change threshold", String(environment.scene_threshold)],
+    ["Video tool timeout (per ffmpeg run)", `${environment.video_timeout_seconds} s`],
     ["Tool timeout", `${environment.tool_timeout_seconds} s`],
     ["OCR timeout (per pass)", `${environment.ocr_timeout_seconds} s`],
     ["Analysis workers", `${environment.job_workers} (${environment.job_mode})`],
