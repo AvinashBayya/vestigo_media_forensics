@@ -69,6 +69,8 @@ export interface ArtifactDetail extends ArtifactListItem {
   md5: string;
   width: number | null;
   height: number | null;
+  /** True when a re-encoded viewing copy exists (D19); videos only. */
+  has_playable_preview: boolean;
   review: ReviewInfo;
 }
 
@@ -599,4 +601,14 @@ export interface KeyframeOCRSection {
   analyzed: number;
   frames: KeyframeOCRFrame[];
   provenance: Provenance;
+}
+
+/** A re-encoded viewing copy of a video (D19). Not evidence; excluded from the export package. */
+export interface PreviewInfo {
+  artifact_id: string;
+  sha256: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+  created_at: string;
 }

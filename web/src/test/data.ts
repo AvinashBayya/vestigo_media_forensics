@@ -54,6 +54,7 @@ export function artifactDetail(overrides: Partial<ArtifactDetail> = {}): Artifac
     md5: "b".repeat(32),
     width: 640,
     height: 480,
+    has_playable_preview: false,
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
     latest_job: { job_id: JOB_ID, status: "completed", created_at: NOW, started_at: NOW, completed_at: NOW },
     problem_count: 0,

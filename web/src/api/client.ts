@@ -16,6 +16,7 @@ import type {
   JobCreated,
   JobStatusResponse,
   MediaType,
+  PreviewInfo,
   RecordReview,
   ReviewHistory,
   SettingsResponse,
@@ -277,4 +278,13 @@ export function getSettings(): Promise<SettingsResponse> {
 
 export function updateSettings(changes: Partial<EditableSettings>): Promise<SettingsResponse> {
   return call(http.patch<SettingsResponse>("/settings", changes));
+}
+
+/** Creates (or returns) the re-encoded viewing copy of a video the browser cannot play (D19). */
+export function createPlayablePreview(artifactId: string): Promise<PreviewInfo> {
+  return call(http.post<PreviewInfo>(`/artifacts/${encodeURIComponent(artifactId)}/preview`));
+}
+
+export function previewContentUrl(artifactId: string): string {
+  return `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}/preview/content`;
 }

@@ -4,12 +4,14 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import {
   ApiError,
   contentUrl,
+  createPlayablePreview,
   deleteArtifact,
   errorMessage,
   getArtifact,
   getEvidence,
   getJob,
   getJobHistory,
+  previewContentUrl,
   startAnalysis,
 } from "../api/client";
 import type { ArtifactDetail, EvidenceReport, JobHistoryItem, JobStatusResponse } from "../api/types";
@@ -55,12 +57,16 @@ export function ArtifactPage() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
+  // True once a re-encoded viewing copy (D19) should be played instead of the original.
+  const [usePlayablePreview, setUsePlayablePreview] = useState(false);
+  const [creatingPreview, setCreatingPreview] = useState(false);
 
   const load = useCallback(async () => {
     setLoadError(null);
     try {
       const [detail, jobs] = await Promise.all([getArtifact(artifactId), getJobHistory(artifactId)]);
       setArtifact(detail);
+      if (detail.has_playable_preview) setUsePlayablePreview(true);
       setHistory(jobs.jobs);
       const latest = detail.latest_job;
       if (latest && isActive(latest.status)) {
@@ -114,6 +120,20 @@ export function ArtifactPage() {
     }
   }
 
+  async function makePlayablePreview() {
+    setCreatingPreview(true);
+    setError(null);
+    try {
+      await createPlayablePreview(artifactId);
+      setUsePlayablePreview(true);
+      setPreviewFailed(false);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setCreatingPreview(false);
+    }
+  }
+
   async function confirmDelete() {
     if (!artifact) return;
     setDeleting(true);
@@ -163,13 +183,31 @@ export function ArtifactPage() {
         <aside className="space-y-4">
           <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
             {previewFailed ? (
-              <p className="p-4 text-sm text-slate-600 dark:text-slate-400">
-                {artifact.media_type === "video"
-                  ? "This video cannot be played in the browser (codec or container not supported). The keyframes below show its content."
-                  : artifact.media_type === "audio"
-                    ? "This audio file cannot be played in the browser."
-                    : "This format cannot be previewed in the browser."}
-              </p>
+              <div className="space-y-2 p-4 text-sm text-slate-600 dark:text-slate-400">
+                <p>
+                  {artifact.media_type === "video"
+                    ? "This video cannot be played in the browser (codec or container not supported). The keyframes below show its content."
+                    : artifact.media_type === "audio"
+                      ? "This audio file cannot be played in the browser."
+                      : "This format cannot be previewed in the browser."}
+                </p>
+                {artifact.media_type === "video" && !usePlayablePreview && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => void makePlayablePreview()}
+                      disabled={creatingPreview}
+                      className="rounded-md border border-slate-300 px-3 py-1.5 font-medium text-slate-900 disabled:opacity-40 dark:border-slate-700 dark:text-slate-100"
+                    >
+                      {creatingPreview ? "Creating preview…" : "Create playable preview"}
+                    </button>
+                    <p className="text-xs">
+                      Re-encodes a viewing copy with ffmpeg. The copy is for viewing only — it is not
+                      evidence, is left out of the evidence package, and the original is unchanged.
+                    </p>
+                  </>
+                )}
+              </div>
             ) : artifact.media_type === "audio" ? (
               <div className="p-3">
                 <audio
@@ -182,15 +220,25 @@ export function ArtifactPage() {
                 />
               </div>
             ) : artifact.media_type === "video" ? (
-              // No transcoding (M3-6): the original streams with HTTP Range, or the fallback shows.
-              <video
-                src={contentUrl(artifact.artifact_id)}
-                controls
-                preload="metadata"
-                aria-label={`Preview of ${artifact.filename}`}
-                onError={() => setPreviewFailed(true)}
-                className="max-h-80 w-full bg-black object-contain"
-              />
+              // The original streams with HTTP Range; if the browser refuses the codec, an
+              // on-demand re-encoded viewing copy (D19) can be played instead.
+              <div>
+                <video
+                  key={usePlayablePreview ? "preview" : "original"}
+                  src={usePlayablePreview ? previewContentUrl(artifact.artifact_id) : contentUrl(artifact.artifact_id)}
+                  controls
+                  preload="metadata"
+                  aria-label={`Preview of ${artifact.filename}`}
+                  onError={() => setPreviewFailed(true)}
+                  className="max-h-80 w-full bg-black object-contain"
+                />
+                {usePlayablePreview && (
+                  <p className="px-3 py-2 text-xs text-slate-600 dark:text-slate-400">
+                    Playing a re-encoded viewing copy — not the original evidence. The original file is
+                    unchanged.
+                  </p>
+                )}
+              </div>
             ) : (
               <img
                 src={contentUrl(artifact.artifact_id)}

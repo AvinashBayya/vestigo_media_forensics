@@ -86,13 +86,26 @@ describe("Video artifact page", () => {
     );
   });
 
-  it("falls back to a message when the browser cannot play the codec", async () => {
+  it("falls back with a create-preview offer when the browser cannot play the codec", async () => {
+    let posted = false;
     server.use(
       http.get(`${API}/artifacts/${ARTIFACT_ID}`, () =>
         HttpResponse.json(videoDetail({ mime_type: "video/x-matroska", filename: "scenes.mkv" })),
       ),
       http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () => HttpResponse.json(videoReport())),
+      http.post(`${API}/artifacts/${ARTIFACT_ID}/preview`, () => {
+        posted = true;
+        return HttpResponse.json({
+          artifact_id: ARTIFACT_ID,
+          sha256: "ab".repeat(32),
+          size_bytes: 1234,
+          width: 640,
+          height: 360,
+          created_at: "2026-11-04T09:00:00Z",
+        });
+      }),
     );
+    const user = userEvent.setup();
     renderApp(PAGE);
 
     const player = await screen.findByLabelText("Preview of scenes.mkv");
@@ -100,6 +113,28 @@ describe("Video artifact page", () => {
     expect(
       await screen.findByText(/This video cannot be played in the browser .* The keyframes below show its content/),
     ).toBeInTheDocument();
+    expect(screen.getByText(/not\s+evidence, is left out of the evidence package/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Create playable preview" }));
+
+    const preview = await screen.findByLabelText("Preview of scenes.mkv");
+    expect(posted).toBe(true);
+    expect(preview).toHaveAttribute("src", `/api/v1/artifacts/${ARTIFACT_ID}/preview/content`);
+    expect(screen.getByText(/Playing a re-encoded viewing copy — not the original evidence/)).toBeInTheDocument();
+  });
+
+  it("plays an existing viewing copy directly, clearly labelled", async () => {
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}`, () =>
+        HttpResponse.json(videoDetail({ mime_type: "video/x-matroska", filename: "scenes.mkv", has_playable_preview: true })),
+      ),
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () => HttpResponse.json(videoReport())),
+    );
+    renderApp(PAGE);
+
+    const player = await screen.findByLabelText("Preview of scenes.mkv");
+    expect(player).toHaveAttribute("src", `/api/v1/artifacts/${ARTIFACT_ID}/preview/content`);
+    expect(screen.getByText(/re-encoded viewing copy — not the original evidence/)).toBeInTheDocument();
   });
 
   it("re-runs analysis through the video endpoint", async () => {
