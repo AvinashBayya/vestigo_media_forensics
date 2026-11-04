@@ -44,21 +44,14 @@
 - Dev Containers
 - Git
 
-## Installed but not used in Milestone 1
+## Backend — Milestone 3
 
-- FFmpeg
-- ffprobe
-
-These are installed and verified during environment setup. They will be used in Milestone 3 for video metadata, keyframe extraction, and scene detection.
+- ffprobe (video validation and media information) and FFmpeg (scene detection and keyframe
+  extraction) are required tools from Milestone 3; a missing one degrades /health.
+- No new Python dependencies: keyframe hashing and OCR reuse Pillow, imagehash, and Tesseract.
+  OpenCV and PyAV, listed earlier as possible video dependencies, were not needed.
 
 ## Future dependencies
-
-### Video
-
-- FFmpeg
-- ffprobe
-- OpenCV
-- PyAV
 
 ### Reverse-image search
 

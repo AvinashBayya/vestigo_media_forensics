@@ -16,16 +16,16 @@ The backend must:
 - Prevent path traversal
 - Store originals separately from derived files
 - Reject unsupported or dangerous file types
-- Never execute uploaded media
+- Enforce video duration, frame-size, and keyframe limits
+- Never execute uploaded media (ffprobe and ffmpeg run with argument lists and timeouts)
 
-## 3. Allowed Milestone 1 inputs
+## 3. Allowed inputs
 
-- JPEG
-- PNG
-- WebP
-- TIFF
+Images (Milestone 1): JPEG, PNG, WebP, TIFF.
+Videos (Milestone 3): MP4, MOV, WebM, MKV — validated with ffprobe after byte sniffing; a video
+stream with readable dimensions and a container-reported duration within the limits is required.
 
-Video, audio, documents, and archives are out of scope for Milestone 1.
+Audio files, documents, and archives are not accepted.
 
 ## 4. External-service policy
 

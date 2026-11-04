@@ -164,3 +164,26 @@ is inspected through ffprobe stream metadata only; duration is stored and labell
 container-reported. ffprobe provides media information; ffmpeg provides scene detection and keyframe
 extraction. No facial recognition, speaker identification, transcription, deepfake detection,
 verdicts, ELA, or C2PA validation.
+
+## D18 — Milestone 3 implementation notes
+
+Details settled while implementing D17, recorded so later work keeps them:
+
+- An EBML upload is classified as WebM only when every stream fits the WebM codec profile
+  (VP8/VP9/AV1 video, Vorbis/Opus audio); otherwise it is Matroska. MP4 vs MOV comes from the
+  ftyp major brand.
+- The upload stream cap is the video limit; the image limit is re-checked once the file sniffs as
+  an image. ffprobe validation ignores attached-picture "video" streams (cover art).
+- The video duplicate stage is also named `duplicates`, so the Library's match indicators, filters,
+  and "added since analysis" cover videos with no changes. Matching pairs each query hash with its
+  best counterpart (at most one pair per query frame); image-to-image matches keep the Milestone 1
+  payload shape with null frame fields.
+- Keyframe OCR stores raw TSVs per analysed frame and pass but not the prepared pass images (the
+  keyframe thumbnails themselves are stored); the stage method says so.
+- Job history reports each job's options exactly as recorded, since image and video option sets
+  differ.
+- Evidence contract clarification pinned by tests: `tool_version` is null only for records whose
+  stage never invoked its tool (skipped stages).
+- pHash pairs flat-field frames with same-position text across different scenes (a coarse-structure
+  measure); the duplicate tests document this rather than hiding it.
+

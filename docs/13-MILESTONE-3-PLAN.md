@@ -1,6 +1,7 @@
 # Milestone 3 Build Plan — Video Foundation (approved)
 
-Approved: 2026-11-04. This is the implementation plan for Milestone 3 (`06-ROADMAP.md`): responsible
+Approved: 2026-11-04. Implemented: 2026-11-04 (implementation notes in `09-DECISIONS.md` D18).
+This is the implementation plan for Milestone 3 (`06-ROADMAP.md`): responsible
 local video analysis on the evidence-first architecture built in Milestones 1–2. The ffmpeg and
 ffprobe command designs below were verified against the installed FFmpeg 7.1.5 before approval, as
 were the duplicate-detection measurements.

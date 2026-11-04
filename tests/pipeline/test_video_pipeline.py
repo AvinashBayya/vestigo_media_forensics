@@ -623,3 +623,50 @@ def test_video_duplicates_can_be_disabled_and_show_in_library_indicators(
     assert listed[off_id]["duplicate_match_count"] is None
     with_duplicates = client.get("/api/v1/artifacts", params={"has_duplicates": "true"}).json()
     assert [i["artifact_id"] for i in with_duplicates["items"]] == [copy_id]
+
+
+# --- Deletion and export of video artifacts (M3 step 11) ----------------------------------------
+
+
+def test_video_deletion_removes_original_derived_files_and_rows(
+    client: TestClient, services: AppServices, settings, fixtures: FixtureSet
+) -> None:
+    artifact_id, job_id = analyse_video(client, fixtures.video_scenes, {"keyframe_ocr": True})
+    artifact_dir = settings.data_dir / "artifacts" / artifact_id
+    assert any(artifact_dir.glob("derived/*/keyframes.*.jpg"))
+
+    summary = client.delete(f"/api/v1/artifacts/{artifact_id}").json()
+
+    assert summary["original_files"] == 1
+    assert summary["derived_files"] > 20  # ffprobe json, scene output, 8 keyframes, OCR TSVs, exiftool
+    assert not artifact_dir.exists()
+    assert records_for(services, job_id) == []
+    with services.db.reader() as session:
+        assert session.scalar(select(func.count()).select_from(KeyframeFingerprint)) == 0
+
+
+def test_video_evidence_package_contains_keyframes_and_raw_tool_output(
+    client: TestClient, fixtures: FixtureSet
+) -> None:
+    import hashlib
+    import io
+    import json
+    import zipfile
+
+    artifact_id, job_id = analyse_video(client, fixtures.video_scenes)
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/export")
+    assert response.status_code == 200
+    package = zipfile.ZipFile(io.BytesIO(response.content))
+    names = set(package.namelist())
+
+    assert "derived/media_info.ffprobe.json" in names
+    assert "derived/scene_changes.ffmpeg.txt" in names
+    keyframes = [name for name in names if name.startswith("derived/keyframes.")]
+    assert len(keyframes) == 8
+    manifest = json.loads(package.read("manifest.json"))
+    assert manifest["job_id"] == job_id
+    assert manifest["problems"] == []
+    for entry in manifest["files"]:
+        assert entry["sha256"] == hashlib.sha256(package.read(entry["path"])).hexdigest()
+    report = json.loads(package.read("report.json"))
+    assert report["media_info"]["container"]["duration_seconds"] == pytest.approx(9.0, abs=0.1)

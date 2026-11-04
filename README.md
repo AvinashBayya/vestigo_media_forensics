@@ -41,9 +41,17 @@ Milestone 1 is image-only. FFmpeg and ffprobe are installed during environment s
 
 See `docs/12-MILESTONE-2-PLAN.md`.
 
+### Milestone 3 — Video foundation
+
+- Video upload (MP4, MOV, WebM, MKV) validated with ffprobe; limits on size, duration, and frame size
+- `video.v1` pipeline: hashes, ffprobe media information (container and stream facts as written, audio headers only), ExifTool metadata, scene-change detection, keyframe extraction with a recorded selection policy, keyframe perceptual hashes, optional keyframe OCR (off by default, ≤ 10 frames), and duplicate search
+- Duplicate detection across media: videos match re-encoded copies frame for frame, stills match the videos they came from, and vice versa
+- Browser playback through the content endpoint (HTTP Range; no transcoding) with a fallback message, keyframe thumbnails, and video evidence panels
+
+See `docs/13-MILESTONE-3-PLAN.md`.
+
 ## Later phases
 
-- Video metadata, keyframe extraction, scene detection, and audio inspection
 - Reverse-image search integrations
 - GEOINT / geo-lite analysis
 - C2PA validation and provenance reporting
@@ -138,15 +146,28 @@ With both servers running, open http://localhost:5180.
 10. **Duplicate library.** "Exclude from future searches" on an artifact page, then analyse a copy of it: no match, and the duplicates panel says one artifact was excluded. Settings lists excluded and not-analysed artifacts.
 11. **Settings.** Change the default checks, turn off automatic analysis, set 10 artifacts per page, and save. The Library uses 10 rows; uploads no longer start an analysis. The duplicate threshold and limits are shown read-only.
 
+## Manual test of the Milestone 3 video workflow
+
+1. **Upload a video.** On the Upload page choose an MP4 (or MOV/WebM/MKV) under 500 MB and at most 15 minutes. The checks switch to the video options — keyframe OCR is off by default; tick it if you want text read from frames. Upload; the analysis starts and per-stage progress shows.
+2. **Preview and media information.** The artifact page plays the video (seeking works). The header shows the container-reported duration. "Media information" lists the container, duration, video codec/resolution/frame rate, and audio stream facts; nothing is decoded or transcribed.
+3. **Scene changes and keyframes.** "Scene changes" lists timestamps with scores. "Keyframes" shows the extracted thumbnails, each with its timestamp and why it was selected (first frame, scene change with score, or even sample).
+4. **Keyframe OCR** (if enabled): "Text in keyframes (OCR)" is labelled provisional and lists per-frame text with Tesseract's own confidence.
+5. **Duplicates across media.** Re-encode or resize the video (for example export it as WebM) and upload the copy: its duplicates panel lists the original with matching frame pairs ("this video at 0:03 ↔ matched video at 0:03.1"). Take a screenshot of a frame and upload it as an image: its duplicate search finds the video.
+6. **Unplayable codecs.** Upload an MKV with a codec your browser refuses: the preview area explains it cannot be played and points to the keyframes.
+7. **Review, export, delete.** Review states, per-section review, history, and bulk review work on videos unchanged. "Download evidence package (ZIP)" includes the keyframes, raw ffprobe output, and scene-filter output with verified hashes (check with `sha256sum -c SHA256SUMS`). Deleting the video removes the original, every derived file, all evidence, and its keyframe fingerprints.
+8. **Settings.** Default video checks are editable; the video limits (size, duration, frame size, keyframes, scene threshold, ffmpeg timeout) are shown read-only and set with `VESTIGO_*` variables.
+
 ## Limitations
 
-- C2PA / Content Credentials are **detected, not validated**. Signatures, certificates, and hash bindings are not checked until Milestone 4.
-- OCR is best-effort and English only; its output is provisional, not a verified transcription (D14).
-- Duplicate search covers only artifacts in the local library, as it was when each analysis ran. Earlier results are not updated when artifacts are added or excluded; run the analysis again.
+- C2PA / Content Credentials are **detected, not validated**. Signatures, certificates, and hash bindings are not checked until Milestone 4 (video C2PA is also Milestone 4).
+- OCR is best-effort and English only; its output is provisional, not a verified transcription (D14). Keyframe OCR reads at most 10 sampled frames.
+- Duplicate search covers only artifacts in the local library, as it was when each analysis ran. Video matching compares sampled keyframes; content between keyframes is not searched.
+- Video duration, frame rate, and similar values are container-reported metadata, not decode-verified measurements. Audio is inspected from stream headers only — no decoding, transcription, or speaker identification.
+- Videos are never transcoded; a browser that cannot play a codec shows a fallback message.
 - Review conflicts are detected per artifact or record; there is no login, and the service is meant for a single analyst on their own machine.
 - Nothing is deleted automatically.
 
-See `docs/11-BUILD-PLAN.md` (Milestone 1) and `docs/12-MILESTONE-2-PLAN.md` (Milestone 2).
+See `docs/11-BUILD-PLAN.md` (Milestone 1), `docs/12-MILESTONE-2-PLAN.md` (Milestone 2), and `docs/13-MILESTONE-3-PLAN.md` (Milestone 3).
 
 ## Repository layout
 
@@ -166,7 +187,7 @@ vestigo-media-forensics/
 │   ├── schemas/          # Pydantic request/response schemas
 │   ├── services/         # tool wrappers, library, review, export, settings, reports
 │   ├── migrations/       # Alembic revisions (0001 = Milestone 1 baseline)
-│   └── pipeline/         # stage interface, image pipeline, job runner
+│   └── pipeline/         # stage interface, image and video pipelines, job runner
 ├── web/                  # React + Vite + TypeScript + Tailwind frontend
 ├── tests/                # pytest suites and test fixtures
 ├── samples/              # local media for manual testing (gitignored)

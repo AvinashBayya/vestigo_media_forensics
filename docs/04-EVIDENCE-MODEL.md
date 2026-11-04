@@ -124,3 +124,16 @@ history, the raw tool outputs of one analysis job, and (only on request) the ori
 lists the SHA-256 and size of every file, and the SHA-256 recorded when each derived file and the
 original were stored. A recorded file that is missing or no longer matches is listed as a problem,
 never silently left out.
+
+## 9. Video evidence (Milestone 3)
+
+- `media_info` is OBSERVED: container and stream headers reported as written; nothing is decoded,
+  and audio is never transcribed or identified (M3-7). The stored `duration_seconds` is the
+  container-reported value and is labelled as such, not a decode-verified measurement (M3-8).
+- `scene_changes`, `keyframes`, `keyframe_phash`, `keyframe_ocr`, and `duplicates` are DERIVED.
+  Keyframes record the selection policy and each frame's reason; extracted frames are re-encoded
+  thumbnails stored as derived files, never the originals.
+- Keyframe fingerprints (`keyframe_fingerprints`) index the latest successful analysis and are
+  deleted with the artifact. Duplicate matches record frame pairs with both sides' timestamps.
+- Scene changes are ordinary editing; no stage claims a video is authentic, manipulated, or
+  deceptive.

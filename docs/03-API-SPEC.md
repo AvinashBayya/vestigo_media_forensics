@@ -250,6 +250,51 @@ The duplicates stage records `excluded_count`; `library_size` counts the artifac
 
 New error codes: `REVIEW_CONFLICT`, `EVIDENCE_RECORD_NOT_FOUND`, `EXPORT_FAILED`.
 
+## Milestone 3 endpoints (video foundation)
+
+All additive. See `13-MILESTONE-3-PLAN.md`.
+
+### Upload
+
+`POST /artifacts/upload` also accepts MP4, MOV, WebM, and MKV videos (M3-1), detected from the
+file's bytes. After sniffing, ffprobe must parse the file and find a video stream with readable
+dimensions and a container-reported duration within the limits. Summaries carry
+`duration_seconds` (container-reported, M3-8; null for images). New error codes: `INVALID_VIDEO`,
+`VIDEO_TOO_LONG`, `VIDEO_RESOLUTION_TOO_LARGE`, and `WRONG_MEDIA_TYPE` (an analysis endpoint used
+on the other media type).
+
+### `POST /analysis/video`
+
+Queues the `video.v1` pipeline. Options: `metadata`, `scene_detection`, `keyframe_ocr`
+(default **false**, M3-3), `duplicate_search`. Hashes, media info, keyframes, and keyframe
+perceptual hashes always run. Omitted `options` use the saved `default_video_analysis_options`.
+
+### `GET /artifacts/{id}/derived/{derived_file_id}/content`
+
+Serves a derived file (for example a keyframe thumbnail) for display, only for the artifact that
+owns it, typed by its recorded kind, with the content endpoint's protective headers.
+
+### Evidence report 1.2 — video sections (null for image jobs)
+
+| Section | Content |
+|---|---|
+| `media_info` | Container and per-stream facts exactly as ffprobe read them: format, container-reported duration, video codec/profile/dimensions/frame rate/bit rate/pixel format/display rotation, and audio codec/channels/sample rate from headers only (M3-7). |
+| `scene_changes` | ffmpeg scene-filter results: threshold and `[{time, score}]`. |
+| `keyframes` | The selection policy, counts, and per frame its timestamp, selection reason (`first_frame`, `scene_change` with score, `uniform_sample`), thumbnail `derived_file_id`, and dimensions. |
+| `keyframe_phash` | 64-bit pHash per keyframe. |
+| `keyframe_ocr` | Per analysed frame (≤ 10, evenly spaced): the D13 OCR detail (raw and cleaned text, confidence, passes, selection), labelled provisional (D14). |
+
+`duplicates` is shared by both pipelines. `DuplicateMatch` adds `media_type`,
+`matched_frame_count`, and `frame_matches` (each query hash's best counterpart with both sides'
+keyframe timestamps); these are null for image-to-image and byte-identical matches. Image
+duplicate searches also cover video keyframes, and vice versa (M3-4).
+
+### Settings
+
+`editable` adds `default_video_analysis_options`; `environment` adds the read-only video limits
+(`max_video_upload_bytes`, `max_video_duration_seconds`, `max_video_pixels`, `max_keyframes`,
+`scene_threshold`, `video_timeout_seconds`).
+
 ## Review state values
 
 - `UNREVIEWED`

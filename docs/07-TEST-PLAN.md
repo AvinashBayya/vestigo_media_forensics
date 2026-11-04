@@ -138,7 +138,39 @@ Frontend:
   load errors with retry, not-analysed state.
 - Settings page and saved defaults (upload, Library page size, re-run); health banner.
 
-## 6. Container tests
+## 6. Milestone 3 tests (video foundation)
+
+Backend:
+
+- Upload and validation: each container classified from its bytes (WebM by codec profile), MOV by
+  ftyp brand, rotated and audio-less videos accepted, audio-only and truncated files rejected,
+  per-type size caps, duration and resolution limits, read-only originals, Range requests.
+- Migrations: v1 and v2 databases upgrade to v3 in place without data loss; keyframe fingerprints
+  cascade and enforce their foreign keys.
+- media_info values match the fixtures (codec, dimensions, frame rate, audio facts, rotation);
+  raw ffprobe output stored.
+- Scene detection finds exactly the fixture's cuts and nothing in a static clip; threshold
+  recorded; parsing unit-tested.
+- Keyframe policy: first frame always, scene frames with scores, uniform fill, dedupe window,
+  cap keeps highest scores, end margin; rotated frames extracted upright; failed extractions are
+  warnings, never silent.
+- Keyframe pHash per frame; index replaced on re-analysis and deleted with the artifact; a
+  half-resolution VP9 re-encode hashes within the threshold frame for frame.
+- Keyframe OCR off by default; when enabled reads the drawn scene text on an evenly spaced subset
+  (≤ 10), stores per-frame TSVs, and records frame failures.
+- Duplicates across media: re-encoded video found with same-scene frame pairs; a still finds the
+  video it came from and vice versa; unrelated videos do not match; exact-file, exclusion, and
+  Library indicators hold; image-to-image matches keep their Milestone 1 shape.
+- WRONG_MEDIA_TYPE on both analysis endpoints; derived-content endpoint scoped to its artifact.
+- Video deletion removes originals, derived files, evidence, and fingerprints; the export package
+  carries keyframes and raw tool output with verified hashes.
+
+Frontend: video upload flow with the video checks (keyframe OCR off by default), video playback
+with a codec fallback, media info / scene changes / keyframes / keyframe OCR / keyframe hash
+panels, duplicate frame pairs, Library durations and video type filter, video defaults in
+Settings, and the read-only video limits.
+
+## 7. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

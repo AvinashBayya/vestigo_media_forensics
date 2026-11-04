@@ -9,7 +9,7 @@ This is the entry point to the docs. Detailed requirements live in docs 01–10;
 
 Build a local-first media provenance and verification web app that:
 
-- Accepts images (Milestone 1), and videos later (Milestone 3).
+- Accepts images (Milestone 1) and videos (Milestone 3).
 - Runs automated, explainable checks and extracts technical evidence.
 - Shows the method, tool, version, timestamp, source, limitations, and review state behind every result.
 - Leaves conclusions to a human analyst.
@@ -25,7 +25,7 @@ deceptive (see D2 in `09-DECISIONS.md`).
 - Frontend: React + Vite + TypeScript + Tailwind.
 - OCR: Tesseract.
 - Metadata and C2PA detection: ExifTool.
-- Video (Milestone 3): ffmpeg / ffprobe — installed from the start, not invoked in Milestone 1.
+- Video (Milestone 3): ffmpeg / ffprobe for media information, scene detection, and keyframes.
 - Storage: local filesystem under `data/`.
 - DB: SQLite file at `data/app.db`.
 - Configuration via `.env` (`VESTIGO_*`); no hardcoded secrets.
