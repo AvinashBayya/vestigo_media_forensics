@@ -10,7 +10,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas.analysis import AnalysisOptions
+from app.schemas.analysis import AnalysisOptions, VideoAnalysisOptions
 
 LibraryPageSize = Literal[10, 25, 50, 100]
 
@@ -18,6 +18,7 @@ LibraryPageSize = Literal[10, 25, 50, 100]
 class EditableSettings(BaseModel):
     # Used for new analyses when no options are given, and as the upload page's defaults.
     default_analysis_options: AnalysisOptions = Field(default_factory=AnalysisOptions)
+    default_video_analysis_options: VideoAnalysisOptions = Field(default_factory=VideoAnalysisOptions)
     library_page_size: LibraryPageSize = 25
     # Start the analysis as soon as an upload finishes.
     auto_analyze_after_upload: bool = True
@@ -55,6 +56,7 @@ class SettingsUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     default_analysis_options: AnalysisOptions | None = None
+    default_video_analysis_options: VideoAnalysisOptions | None = None
     library_page_size: LibraryPageSize | None = None
     auto_analyze_after_upload: bool | None = None
 

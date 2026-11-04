@@ -35,7 +35,8 @@ def test_job_history_lists_every_job_newest_first(client: TestClient, services: 
     assert earlier["problem_count"] == 2
     assert earlier["pipeline"] == "image.v1"
     assert earlier["app_version"] == "0.1.0"
-    assert earlier["options"] == {"metadata": True, "c2pa": True, "ocr": True, "duplicate_search": True}
+    # Options are reported exactly as recorded on the job (these synthetic jobs recorded none).
+    assert earlier["options"] == {}
 
 
 def test_job_history_of_real_analyses(client: TestClient, fixtures: FixtureSet) -> None:

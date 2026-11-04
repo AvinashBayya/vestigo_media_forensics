@@ -63,7 +63,7 @@ def test_package_contents_and_verification(
     assert manifest["format"] == "vestigo-evidence-package"
     assert (manifest["artifact_id"], manifest["job_id"]) == (artifact_id, job_id)
     assert manifest["original_included"] is False
-    assert manifest["report_schema_version"] == "1.1"
+    assert manifest["report_schema_version"] == "1.2"
     assert manifest["notice"] == REPORT_NOTICE
     assert manifest["problems"] == []
     # Every listed file is in the ZIP with that SHA-256 and size, and SHA256SUMS says the same.

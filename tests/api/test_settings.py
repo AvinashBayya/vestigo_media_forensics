@@ -15,6 +15,13 @@ from tests.fixtures.make_fixtures import FixtureSet
 from tests.helpers import assert_error, upload_ok
 
 DEFAULT_OPTIONS = {"metadata": True, "c2pa": True, "ocr": True, "duplicate_search": True}
+# Keyframe OCR is off by default (decision M3-3).
+DEFAULT_VIDEO_OPTIONS = {
+    "metadata": True,
+    "scene_detection": True,
+    "keyframe_ocr": False,
+    "duplicate_search": True,
+}
 
 
 def test_defaults_and_environment(client: TestClient, settings: Settings) -> None:
@@ -22,6 +29,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
 
     assert body["editable"] == {
         "default_analysis_options": DEFAULT_OPTIONS,
+        "default_video_analysis_options": DEFAULT_VIDEO_OPTIONS,
         "library_page_size": 25,
         "auto_analyze_after_upload": True,
     }
@@ -52,6 +60,7 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
         editable = restarted.get("/api/v1/settings").json()["editable"]
     assert editable == {
         "default_analysis_options": {**DEFAULT_OPTIONS, "ocr": False},
+        "default_video_analysis_options": DEFAULT_VIDEO_OPTIONS,
         "library_page_size": 50,
         "auto_analyze_after_upload": False,
     }

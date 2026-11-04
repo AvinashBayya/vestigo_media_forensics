@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
@@ -10,14 +11,15 @@ from app.core.database import Database
 from app.models import AnalysisJob, Artifact, EvidenceRecord
 from app.pipeline.image_pipeline import IMAGE_PIPELINE
 from app.pipeline.jobs import JobExecutor
+from app.pipeline.video_pipeline import VIDEO_PIPELINE
 from app.schemas.analysis import (
-    AnalysisOptions,
     ImageAnalysisRequest,
     JobHistory,
     JobHistoryItem,
     JobStatusResponse,
     JobSummary,
     StageProgress,
+    VideoAnalysisRequest,
 )
 from app.schemas.common import (
     ACTIVE_JOB_STATUSES,
@@ -58,29 +60,33 @@ def to_job_summary(job: AnalysisJob) -> JobSummary:
     )
 
 
-def start_image_analysis(db: Database, executor: JobExecutor, request: ImageAnalysisRequest) -> AnalysisJob:
-    artifact_id = request.artifact_id
+def _start_analysis(
+    db: Database,
+    executor: JobExecutor,
+    artifact_id: str,
+    requested_options: BaseModel | None,
+    pipeline: str,
+    expected_media_type: MediaType,
+    other_endpoint: str,
+    default_options: Callable[[Session], BaseModel],
+) -> AnalysisJob:
     if not ids.is_valid_id(artifact_id, ids.ARTIFACT):
         raise artifact_not_found(artifact_id)
     with db.writer() as session, session.begin():
         artifact = session.get(Artifact, artifact_id)
         if artifact is None:
             raise artifact_not_found(artifact_id)
-        if artifact.media_type != MediaType.IMAGE:
-            raise wrong_media_type(artifact_id, artifact.media_type, "video")
+        if artifact.media_type != expected_media_type:
+            raise wrong_media_type(artifact_id, artifact.media_type, other_endpoint)
         existing = active_job(session, artifact_id)
         if existing is not None:
             raise analysis_in_progress(existing)
-        # Requests without options use the analyst's default options from Settings (M2-8).
-        options = (
-            request.options
-            if "options" in request.model_fields_set
-            else editable_settings(session)[0].default_analysis_options
-        )
+        # Requests without options use the analyst's defaults from Settings (M2-8).
+        options = requested_options if requested_options is not None else default_options(session)
         job = AnalysisJob(
             id=ids.new_id(ids.JOB),
             artifact_id=artifact_id,
-            pipeline=IMAGE_PIPELINE,
+            pipeline=pipeline,
             app_version=__version__,
             status=JobStatus.QUEUED,
             options=options.model_dump(),
@@ -88,8 +94,35 @@ def start_image_analysis(db: Database, executor: JobExecutor, request: ImageAnal
         )
         session.add(job)
     executor.submit(job.id)
+    # In inline job mode the job has already run; return its current state.
     with db.reader() as session:
         return session.get(AnalysisJob, job.id) or job
+
+
+def start_image_analysis(db: Database, executor: JobExecutor, request: ImageAnalysisRequest) -> AnalysisJob:
+    return _start_analysis(
+        db,
+        executor,
+        request.artifact_id,
+        request.options if "options" in request.model_fields_set else None,
+        IMAGE_PIPELINE,
+        MediaType.IMAGE,
+        "video",
+        lambda session: editable_settings(session)[0].default_analysis_options,
+    )
+
+
+def start_video_analysis(db: Database, executor: JobExecutor, request: VideoAnalysisRequest) -> AnalysisJob:
+    return _start_analysis(
+        db,
+        executor,
+        request.artifact_id,
+        request.options if "options" in request.model_fields_set else None,
+        VIDEO_PIPELINE,
+        MediaType.VIDEO,
+        "image",
+        lambda session: editable_settings(session)[0].default_video_analysis_options,
+    )
 
 
 def get_job_status(db: Database, job_id: str, stage_names: Callable[[str], list[str]]) -> JobStatusResponse:
@@ -170,7 +203,7 @@ def job_history(db: Database, artifact_id: str) -> JobHistory:
                 **to_job_summary(job).model_dump(),
                 pipeline=job.pipeline,
                 app_version=job.app_version,
-                options=AnalysisOptions.model_validate(job.options),
+                options=dict(job.options),
                 error=_job_error(job),
                 problem_count=(counts.get(job.id) or 0) + (1 if job.status == JobStatus.FAILED else 0),
             )

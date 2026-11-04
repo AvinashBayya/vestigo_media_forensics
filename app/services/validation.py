@@ -152,7 +152,13 @@ def _duration_seconds(probe: dict) -> float | None:
     return max(values) if values else None
 
 
-def probe_video(ffprobe: ToolStatus, path: Path, timeout: float) -> dict:
+@dataclass(frozen=True)
+class ProbeResult:
+    data: dict
+    raw_output: bytes
+
+
+def probe_video(ffprobe: ToolStatus, path: Path, timeout: float) -> ProbeResult:
     """ffprobe's JSON description of the file. Raises InvalidVideoError if it cannot be read."""
     args = ["-v", "error", "-print_format", "json", "-show_format", "-show_streams", path]
     completed = run_tool(ffprobe, args, timeout=timeout)
@@ -164,7 +170,7 @@ def probe_video(ffprobe: ToolStatus, path: Path, timeout: float) -> dict:
         raise InvalidVideoError("ffprobe produced unreadable output") from exc
     if not isinstance(probe, dict) or not probe.get("streams"):
         raise InvalidVideoError("the file contains no streams")
-    return probe
+    return ProbeResult(probe, completed.stdout)
 
 
 def inspect_video(
@@ -178,7 +184,7 @@ def inspect_video(
     timeout: float,
 ) -> VideoInfo:
     """Confirm the sniffed container holds a decodable video within the limits (M3-2)."""
-    probe = probe_video(ffprobe, path, timeout)
+    probe = probe_video(ffprobe, path, timeout).data
     streams = probe["streams"]
     video_streams = [
         s

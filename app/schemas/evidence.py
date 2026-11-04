@@ -132,6 +132,54 @@ class OCRSection(BaseModel):
     provenance: Provenance
 
 
+class ContainerInfo(BaseModel):
+    format_name: str | None
+    format_long_name: str | None
+    # As written in the container (decision M3-8), not measured by decoding.
+    duration_seconds: float | None
+    size_bytes: int | None
+    bit_rate: int | None
+    stream_count: int
+
+
+class VideoStreamInfo(BaseModel):
+    index: int | None
+    codec: str | None
+    profile: str | None
+    width: int | None
+    height: int | None
+    frame_rate: float | None
+    bit_rate: int | None
+    pixel_format: str | None
+    rotation: int | None
+
+
+class AudioStreamInfo(BaseModel):
+    """Header-level audio facts only (decision M3-7): nothing is decoded or transcribed."""
+
+    index: int | None
+    codec: str | None
+    profile: str | None
+    channels: int | None
+    channel_layout: str | None
+    sample_rate: int | None
+    bit_rate: int | None
+
+
+class OtherStreamInfo(BaseModel):
+    index: int | None
+    codec_type: str | None
+    codec: str | None
+
+
+class MediaInfoSection(BaseModel):
+    container: ContainerInfo
+    video_streams: list[VideoStreamInfo]
+    audio_streams: list[AudioStreamInfo]
+    other_streams: list[OtherStreamInfo]
+    provenance: Provenance
+
+
 class DuplicateMatch(BaseModel):
     artifact_id: str
     # Current filename, or None if the matched artifact has since been deleted.
@@ -154,8 +202,9 @@ class DuplicatesSection(BaseModel):
 
 
 class EvidenceReport(BaseModel):
-    # 1.1 (Milestone 2) adds record-level review in `provenance` and `review_history`; nothing removed.
-    schema_version: Literal["1.1"] = "1.1"
+    # 1.1 (Milestone 2) added record-level review in `provenance` and `review_history`; 1.2
+    # (Milestone 3) adds the video sections, null for image jobs; nothing removed.
+    schema_version: Literal["1.2"] = "1.2"
     artifact_id: str
     job_id: str
     created_at: datetime
@@ -168,6 +217,8 @@ class EvidenceReport(BaseModel):
     perceptual_hash: PerceptualHashSection | None
     ocr: OCRSection | None
     duplicates: DuplicatesSection | None
+    # Video sections (Milestone 3); null for image jobs, as image sections are null for video jobs.
+    media_info: MediaInfoSection | None = None
     review: ReviewInfo
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

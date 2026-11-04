@@ -21,7 +21,7 @@ from app.core.config import Settings
 from app.core.storage import Storage
 from app.core.tools import ToolError, ToolRegistry
 from app.models import EvidenceRecord
-from app.schemas.analysis import AnalysisOptions
+from app.schemas.analysis import AnalysisOptions, VideoAnalysisOptions
 from app.schemas.common import EvidenceClassification, MediaType, StageStatus
 from app.schemas.evidence import DerivedFileInfo, StageError
 from app.services.duplicates import LibraryReader
@@ -114,7 +114,7 @@ class DerivedFileWriter:
 @dataclass
 class StageContext:
     job_id: str
-    options: AnalysisOptions
+    options: AnalysisOptions | VideoAnalysisOptions
     settings: Settings
     tools: ToolRegistry
     derived: DerivedFileWriter

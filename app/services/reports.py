@@ -20,6 +20,7 @@ from app.schemas.evidence import (
     DuplicatesSection,
     EvidenceReport,
     HashesSection,
+    MediaInfoSection,
     MetadataSection,
     OCRPreprocessingStep,
     OCRSection,
@@ -114,6 +115,16 @@ def _ocr(payload: dict[str, Any], provenance: Provenance) -> OCRSection:
     )
 
 
+def _media_info(payload: dict[str, Any], provenance: Provenance) -> MediaInfoSection:
+    return MediaInfoSection(
+        container=payload.get("container", {"stream_count": 0}),
+        video_streams=payload.get("video_streams", []),
+        audio_streams=payload.get("audio_streams", []),
+        other_streams=payload.get("other_streams", []),
+        provenance=provenance,
+    )
+
+
 def _duplicates(filenames: dict[str, str]) -> Callable[[dict[str, Any], Provenance], DuplicatesSection]:
     def build(payload: dict[str, Any], provenance: Provenance) -> DuplicatesSection:
         matches = [
@@ -194,6 +205,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "perceptual_hash": _perceptual_hash,
         "ocr": _ocr,
         "duplicates": _duplicates(filenames),
+        "media_info": _media_info,
     }
     sections = {
         stage: build(records[stage].payload, _provenance(records[stage], derived.get(stage, [])))

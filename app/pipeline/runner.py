@@ -22,18 +22,20 @@ from app.pipeline.base import (
     StageResult,
 )
 from app.pipeline.image_pipeline import IMAGE_PIPELINE, IMAGE_STAGES
-from app.schemas.analysis import AnalysisOptions
+from app.pipeline.video_pipeline import VIDEO_PIPELINE, VIDEO_STAGES
+from app.schemas.analysis import AnalysisOptions, VideoAnalysisOptions
 from app.schemas.common import ErrorCode, JobStatus, ReviewState, StageStatus
 
 logger = get_logger("pipeline")
 
-PIPELINES: dict[str, Sequence[AnalysisStage]] = {IMAGE_PIPELINE: IMAGE_STAGES}
+PIPELINES: dict[str, Sequence[AnalysisStage]] = {IMAGE_PIPELINE: IMAGE_STAGES, VIDEO_PIPELINE: VIDEO_STAGES}
+OPTIONS_MODELS = {IMAGE_PIPELINE: AnalysisOptions, VIDEO_PIPELINE: VideoAnalysisOptions}
 
 
 @dataclass(frozen=True)
 class ClaimedJob:
     artifact: ArtifactView
-    options: AnalysisOptions
+    options: AnalysisOptions | VideoAnalysisOptions
     pipeline: str
 
 
@@ -112,7 +114,7 @@ class PipelineRunner:
                     md5=artifact.md5,
                     size_bytes=artifact.size_bytes,
                 ),
-                options=AnalysisOptions.model_validate(job.options),
+                options=OPTIONS_MODELS.get(job.pipeline, AnalysisOptions).model_validate(job.options),
                 pipeline=job.pipeline,
             )
 
