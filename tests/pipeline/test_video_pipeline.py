@@ -234,3 +234,114 @@ def test_scene_changes_report_section(client: TestClient, fixtures: FixtureSet) 
     assert section["count"] == 2
     assert section["provenance"]["tool"] == "ffmpeg"
     assert any("Scene changes are ordinary editing" in item for item in section["provenance"]["limitations"])
+
+
+# --- Keyframes (M3 step 6) ----------------------------------------------------------------------
+
+
+def keyframes_payload(services: AppServices, job_id: str) -> dict:
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframes")
+    assert record.status in ("succeeded", "partial"), record.errors
+    return record.payload
+
+
+def test_keyframes_follow_the_selection_policy(
+    client: TestClient, services: AppServices, settings, fixtures: FixtureSet
+) -> None:
+    artifact_id, job_id = analyse_video(client, fixtures.video_scenes)
+
+    payload = keyframes_payload(services, job_id)
+    assert payload["requested"] == payload["extracted"] == 8
+    frames = payload["frames"]
+    assert [frame["seq"] for frame in frames] == list(range(1, 9))
+    reasons = [frame["reason"] for frame in frames]
+    assert reasons[0] == "first_frame"
+    assert reasons.count("scene_change") == 2
+    assert reasons.count("uniform_sample") == 5
+    scene_times = [frame["timestamp"] for frame in frames if frame["reason"] == "scene_change"]
+    assert scene_times == pytest.approx(list(VIDEO_SCENE_CUTS), abs=0.2)
+    assert all(frame["width"] == 640 and frame["height"] == 360 for frame in frames)
+
+    derived_dir = settings.data_dir / "artifacts" / artifact_id / "derived" / job_id
+    stored = sorted(derived_dir.glob("keyframes.*.jpg"))
+    assert len(stored) == 8
+    assert all(path.read_bytes().startswith(b"\xff\xd8\xff") for path in stored)
+    assert payload["policy"]["max_keyframes"] == 40
+
+
+def test_keyframe_cap_keeps_the_best_scene_changes(tmp_path, fixtures: FixtureSet) -> None:
+    from app.core.config import Settings
+    from app.main import create_app
+
+    settings = Settings(_env_file=None, data_dir=tmp_path / "data", job_mode="inline", max_keyframes=3)
+    app = create_app(settings)
+    with TestClient(app) as client:
+        artifact_id = upload_ok(client, fixtures.video_scenes)["artifact_id"]
+        job_id = start_video_analysis(client, artifact_id)["job_id"]
+        payload = keyframes_payload(app.state.services, job_id)
+
+    assert payload["extracted"] == 3
+    reasons = [frame["reason"] for frame in payload["frames"]]
+    assert reasons[0] == "first_frame"
+    assert reasons[1:] == ["scene_change", "scene_change"]
+
+
+def test_rotated_video_keyframes_are_upright(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    _, job_id = analyse_video(client, fixtures.video_rotated)
+    frames = keyframes_payload(services, job_id)["frames"]
+    assert all(frame["width"] == 360 and frame["height"] == 640 for frame in frames)
+
+
+def test_failed_extraction_is_a_warning_not_a_silent_drop(
+    client: TestClient, services: AppServices, fixtures: FixtureSet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.pipeline import video_pipeline
+    from app.services.keyframes import extract_keyframe as real_extract
+
+    def flaky(tool, video, timestamp, target, timeout):
+        if timestamp > 5.0:
+            return False
+        return real_extract(tool, video, timestamp, target, timeout)
+
+    monkeypatch.setattr(video_pipeline, "extract_keyframe", flaky)
+    _, job_id = analyse_video(client, fixtures.video_scenes)
+
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframes")
+    assert record.status == "partial"
+    assert all(error["type"] == "KEYFRAME_EXTRACTION_FAILED" for error in record.errors)
+    assert record.payload["extracted"] == record.payload["requested"] - len(record.errors)
+    assert all(frame["timestamp"] <= 5.0 for frame in record.payload["frames"])
+
+
+def test_keyframe_thumbnails_are_served_only_for_their_artifact(
+    client: TestClient, fixtures: FixtureSet
+) -> None:
+    artifact_id, _ = analyse_video(client, fixtures.video_static)
+    other_id = upload_ok(client, fixtures.jpeg)["artifact_id"]
+
+    report = video_report(client, artifact_id)
+    frame = report["keyframes"]["frames"][0]
+    url = f"/api/v1/artifacts/{artifact_id}/derived/{frame['derived_file_id']}/content"
+    response = client.get(url)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.content.startswith(b"\xff\xd8\xff")
+
+    wrong_owner = f"/api/v1/artifacts/{other_id}/derived/{frame['derived_file_id']}/content"
+    assert_error(client.get(wrong_owner), 404, "NOT_FOUND")
+    assert_error(
+        client.get(f"/api/v1/artifacts/{artifact_id}/derived/df_{'0' * 32}/content"), 404, "NOT_FOUND"
+    )
+    assert_error(client.get(f"/api/v1/artifacts/{artifact_id}/derived/not-an-id/content"), 404, "NOT_FOUND")
+
+
+def test_keyframes_report_section(client: TestClient, fixtures: FixtureSet) -> None:
+    artifact_id, _ = analyse_video(client, fixtures.video_scenes)
+    section = video_report(client, artifact_id)["keyframes"]
+    assert section["extracted"] == 8
+    assert section["provenance"]["stage"] == "keyframes"
+    assert all(frame["derived_file_id"].startswith("df_") for frame in section["frames"])
+    assert any("bounded sample" in item for item in section["provenance"]["limitations"])

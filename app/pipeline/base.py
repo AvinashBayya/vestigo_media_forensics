@@ -38,6 +38,8 @@ class ArtifactView:
     sha256: str
     md5: str
     size_bytes: int
+    # Container-reported duration for videos (decision M3-8); None for images.
+    duration_seconds: float | None = None
 
 
 class StageFailure(Exception):

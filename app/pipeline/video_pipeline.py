@@ -5,11 +5,22 @@ Later stages (scene detection, keyframes, keyframe pHash, keyframe OCR, duplicat
 step by step per 13-MILESTONE-3-PLAN.md §11.
 """
 
+from PIL import Image
+
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.pipeline.image_pipeline import HashesStage, MetadataStage
 from app.schemas.common import EvidenceClassification, MediaType
+from app.schemas.evidence import StageError
 from app.services import media_info
-from app.services.scenes import detect_scene_changes
+from app.services.keyframes import (
+    DEDUPE_SECONDS,
+    JPEG_QUALITY,
+    MIN_KEYFRAMES,
+    THUMBNAIL_MAX_SIDE,
+    extract_keyframe,
+    select_keyframes,
+)
+from app.services.scenes import SceneChange, detect_scene_changes
 from app.services.validation import InvalidVideoError, probe_video
 
 VIDEO_PIPELINE = "video.v1"
@@ -104,9 +115,103 @@ class SceneChangesStage(AnalysisStage):
         )
 
 
+class KeyframesStage(AnalysisStage):
+    name = "keyframes"
+    media_type = MediaType.VIDEO
+    method = (
+        "Representative frames are selected deterministically: the first decodable frame, one frame "
+        "per detected scene change (highest scores kept when over the keyframe limit), and evenly "
+        f"spaced frames to reach at least {MIN_KEYFRAMES} when fewer were found; candidates within "
+        f"{DEDUPE_SECONDS:g} s of a selected frame are dropped. Each frame is extracted with ffmpeg "
+        f"(one decoded frame at its timestamp, display rotation applied) as a JPEG capped at "
+        f"{THUMBNAIL_MAX_SIDE} px on the longest side (quality {JPEG_QUALITY}). Every frame records "
+        "its timestamp and why it was selected."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "artifact:original + stage:scene_changes"
+    tool_name = "ffmpeg"
+    limitations = (
+        "Keyframes are a bounded sample of the video. Content between the selected frames is not "
+        "shown or analysed.",
+        "Extracted frames are re-encoded, possibly downscaled JPEG copies for analysis and display, "
+        "not original frames.",
+        "When scene detection is disabled or finds nothing, frames are sampled at even intervals and "
+        "can miss short shots entirely.",
+        "Timestamps are presentation times from decoding and can differ slightly between players.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return ctx.tools.require("ffmpeg").version or "unknown"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("ffmpeg")
+        duration = artifact.duration_seconds or 0.0
+        scenes_result = ctx.results.get("scene_changes")
+        scene_changes = []
+        if scenes_result is not None and scenes_result.has_output:
+            scene_changes = [
+                SceneChange(change["time"], change["score"])
+                for change in scenes_result.output.get("changes", [])
+            ]
+        selected = select_keyframes(duration, scene_changes, ctx.settings.max_keyframes)
+
+        frames, warnings = [], []
+        for frame in selected:
+            scratch_file = ctx.scratch_dir / f"kf_{frame.seq:04d}.jpg"
+            ok = extract_keyframe(
+                tool, artifact.path, frame.timestamp, scratch_file, ctx.settings.video_timeout_seconds
+            )
+            if not ok:
+                warnings.append(
+                    StageError(
+                        type="KEYFRAME_EXTRACTION_FAILED",
+                        message=f"No frame could be extracted at {frame.timestamp:.3f} s.",
+                    )
+                )
+                continue
+            data = scratch_file.read_bytes()
+            info = ctx.derived.write(
+                self.name, "keyframe_jpeg", f"{frame.seq:04d}_t{frame.timestamp:.3f}.jpg", data
+            )
+            with Image.open(scratch_file) as thumbnail:
+                width, height = thumbnail.size
+            frames.append(
+                {
+                    "seq": frame.seq,
+                    "timestamp": frame.timestamp,
+                    "reason": frame.reason,
+                    "scene_score": frame.scene_score,
+                    "derived_file_id": info.derived_file_id,
+                    "width": width,
+                    "height": height,
+                }
+            )
+        if not frames:
+            raise StageFailure(
+                "KEYFRAME_EXTRACTION_FAILED",
+                "No keyframes could be extracted from the video.",
+                {"requested": len(selected)},
+            )
+        return StageOutput(
+            {
+                "policy": {
+                    "min_keyframes": MIN_KEYFRAMES,
+                    "max_keyframes": ctx.settings.max_keyframes,
+                    "dedupe_seconds": DEDUPE_SECONDS,
+                    "thumbnail_max_side": THUMBNAIL_MAX_SIDE,
+                },
+                "requested": len(selected),
+                "extracted": len(frames),
+                "frames": frames,
+            },
+            warnings=warnings,
+        )
+
+
 VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoHashesStage(),
     MediaInfoStage(),
     VideoMetadataStage(),
     SceneChangesStage(),
+    KeyframesStage(),
 )

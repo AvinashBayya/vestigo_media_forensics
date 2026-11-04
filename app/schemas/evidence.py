@@ -193,6 +193,27 @@ class SceneChangesSection(BaseModel):
     provenance: Provenance
 
 
+class KeyframeInfo(BaseModel):
+    seq: int
+    # Presentation time in seconds.
+    timestamp: float
+    # Why the frame was selected: first_frame, scene_change, or uniform_sample.
+    reason: str
+    scene_score: float | None = None
+    # The stored thumbnail, served by GET /artifacts/{id}/derived/{derived_file_id}/content.
+    derived_file_id: str | None = None
+    width: int | None = None
+    height: int | None = None
+
+
+class KeyframesSection(BaseModel):
+    policy: dict[str, Any]
+    requested: int
+    extracted: int
+    frames: list[KeyframeInfo]
+    provenance: Provenance
+
+
 class DuplicateMatch(BaseModel):
     artifact_id: str
     # Current filename, or None if the matched artifact has since been deleted.
@@ -233,6 +254,7 @@ class EvidenceReport(BaseModel):
     # Video sections (Milestone 3); null for image jobs, as image sections are null for video jobs.
     media_info: MediaInfoSection | None = None
     scene_changes: SceneChangesSection | None = None
+    keyframes: KeyframesSection | None = None
     review: ReviewInfo
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

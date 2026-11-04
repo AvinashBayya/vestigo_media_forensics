@@ -16,7 +16,7 @@ from app.core.database import Database
 from app.core.errors import AppError
 from app.core.logging import get_logger, log_event
 from app.core.storage import Storage
-from app.models import AnalysisJob, Artifact, EvidenceRecord, ReviewEvent
+from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ReviewEvent
 from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
 from app.services import analysis, library
@@ -238,6 +238,20 @@ def get_artifact(db: Database, artifact_id: str) -> Artifact:
     if artifact is None:
         raise artifact_not_found(artifact_id)
     return artifact
+
+
+def get_derived_file(db: Database, artifact_id: str, derived_file_id: str) -> DerivedFile:
+    """The derived file, only if it belongs to this artifact."""
+    artifact = get_artifact(db, artifact_id)
+    derived = None
+    if ids.is_valid_id(derived_file_id, ids.DERIVED_FILE):
+        with db.reader() as session:
+            derived = session.get(DerivedFile, derived_file_id)
+    if derived is None or derived.artifact_id != artifact.id:
+        raise AppError(
+            404, ErrorCode.NOT_FOUND, "Derived file not found.", {"derived_file_id": derived_file_id}
+        )
+    return derived
 
 
 def to_summary(artifact: Artifact, latest_job_status: str | None) -> ArtifactSummary:

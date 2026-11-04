@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, Query, UploadFile
@@ -30,6 +31,16 @@ from app.services import analysis, artifacts, exports, library, reports, review
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
 EXPORT_SHA256_HEADER = "X-Vestigo-Export-SHA256"
+
+# Derived files are served by their recorded kind, never by sniffing their contents.
+DERIVED_MIME_TYPES = {
+    "keyframe_jpeg": "image/jpeg",
+    "exiftool_json": "application/json",
+    "exiftool_c2pa_json": "application/json",
+    "ffprobe_json": "application/json",
+    "ffmpeg_scene_output": "text/plain; charset=utf-8",
+    "tesseract_tsv": "text/plain; charset=utf-8",
+}
 
 
 @router.post("/upload", status_code=201, response_model=ArtifactUploadResponse)
@@ -77,6 +88,23 @@ def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
         services.storage.resolve(artifact.stored_path),
         media_type=artifact.mime_type,
         filename=artifact.original_filename,
+        content_disposition_type="inline",
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get("/{artifact_id}/derived/{derived_file_id}/content", response_class=FileResponse)
+def get_derived_file_content(services: Services, artifact_id: str, derived_file_id: str) -> FileResponse:
+    """A derived file (for example a keyframe thumbnail), for display in the browser."""
+    derived = artifacts.get_derived_file(services.db, artifact_id, derived_file_id)
+    return FileResponse(
+        services.storage.resolve(derived.stored_path),
+        media_type=DERIVED_MIME_TYPES.get(derived.kind, "application/octet-stream"),
+        filename=Path(derived.stored_path).name,
         content_disposition_type="inline",
         headers={
             "X-Content-Type-Options": "nosniff",

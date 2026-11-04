@@ -113,6 +113,7 @@ class PipelineRunner:
                     sha256=artifact.sha256,
                     md5=artifact.md5,
                     size_bytes=artifact.size_bytes,
+                    duration_seconds=artifact.duration_seconds,
                 ),
                 options=OPTIONS_MODELS.get(job.pipeline, AnalysisOptions).model_validate(job.options),
                 pipeline=job.pipeline,
