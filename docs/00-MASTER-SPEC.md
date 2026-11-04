@@ -1,7 +1,8 @@
 # Vestigo Media Forensics — Master Build Spec
 
 This is the entry point to the docs. Detailed requirements live in docs 01–10; the approved Milestone 1 plan is
-`11-BUILD-PLAN.md`, and the approved Milestone 2 plan is `12-MILESTONE-2-PLAN.md`. If this file and docs
+`11-BUILD-PLAN.md`; the approved Milestone 2 and 3 plans are `12-MILESTONE-2-PLAN.md` and
+`13-MILESTONE-3-PLAN.md`. If this file and docs
 01–10 ever disagree, docs 01–10 win.
 
 ## 1. Project Goal

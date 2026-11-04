@@ -150,3 +150,17 @@ Details settled while implementing D15, recorded so later work keeps them:
   environment and are read-only in the UI.
 - The frontend uses a React Router data router so the unsaved-changes guard can block navigation.
 
+
+## D17 — Milestone 3 scope and decisions
+
+Milestone 3 (Video Foundation) follows the approved plan in `13-MILESTONE-3-PLAN.md`, decisions
+M3-1 to M3-8. In summary: MP4/MOV/WebM/MKV only, detected from bytes; limits of 500 MB, 15 minutes,
+4K per frame, 40 keyframes, scene threshold 0.3, and a 600 s ffmpeg timeout, all environment-set and
+read-only in the UI; keyframe OCR off by default and capped at 10 frames when enabled, reusing D13
+OCR unchanged; duplicate search spans images and video keyframes in both directions, changing stage
+method texts for new records only; the existing ExifTool metadata stage runs on videos; no
+transcoding (browser playback via the content endpoint with Range, with a fallback message); audio
+is inspected through ffprobe stream metadata only; duration is stored and labelled as
+container-reported. ffprobe provides media information; ffmpeg provides scene detection and keyframe
+extraction. No facial recognition, speaker identification, transcription, deepfake detection,
+verdicts, ELA, or C2PA validation.
