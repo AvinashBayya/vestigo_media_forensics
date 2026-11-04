@@ -9,6 +9,7 @@ from PIL import Image
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app.core.tools import ToolError
 from app.models import EvidenceRecord, KeyframeFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.pipeline.image_pipeline import HashesStage, MetadataStage
@@ -19,10 +20,13 @@ from app.services.keyframes import (
     DEDUPE_SECONDS,
     JPEG_QUALITY,
     MIN_KEYFRAMES,
+    OCR_KEYFRAME_LIMIT,
     THUMBNAIL_MAX_SIDE,
+    evenly_spaced_subset,
     extract_keyframe,
     select_keyframes,
 )
+from app.services.ocr import LANGUAGES, PAGE_SEGMENTATION_MODE, pillow_version, run_ocr
 from app.services.phash import BITS, FINGERPRINT_ALGORITHM, compute_phash, imagehash_version
 from app.services.scenes import SceneChange, detect_scene_changes
 from app.services.validation import InvalidVideoError, probe_video
@@ -277,6 +281,107 @@ class KeyframePHashStage(AnalysisStage):
             )
 
 
+class KeyframeOCRStage(AnalysisStage):
+    name = "keyframe_ocr"
+    media_type = MediaType.VIDEO
+    method = (
+        f"Tesseract OCR (languages: {'+'.join(LANGUAGES)}; --psm {PAGE_SEGMENTATION_MODE}) runs on an "
+        f"evenly spaced subset of at most {OCR_KEYFRAME_LIMIT} extracted keyframes, always including "
+        "the first and last. Each frame uses the two-pass preprocessing of the image OCR stage "
+        "(grayscale with upscaling, and an adaptive-threshold pass, the better pass chosen by the "
+        "recorded rule); raw Tesseract TSV output is stored per analysed frame and pass. The prepared "
+        "pass images are not stored for keyframes; the keyframe thumbnails themselves are."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "stage:keyframes"
+    tool_name = "Tesseract"
+    depends_on = ("keyframes",)
+    option = "keyframe_ocr"
+    limitations = (
+        "OCR output is provisional, best-effort text, not a verified transcription (decision D14). "
+        "Text can be missed or misread; check it against the frames.",
+        "Only a bounded subset of keyframes is analysed. Text shown between the analysed frames, or "
+        "in unselected parts of the video, is not read.",
+        "English language data only. Text in other languages or scripts may be missed or misread.",
+        "Confidence is Tesseract's own estimate, not a measured accuracy.",
+        "Small, moving, stylised, or low-contrast captions are often misread or missed.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        version = ctx.tools.require("tesseract").version or "unknown"
+        return f"{version}; Pillow {pillow_version()}"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("tesseract")
+        keyframes = ctx.results["keyframes"].output.get("frames", [])
+        chosen = [keyframes[index] for index in evenly_spaced_subset(len(keyframes), OCR_KEYFRAME_LIMIT)]
+        frames, warnings = [], []
+        for frame in chosen:
+            path = ctx.derived.stored_file("keyframes", f"{frame['seq']:04d}_t{frame['timestamp']:.3f}.jpg")
+            scratch = ctx.scratch_dir / f"ocr_{frame['seq']:04d}"
+            scratch.mkdir(exist_ok=True)
+            try:
+                result = run_ocr(tool, path, scratch, ctx.settings.ocr_timeout_seconds)
+            except ToolError as exc:
+                warnings.append(
+                    StageError(
+                        type="OCR_FRAME_FAILED",
+                        message=f"OCR failed on the keyframe at {frame['timestamp']:.3f} s: {exc}",
+                    )
+                )
+                continue
+            for ocr_pass in result.passes:
+                if ocr_pass.recognition is not None:
+                    ctx.derived.write(
+                        self.name,
+                        f"tesseract_tsv_{ocr_pass.variant}",
+                        f"{frame['seq']:04d}.{ocr_pass.variant}.tsv",
+                        ocr_pass.recognition.tsv,
+                    )
+            if result.variant_error is not None:
+                warnings.append(
+                    StageError(
+                        type="OCR_VARIANT_FAILED",
+                        message=(
+                            f"The threshold pass failed on the keyframe at {frame['timestamp']:.3f} s; "
+                            f"the grayscale pass is used. {result.variant_error}"
+                        ),
+                    )
+                )
+            payload = result.payload()
+            frames.append(
+                {
+                    "seq": frame["seq"],
+                    "timestamp": frame["timestamp"],
+                    **{
+                        key: payload[key]
+                        for key in (
+                            "text",
+                            "cleaned_text",
+                            "cleaning",
+                            "confidence",
+                            "word_count",
+                            "preprocessing",
+                            "candidates",
+                            "selected",
+                        )
+                    },
+                }
+            )
+        if chosen and not frames:
+            raise StageFailure("OCR_FRAME_FAILED", "OCR failed on every analysed keyframe.", {"analyzed": 0})
+        return StageOutput(
+            {
+                "engine": "tesseract",
+                "languages": list(LANGUAGES),
+                "frame_limit": OCR_KEYFRAME_LIMIT,
+                "analyzed": len(frames),
+                "frames": frames,
+            },
+            warnings=warnings,
+        )
+
+
 VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoHashesStage(),
     MediaInfoStage(),
@@ -284,4 +389,5 @@ VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     SceneChangesStage(),
     KeyframesStage(),
     KeyframePHashStage(),
+    KeyframeOCRStage(),
 )

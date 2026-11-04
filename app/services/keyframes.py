@@ -24,6 +24,8 @@ DEDUPE_SECONDS = 0.25
 END_MARGIN_SECONDS = 0.2
 THUMBNAIL_MAX_SIDE = 1920
 JPEG_QUALITY = "2"
+# Keyframe OCR analyses at most this many frames (decision M3-3).
+OCR_KEYFRAME_LIMIT = 10
 
 
 @dataclass(frozen=True)
@@ -91,3 +93,11 @@ def extract_keyframe(ffmpeg: ToolStatus, video: Path, timestamp: float, target: 
     ]
     completed = run_tool(ffmpeg, args, timeout=timeout)
     return completed.returncode == 0 and target.is_file() and target.stat().st_size > 0
+
+
+def evenly_spaced_subset(count: int, limit: int) -> list[int]:
+    """Indices of up to `limit` items spread evenly over `count`, always including the first and last."""
+    if count <= limit:
+        return list(range(count))
+    last = count - 1
+    return sorted({round(position * last / (limit - 1)) for position in range(limit)})

@@ -229,6 +229,30 @@ class KeyframePHashSection(BaseModel):
     provenance: Provenance
 
 
+class KeyframeOCRFrame(BaseModel):
+    """One analysed keyframe's OCR result, with the image OCR stage's full detail (D13)."""
+
+    seq: int
+    timestamp: float
+    text: str
+    cleaned_text: str | None = None
+    cleaning: list[OCRCleaningRule] = []
+    confidence: float | None
+    word_count: int
+    preprocessing: list[OCRPreprocessingStep] = []
+    candidates: list[OCRCandidate] = []
+    selected: OCRSelection | None = None
+
+
+class KeyframeOCRSection(BaseModel):
+    engine: Literal["tesseract"] = "tesseract"
+    languages: list[str]
+    frame_limit: int
+    analyzed: int
+    frames: list[KeyframeOCRFrame]
+    provenance: Provenance
+
+
 class DuplicateMatch(BaseModel):
     artifact_id: str
     # Current filename, or None if the matched artifact has since been deleted.
@@ -271,6 +295,7 @@ class EvidenceReport(BaseModel):
     scene_changes: SceneChangesSection | None = None
     keyframes: KeyframesSection | None = None
     keyframe_phash: KeyframePHashSection | None = None
+    keyframe_ocr: KeyframeOCRSection | None = None
     review: ReviewInfo
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

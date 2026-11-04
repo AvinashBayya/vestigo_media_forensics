@@ -58,3 +58,17 @@ def test_zero_duration_still_selects_the_first_frame() -> None:
     frames = select_keyframes(0.0, [], max_keyframes=40)
     assert times(frames) == [0.0]
     assert reasons(frames) == ["first_frame"]
+
+
+def test_evenly_spaced_subset() -> None:
+    from app.services.keyframes import evenly_spaced_subset
+
+    assert evenly_spaced_subset(8, 10) == list(range(8))
+    chosen = evenly_spaced_subset(15, 10)
+    assert len(chosen) == 10
+    assert chosen[0] == 0 and chosen[-1] == 14
+    assert chosen == sorted(set(chosen))
+    big = evenly_spaced_subset(40, 10)
+    assert len(big) == 10 and big[0] == 0 and big[-1] == 39
+    gaps = [b - a for a, b in zip(big, big[1:], strict=False)]
+    assert max(gaps) - min(gaps) <= 1

@@ -47,9 +47,11 @@ def test_video_analysis_runs_the_video_pipeline(
     assert stages["media_info"] == "succeeded"
     assert stages["metadata"] == "succeeded"
 
-    # Every record carries the full evidence contract (04-EVIDENCE-MODEL.md §5).
+    # Every record carries the full evidence contract (04-EVIDENCE-MODEL.md §5). tool_version is
+    # null only when the tool was never invoked (a skipped stage).
     for record in records_for(services, job_id):
-        assert record.method and record.tool and record.tool_version
+        assert record.method and record.tool
+        assert record.tool_version or record.status == "skipped"
         assert record.source
         assert record.limitations
         assert record.started_at <= record.completed_at
@@ -423,3 +425,69 @@ def test_reencoded_copy_has_matching_keyframe_hashes(
     distances = [hamming_distance(original[seq], copy[seq]) for seq in sorted(set(original) & set(copy))]
     assert distances, "no comparable keyframes"
     assert max(distances) <= 10
+
+
+# --- Keyframe OCR (M3 step 8) -------------------------------------------------------------------
+
+
+def test_keyframe_ocr_is_off_by_default(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    _, job_id = analyse_video(client, fixtures.video_static)
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframe_ocr")
+    assert record.status == "skipped"
+    assert record.payload["skip_reason"] == "Disabled by the analysis option 'keyframe_ocr'."
+
+
+def test_keyframe_ocr_reads_scene_text_when_enabled(
+    client: TestClient, services: AppServices, settings, fixtures: FixtureSet
+) -> None:
+    artifact_id, job_id = analyse_video(client, fixtures.video_scenes, {"keyframe_ocr": True})
+
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframe_ocr")
+    assert record.status == "succeeded", record.errors
+    payload = record.payload
+    assert payload["frame_limit"] == 10
+    assert payload["analyzed"] == 8  # all 8 keyframes fit within the limit
+    texts = {frame["seq"]: frame["text"].upper() for frame in payload["frames"]}
+    assert "SCENE ONE" in texts[1]
+    assert any("SCENE THREE" in text for text in texts.values())
+    first = payload["frames"][0]
+    assert first["confidence"] is not None and first["confidence"] > 0.5
+    assert first["selected"]["variant"] in ("grayscale", "threshold")
+    assert [step["step"] for step in first["preprocessing"]][:2] == ["first_frame", "exif_orientation"]
+    assert [candidate["variant"] for candidate in first["candidates"]] == ["grayscale", "threshold"]
+
+    derived_dir = settings.data_dir / "artifacts" / artifact_id / "derived" / job_id
+    tsvs = sorted(derived_dir.glob("keyframe_ocr.*.tsv"))
+    assert len(tsvs) == 16  # two passes per analysed frame
+    assert tsvs[0].read_bytes().startswith(b"level\t")
+
+    section = video_report(client, artifact_id)["keyframe_ocr"]
+    assert section["analyzed"] == 8
+    assert any("provisional" in item for item in section["provenance"]["limitations"])
+    assert any("bounded subset" in item for item in section["provenance"]["limitations"])
+
+
+def test_keyframe_ocr_frame_failure_is_recorded_not_hidden(
+    client: TestClient, services: AppServices, fixtures: FixtureSet, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.tools import ToolError
+    from app.pipeline import video_pipeline
+    from app.services.ocr import run_ocr as real_run_ocr
+
+    calls = {"n": 0}
+
+    def flaky(tool, source, scratch_dir, timeout):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise ToolError("Tesseract exited with code 1 (boom).")
+        return real_run_ocr(tool, source, scratch_dir, timeout)
+
+    monkeypatch.setattr(video_pipeline, "run_ocr", flaky)
+    _, job_id = analyse_video(client, fixtures.video_static, {"keyframe_ocr": True})
+
+    record = next(r for r in records_for(services, job_id) if r.stage == "keyframe_ocr")
+    assert record.status == "partial"
+    assert [error["type"] for error in record.errors] == ["OCR_FRAME_FAILED"]
+    assert record.payload["analyzed"] == 7
