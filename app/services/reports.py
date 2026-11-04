@@ -167,16 +167,21 @@ def _keyframe_ocr(payload: dict[str, Any], provenance: Provenance) -> KeyframeOC
     )
 
 
-def _duplicates(filenames: dict[str, str]) -> Callable[[dict[str, Any], Provenance], DuplicatesSection]:
+def _duplicates(
+    matched: dict[str, tuple[str, str]],
+) -> Callable[[dict[str, Any], Provenance], DuplicatesSection]:
     def build(payload: dict[str, Any], provenance: Provenance) -> DuplicatesSection:
         matches = [
             DuplicateMatch(
                 artifact_id=match["artifact_id"],
-                filename=filenames.get(match["artifact_id"]),
-                available=match["artifact_id"] in filenames,
+                filename=matched[match["artifact_id"]][0] if match["artifact_id"] in matched else None,
+                available=match["artifact_id"] in matched,
+                media_type=matched[match["artifact_id"]][1] if match["artifact_id"] in matched else None,
                 similarity=match["similarity"],
                 distance=match["distance"],
                 match_type=match["match_type"],
+                matched_frame_count=match.get("matched_frame_count"),
+                frame_matches=match.get("frame_matches"),
             )
             for match in payload.get("matches", [])
         ]
@@ -234,11 +239,14 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         duplicates = records.get("duplicates")
         matches = duplicates.payload.get("matches", []) if duplicates else []
         matched_ids = {match["artifact_id"] for match in matches}
-        filenames = dict(
-            session.execute(
-                select(Artifact.id, Artifact.original_filename).where(Artifact.id.in_(matched_ids))
+        matched = {
+            row[0]: (row[1], row[2])
+            for row in session.execute(
+                select(Artifact.id, Artifact.original_filename, Artifact.media_type).where(
+                    Artifact.id.in_(matched_ids)
+                )
             ).all()
-        )
+        }
 
     builders: dict[str, Callable[[dict[str, Any], Provenance], BaseModel]] = {
         "hashes": _hashes,
@@ -246,7 +254,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "c2pa": _c2pa,
         "perceptual_hash": _perceptual_hash,
         "ocr": _ocr,
-        "duplicates": _duplicates(filenames),
+        "duplicates": _duplicates(matched),
         "media_info": _media_info,
         "scene_changes": _scene_changes,
         "keyframes": _keyframes,

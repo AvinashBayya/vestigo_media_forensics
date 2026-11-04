@@ -10,7 +10,7 @@ from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFa
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
 from app.services.c2pa import detect_c2pa
-from app.services.duplicates import find_matches
+from app.services.duplicates import FrameHash, find_matches
 from app.services.hashing import hash_file, hashlib_version
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
 from app.services.ocr import (
@@ -261,10 +261,11 @@ class DuplicatesStage(AnalysisStage):
     name = "duplicates"
     media_type = MediaType.IMAGE
     method = (
-        "Compares this image's pHash with the stored pHash of every other artifact in the local library "
-        "using Hamming distance, and lists those at or below the threshold. Byte-identical files are "
-        "found by SHA-256. Artifacts the analyst excluded from duplicate search are not compared; their "
-        "number is recorded."
+        "Compares this image's pHash with the stored pHash of every other image and with the keyframe "
+        "pHashes of every analysed video in the local library using Hamming distance, and lists "
+        "artifacts with a hash at or below the threshold. Byte-identical files are found by SHA-256. "
+        "Artifacts the analyst excluded from duplicate search are not compared; their number is "
+        "recorded."
     )
     classification = EvidenceClassification.DERIVED
     source = "stage:perceptual_hash + local library"
@@ -278,6 +279,8 @@ class DuplicatesStage(AnalysisStage):
         "byte-identical.",
         "A match means the images look alike at a coarse level. It does not show which came first or "
         "that one was derived from the other.",
+        "A match against a video lists the sampled keyframes this image resembles. Video content "
+        "between keyframes is not searched.",
         "Artifacts excluded from duplicate search by the analyst are not compared, even if identical. "
         "`excluded_count` records how many were left out.",
     )
@@ -287,9 +290,9 @@ class DuplicatesStage(AnalysisStage):
 
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         threshold = ctx.settings.phash_max_distance
-        own_hash = ctx.results["perceptual_hash"].output["value"]
+        own_hash = FrameHash(ctx.results["perceptual_hash"].output["value"])
         library = ctx.library.snapshot(artifact.id, FINGERPRINT_ALGORITHM)
-        search = find_matches(artifact.sha256, own_hash, library.entries, threshold)
+        search = find_matches(artifact.sha256, [own_hash], library.entries, threshold)
         return StageOutput(
             {
                 "algorithm": "pHash",

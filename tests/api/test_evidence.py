@@ -191,9 +191,13 @@ def test_duplicate_matches_show_current_filenames(client: TestClient, fixtures: 
             "artifact_id": first,
             "filename": "first.jpg",
             "available": True,
+            "media_type": "image",
             "similarity": 1.0,
             "distance": 0,
             "match_type": "exact_file",
+            # Null for image-to-image and byte-identical matches (frame detail is M3-4).
+            "matched_frame_count": None,
+            "frame_matches": None,
         }
     ]
 

@@ -120,8 +120,8 @@ def test_video_report_sections(client: TestClient, fixtures: FixtureSet) -> None
     assert media_info["provenance"]["stage"] == "media_info"
     assert media_info["provenance"]["tool"] == "ffprobe"
     assert media_info["provenance"]["classification"] == "OBSERVED"
-    # Image-only sections are null for a video job.
-    for section in ("c2pa", "perceptual_hash", "ocr", "duplicates"):
+    # Image-only sections are null for a video job (duplicates is shared by both pipelines).
+    for section in ("c2pa", "perceptual_hash", "ocr"):
         assert report[section] is None, section
     assert report["hashes"]["sha256"]
     assert report["artifact"]["duration_seconds"] == pytest.approx(9.0, abs=0.1)
@@ -491,3 +491,135 @@ def test_keyframe_ocr_frame_failure_is_recorded_not_hidden(
     assert record.status == "partial"
     assert [error["type"] for error in record.errors] == ["OCR_FRAME_FAILED"]
     assert record.payload["analyzed"] == 7
+
+
+# --- Duplicate search across videos and images (M3 step 9) --------------------------------------
+
+
+def duplicates_payload(services: AppServices, job_id: str) -> dict:
+    record = next(r for r in records_for(services, job_id) if r.stage == "duplicates")
+    assert record.status == "succeeded", record.errors
+    return record.payload
+
+
+def test_reencoded_video_copy_is_found_with_frame_pairs(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    original_id, _ = analyse_video(client, fixtures.video_scenes)
+    copy_id, copy_job = analyse_video(client, fixtures.video_webm)
+
+    payload = duplicates_payload(services, copy_job)
+    assert payload["threshold"] == 10
+    [match] = payload["matches"]
+    assert match["artifact_id"] == original_id
+    assert match["match_type"] in ("near", "visually_identical")
+    assert match["matched_frame_count"] >= 6
+
+    def scene_of(timestamp: float) -> int:
+        # The fixture's scenes run 0-3 s, 3-6 s, 6-9 s; 0.1 s of tolerance at the cuts.
+        if timestamp < VIDEO_SCENE_CUTS[0] - 0.1:
+            return 0
+        if timestamp < VIDEO_SCENE_CUTS[1] - 0.1:
+            return 1
+        return 2
+
+    for pair in match["frame_matches"]:
+        assert pair["distance"] <= 10
+        # Frames within a static scene are interchangeable, so pairs land in the same scene
+        # rather than at identical timestamps.
+        assert scene_of(pair["query_timestamp"]) == scene_of(pair["matched_timestamp"])
+
+    report = video_report(client, copy_id)
+    [reported] = report["duplicates"]["matches"]
+    assert reported["filename"] == "scenes.mp4"
+    assert reported["media_type"] == "video"
+    assert reported["matched_frame_count"] == match["matched_frame_count"]
+    assert "keyframe pHashes of every analysed video" in report["duplicates"]["provenance"]["method"]
+
+
+def test_unrelated_videos_do_not_match(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    analyse_video(client, fixtures.video_scenes)
+    _, static_job = analyse_video(client, fixtures.video_static)
+    assert duplicates_payload(services, static_job)["matches"] == []
+
+
+def test_video_uploaded_twice_is_an_exact_file_match(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    first_id, _ = analyse_video(client, fixtures.video_static)
+    _, second_job = analyse_video(client, fixtures.video_static)
+    [match] = duplicates_payload(services, second_job)["matches"]
+    assert (match["artifact_id"], match["match_type"]) == (first_id, "exact_file")
+    assert match["frame_matches"] is None
+
+
+def test_image_analysis_finds_the_video_it_was_taken_from(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    video_id, _ = analyse_video(client, fixtures.video_scenes)
+    image_id = upload_ok(client, fixtures.video_frame_jpg)["artifact_id"]
+    assert client.post("/api/v1/analysis/image", json={"artifact_id": image_id}).status_code == 202
+
+    report = client.get(f"/api/v1/artifacts/{image_id}/evidence").json()
+    matches = {m["artifact_id"]: m for m in report["duplicates"]["matches"]}
+    assert video_id in matches
+    match = matches[video_id]
+    assert match["media_type"] == "video"
+    assert match["matched_frame_count"] == 1
+    [pair] = match["frame_matches"]
+    assert pair["query_seq"] is None  # the query is a whole image
+    assert pair["matched_timestamp"] == pytest.approx(0.0, abs=3.1)  # within the first scene
+    assert "keyframe pHashes of every analysed video" in report["duplicates"]["provenance"]["method"]
+
+
+def test_video_analysis_finds_a_matching_image(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    image_id = upload_ok(client, fixtures.video_frame_jpg)["artifact_id"]
+    assert client.post("/api/v1/analysis/image", json={"artifact_id": image_id}).status_code == 202
+    _, video_job = analyse_video(client, fixtures.video_scenes)
+
+    matches = {m["artifact_id"]: m for m in duplicates_payload(services, video_job)["matches"]}
+    assert image_id in matches
+    match = matches[image_id]
+    assert match["matched_frame_count"] == len(match["frame_matches"]) >= 1
+    assert all(pair["matched_seq"] is None for pair in match["frame_matches"])  # a whole image
+    # pHash is a coarse-structure measure, so other flat-field scenes with same-position text can
+    # also pair within the threshold; the closest pair must be the frame the still was taken from.
+    best = min(match["frame_matches"], key=lambda pair: pair["distance"])
+    assert best["query_timestamp"] < 3.1  # within scene one
+    assert best["distance"] <= 4
+
+
+def test_excluded_video_is_skipped_by_video_duplicate_search(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    original_id, _ = analyse_video(client, fixtures.video_scenes)
+    assert (
+        client.patch(
+            f"/api/v1/artifacts/{original_id}/duplicate-library", json={"included": False}
+        ).status_code
+        == 200
+    )
+    _, copy_job = analyse_video(client, fixtures.video_webm)
+
+    payload = duplicates_payload(services, copy_job)
+    assert payload["matches"] == []
+    assert payload["excluded_count"] == 1
+
+
+def test_video_duplicates_can_be_disabled_and_show_in_library_indicators(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    analyse_video(client, fixtures.video_scenes)
+    copy_id, _ = analyse_video(client, fixtures.video_webm)
+    off_id = upload_ok(client, fixtures.video_static)["artifact_id"]
+    start_video_analysis(client, off_id, {"duplicate_search": False})
+
+    listed = {i["artifact_id"]: i for i in client.get("/api/v1/artifacts").json()["items"]}
+    assert listed[copy_id]["duplicate_match_count"] == 1
+    assert listed[off_id]["duplicate_match_count"] is None
+    with_duplicates = client.get("/api/v1/artifacts", params={"has_duplicates": "true"}).json()
+    assert [i["artifact_id"] for i in with_duplicates["items"]] == [copy_id]

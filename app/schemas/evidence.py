@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.schemas.analysis import JobSummary
 from app.schemas.artifact import ArtifactSummary, ReviewInfo
-from app.schemas.common import EvidenceClassification, ReviewState, StageStatus
+from app.schemas.common import EvidenceClassification, MediaType, ReviewState, StageStatus
 from app.schemas.review import ReviewEventOut
 
 REPORT_NOTICE = (
@@ -253,6 +253,17 @@ class KeyframeOCRSection(BaseModel):
     provenance: Provenance
 
 
+class FrameMatchInfo(BaseModel):
+    """One matching hash pair (M3-4). Frame fields are null for the whole-image side of a pair."""
+
+    distance: int
+    similarity: float
+    query_seq: int | None = None
+    query_timestamp: float | None = None
+    matched_seq: int | None = None
+    matched_timestamp: float | None = None
+
+
 class DuplicateMatch(BaseModel):
     artifact_id: str
     # Current filename, or None if the matched artifact has since been deleted.
@@ -261,6 +272,11 @@ class DuplicateMatch(BaseModel):
     similarity: float
     distance: int
     match_type: Literal["exact_file", "visually_identical", "near"]
+    media_type: MediaType | None = None
+    # Frame detail when either side is a video (M3-4): the best counterpart per query hash. Null for
+    # image-to-image and byte-identical matches.
+    matched_frame_count: int | None = None
+    frame_matches: list[FrameMatchInfo] | None = None
 
 
 class DuplicatesSection(BaseModel):

@@ -5,10 +5,13 @@ Later stages (scene detection, keyframes, keyframe pHash, keyframe OCR, duplicat
 step by step per 13-MILESTONE-3-PLAN.md §11.
 """
 
+from dataclasses import asdict
+
 from PIL import Image
 from sqlalchemy import delete
 from sqlalchemy.orm import Session
 
+from app import __version__
 from app.core.tools import ToolError
 from app.models import EvidenceRecord, KeyframeFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
@@ -16,6 +19,7 @@ from app.pipeline.image_pipeline import HashesStage, MetadataStage
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
 from app.services import media_info
+from app.services.duplicates import FrameHash, find_matches
 from app.services.keyframes import (
     DEDUPE_SECONDS,
     JPEG_QUALITY,
@@ -382,6 +386,58 @@ class KeyframeOCRStage(AnalysisStage):
         )
 
 
+class VideoDuplicatesStage(AnalysisStage):
+    name = "duplicates"
+    media_type = MediaType.VIDEO
+    method = (
+        "Compares each keyframe's pHash with the stored pHash of every other image and with the "
+        "keyframe pHashes of every analysed video in the local library using Hamming distance. "
+        "Artifacts with a hash at or below the threshold are listed with, per matching keyframe, its "
+        "best counterpart and that pair's distance. Byte-identical files are found by SHA-256. "
+        "Artifacts the analyst excluded from duplicate search are not compared; their number is "
+        "recorded."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "stage:keyframe_phash + local library"
+    tool_name = "Vestigo duplicate search"
+    depends_on = ("keyframe_phash",)
+    option = "duplicate_search"
+    limitations = (
+        "Searches only the artifacts in this local Vestigo library, as it was when the job ran. No "
+        "external or online search is performed.",
+        "Only the selected keyframes are compared. Two videos sharing content between keyframes, or "
+        "sharing shots that keyframe selection skipped, can be missed.",
+        "Artifacts that have not been analysed have no perceptual hashes and are found only if they "
+        "are byte-identical.",
+        "A match means frames look alike at a coarse level. It does not show which came first or that "
+        "one was derived from the other.",
+        "Artifacts excluded from duplicate search by the analyst are not compared, even if identical. "
+        "`excluded_count` records how many were left out.",
+    )
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return __version__
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        threshold = ctx.settings.phash_max_distance
+        own_hashes = [
+            FrameHash(frame["value"], frame["seq"], frame["timestamp"])
+            for frame in ctx.results["keyframe_phash"].output.get("frames", [])
+        ]
+        library = ctx.library.snapshot(artifact.id, FINGERPRINT_ALGORITHM)
+        search = find_matches(artifact.sha256, own_hashes, library.entries, threshold)
+        return StageOutput(
+            {
+                "algorithm": "pHash",
+                "threshold": threshold,
+                "library_size": search.library_size,
+                "compared": search.compared,
+                "excluded_count": library.excluded_count,
+                "matches": [asdict(match) for match in search.matches],
+            }
+        )
+
+
 VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoHashesStage(),
     MediaInfoStage(),
@@ -390,4 +446,5 @@ VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     KeyframesStage(),
     KeyframePHashStage(),
     KeyframeOCRStage(),
+    VideoDuplicatesStage(),
 )

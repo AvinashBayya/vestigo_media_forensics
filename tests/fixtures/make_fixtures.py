@@ -65,6 +65,7 @@ class FixtureSet:
     oversized_dimensions: Path
     bomb_dimensions: Path
     video_scenes: Path
+    video_frame_jpg: Path
     video_static: Path
     video_webm: Path
     video_mkv: Path
@@ -297,9 +298,12 @@ def build_video_fixtures(path) -> dict[str, Path]:
     ffmpeg("-f", "lavfi", "-i", "color=c=green:s=320x240:d=4", "-c:v", "libx264", path("static.mp4"))
     ffmpeg("-f", "lavfi", "-i", "color=c=gray:s=320x240:d=2", "-c:v", "libx264", path("no_audio.mp4"))
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "aac", path("audio_only.mp4"))
+    # A still image taken from the video, for cross-media duplicate tests (M3-4).
+    ffmpeg("-ss", "1.0", "-i", scenes, "-frames:v", "1", "-q:v", "2", path("frame_from_video.jpg"))
     path("truncated.mp4").write_bytes(scenes.read_bytes()[:400])
     path("page.mp4").write_bytes(b"<!doctype html><html><body>not a video</body></html>")
     return {
+        "video_frame_jpg": path("frame_from_video.jpg"),
         "video_scenes": scenes,
         "video_static": path("static.mp4"),
         "video_webm": path("recoded.webm"),
