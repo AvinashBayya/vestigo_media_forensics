@@ -21,9 +21,11 @@ class LibraryArtifactRef(BaseModel):
 
 
 class StorageUsage(BaseModel):
-    # Sizes recorded in the database: uploaded originals, and files derived during analysis.
+    # Sizes recorded in the database: uploaded originals, files derived during analysis, and
+    # playable viewing copies (D19).
     original_bytes: int
     derived_bytes: int
+    preview_bytes: int = 0
 
 
 class LibrarySummary(BaseModel):

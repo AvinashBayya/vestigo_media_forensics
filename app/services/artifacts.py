@@ -16,7 +16,7 @@ from app.core.database import Database
 from app.core.errors import AppError
 from app.core.logging import get_logger, log_event
 from app.core.storage import Storage
-from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ReviewEvent
+from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, PlayablePreview, ReviewEvent
 from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
 from app.services import analysis, library
@@ -331,6 +331,7 @@ def get_artifact_detail(db: Database, artifact_id: str) -> ArtifactDetail:
     artifact = get_artifact(db, artifact_id)
     with db.reader() as session:
         item = library.list_item(session, artifact_id)
+        has_preview = session.get(PlayablePreview, artifact_id) is not None
     if item is None:
         raise artifact_not_found(artifact_id)
     return ArtifactDetail(
@@ -339,6 +340,7 @@ def get_artifact_detail(db: Database, artifact_id: str) -> ArtifactDetail:
         md5=artifact.md5,
         width=artifact.width,
         height=artifact.height,
+        has_playable_preview=has_preview,
         review=to_review_info(artifact),
     )
 
@@ -405,6 +407,7 @@ def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
                 jobs=_count(session, AnalysisJob, artifact_id),
                 evidence_records=_count(session, EvidenceRecord, artifact_id),
                 review_events=_count(session, ReviewEvent, artifact_id),
+                preview_files=1 if session.get(PlayablePreview, artifact_id) is not None else 0,
             )
             trashed = storage.move_to_trash(artifact_id)
             _delete_rows(session, artifact_id)

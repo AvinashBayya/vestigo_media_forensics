@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "3")]
+    assert after.pop("schema_meta") == [("schema_version", "4")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -378,7 +378,7 @@ def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m2_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "3")]
+    assert after.pop("schema_meta") == [("schema_version", "4")]
     before.pop("schema_meta")
     assert after == before
     with sqlite3.connect(path) as connection:
@@ -408,3 +408,23 @@ def test_milestone_3_defaults_and_keyframe_cascade(tmp_path: Path) -> None:
         connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
         connection.commit()
         assert connection.execute("SELECT count(*) FROM keyframe_fingerprints").fetchone() == (0,)
+
+
+# --- Playable previews (0004) -----------------------------------------------------------------------
+
+
+def test_playable_previews_table_defaults_and_cascade(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        assert connection.execute("SELECT count(*) FROM playable_previews").fetchone() == (0,)
+        connection.execute(
+            "INSERT INTO playable_previews VALUES (?, ?, ?, 123, 640, 360, ?)",
+            (ART_A, f"artifacts/{ART_A}/preview/preview.mp4", "e" * 64, T1),
+        )
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        assert connection.execute("SELECT count(*) FROM playable_previews").fetchone() == (0,)

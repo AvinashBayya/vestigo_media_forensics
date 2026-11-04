@@ -9,6 +9,7 @@ from app.models.derived_file import DerivedFile
 from app.models.evidence_record import EvidenceRecord
 from app.models.fingerprint import ImageFingerprint
 from app.models.keyframe_fingerprint import KeyframeFingerprint
+from app.models.playable_preview import PlayablePreview
 from app.models.review_event import ReviewEvent
 
 
@@ -28,6 +29,7 @@ __all__ = [
     "EvidenceRecord",
     "ImageFingerprint",
     "KeyframeFingerprint",
+    "PlayablePreview",
     "ReviewEvent",
     "SchemaMeta",
 ]

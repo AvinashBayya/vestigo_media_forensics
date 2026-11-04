@@ -55,6 +55,8 @@ class ArtifactDetail(ArtifactListItem):
     md5: str
     width: int | None
     height: int | None
+    # True when a re-encoded viewing copy exists (D19); videos only.
+    has_playable_preview: bool = False
     review: ReviewInfo
 
 
@@ -161,3 +163,15 @@ class DeletionSummary(BaseModel):
     jobs: int
     evidence_records: int
     review_events: int = 0
+    preview_files: int = 0
+
+
+class PreviewInfo(BaseModel):
+    """A re-encoded viewing copy of a video (D19). Not evidence; excluded from the export package."""
+
+    artifact_id: str
+    sha256: str
+    size_bytes: int
+    width: int | None
+    height: int | None
+    created_at: datetime

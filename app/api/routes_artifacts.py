@@ -14,6 +14,7 @@ from app.schemas.artifact import (
     ArtifactQuery,
     ArtifactUploadResponse,
     DeletionSummary,
+    PreviewInfo,
     ReviewUpdate,
 )
 from app.schemas.common import ErrorCode, MediaType
@@ -26,7 +27,7 @@ from app.schemas.review import (
     RecordReviewUpdate,
     ReviewHistory,
 )
-from app.services import analysis, artifacts, exports, library, reports, review
+from app.services import analysis, artifacts, exports, library, previews, reports, review
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -146,6 +147,47 @@ def update_duplicate_library(
     """Include or exclude the artifact from future duplicate searches. Recorded evidence is unchanged."""
     artifacts.set_duplicate_library(services.db, artifact_id, update.included)
     return artifacts.get_artifact_detail(services.db, artifact_id)
+
+
+@router.post("/{artifact_id}/preview", response_model=PreviewInfo)
+def create_playable_preview(services: Services, artifact_id: str) -> PreviewInfo:
+    """Create (or return) a re-encoded viewing copy of a video the browser cannot play (D19).
+    A viewing aid only: not evidence, excluded from the export package, deleted with the artifact."""
+    preview = previews.create_preview(services, artifact_id)
+    return _preview_info(preview)
+
+
+@router.get("/{artifact_id}/preview", response_model=PreviewInfo)
+def get_playable_preview(services: Services, artifact_id: str) -> PreviewInfo:
+    return _preview_info(previews.get_preview(services, artifact_id))
+
+
+@router.get("/{artifact_id}/preview/content", response_class=FileResponse)
+def get_playable_preview_content(services: Services, artifact_id: str) -> FileResponse:
+    """The viewing copy itself, streamed with HTTP Range for playback."""
+    preview = previews.get_preview(services, artifact_id)
+    return FileResponse(
+        services.storage.resolve(preview.stored_path),
+        media_type="video/mp4",
+        filename="preview.mp4",
+        content_disposition_type="inline",
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+def _preview_info(preview) -> PreviewInfo:
+    return PreviewInfo(
+        artifact_id=preview.artifact_id,
+        sha256=preview.sha256,
+        size_bytes=preview.size_bytes,
+        width=preview.width,
+        height=preview.height,
+        created_at=preview.created_at,
+    )
 
 
 @router.get("/{artifact_id}/jobs", response_model=JobHistory)

@@ -81,6 +81,15 @@ class Storage:
         target.chmod(0o444)
         return self.relative(target)
 
+    def store_preview(self, temp_path: Path, artifact_id: str) -> str:
+        """Move a finished playable preview into place, read-only, and return its relative path."""
+        directory = self.artifact_dir(artifact_id) / "preview"
+        directory.mkdir(parents=True, exist_ok=True)
+        target = directory / "preview.mp4"
+        os.replace(temp_path, target)
+        target.chmod(0o444)
+        return self.relative(target)
+
     def count_files(self, artifact_id: str) -> tuple[int, int]:
         """Return (original files, derived files) currently on disk for an artifact."""
         directory = self.artifact_dir(artifact_id)

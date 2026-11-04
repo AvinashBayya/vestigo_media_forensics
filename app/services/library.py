@@ -18,7 +18,7 @@ from sqlalchemy import ColumnElement, Select, and_, case, exists, func, or_, sel
 from sqlalchemy.orm import Session, aliased
 
 from app.core import ids
-from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ImageFingerprint
+from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, ImageFingerprint, PlayablePreview
 from app.schemas.analysis import JobSummary
 from app.schemas.artifact import (
     AnalysisStatusFilter,
@@ -300,5 +300,6 @@ def library_summary(session: Session) -> LibrarySummary:
         storage=StorageUsage(
             original_bytes=session.scalar(select(func.coalesce(func.sum(Artifact.size_bytes), 0))) or 0,
             derived_bytes=session.scalar(select(func.coalesce(func.sum(DerivedFile.size_bytes), 0))) or 0,
+            preview_bytes=session.scalar(select(func.coalesce(func.sum(PlayablePreview.size_bytes), 0))) or 0,
         ),
     )

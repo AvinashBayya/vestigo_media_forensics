@@ -85,7 +85,7 @@ def test_duplicate_library_update_validation(client: TestClient, fixtures: Fixtu
 def test_library_summary(client: TestClient, services: AppServices, fixtures: FixtureSet) -> None:
     empty = client.get("/api/v1/library/summary").json()
     assert empty["artifact_count"] == 0
-    assert empty["storage"] == {"original_bytes": 0, "derived_bytes": 0}
+    assert empty["storage"] == {"original_bytes": 0, "derived_bytes": 0, "preview_bytes": 0}
 
     indexed_id, _ = analyse(client, fixtures.jpeg)
     not_indexed_id = upload_ok(client, fixtures.png)["artifact_id"]

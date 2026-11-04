@@ -77,6 +77,7 @@ class FixtureSet:
     video_wmv: Path
     video_flv: Path
     video_3gp: Path
+    video_ffv1: Path
     video_no_audio: Path
     audio_only_mp4: Path
     audio_wav: Path
@@ -346,6 +347,8 @@ def build_video_fixtures(path) -> dict[str, Path]:
         path("clip.3gp"),
     )
     ffmpeg("-f", "lavfi", "-i", "color=c=gray:s=320x240:d=2", "-c:v", "libx264", path("no_audio.mp4"))
+    # A codec browsers cannot play (lossless FFV1), for the playable-preview tests (D19).
+    ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240:d=1", "-c:v", "ffv1", path("archival.mkv"))
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:a", "aac", path("audio_only.mp4"))
     # Audio fixtures (D19): the same two-second tone in each supported audio container.
     ffmpeg("-f", "lavfi", "-i", "sine=frequency=440:duration=2", path("tone.wav"))
@@ -371,6 +374,7 @@ def build_video_fixtures(path) -> dict[str, Path]:
         "video_wmv": path("clip.wmv"),
         "video_flv": path("clip.flv"),
         "video_3gp": path("clip.3gp"),
+        "video_ffv1": path("archival.mkv"),
         "video_no_audio": path("no_audio.mp4"),
         "audio_only_mp4": path("audio_only.mp4"),
         "audio_wav": path("tone.wav"),
