@@ -4,8 +4,10 @@ import type {
   ArtifactListItem,
   C2PASection,
   CustodyReport,
+  ExternalLead,
   HealthResponse,
   JobHistoryItem,
+  SearchProvidersResponse,
   SettingsResponse,
   EvidenceReport,
   JobStatusResponse,
@@ -244,6 +246,7 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
     keyframe_ocr: null,
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
     review_history: [],
+    external_leads: [],
     ...overrides,
   };
 }
@@ -291,6 +294,7 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
       default_audio_analysis_options: { metadata: true, c2pa: true, duplicate_search: true },
       library_page_size: 25,
       auto_analyze_after_upload: true,
+      enabled_search_providers: [],
       ...editable,
     },
     environment: {
@@ -554,6 +558,47 @@ export function custodyReport(overrides: Partial<CustodyReport> = {}): CustodyRe
         source_derived_file_id: "df_" + "7".repeat(32),
       },
     ],
+    ...overrides,
+  };
+}
+
+/** The provider registry as served, with nothing enabled (M5 default). */
+export function searchProviders(enabled: string[] = []): SearchProvidersResponse {
+  const providers = [
+    { key: "google_lens", name: "Google Lens", landing_url: "https://lens.google.com/", terms_url: "https://policies.google.com/terms", instructions: "Drag the downloaded image in." },
+    { key: "bing_visual", name: "Bing Visual Search", landing_url: "https://www.bing.com/visualsearch", terms_url: "https://www.microsoft.com/servicesagreement", instructions: "Drag the downloaded image into the search box." },
+    { key: "tineye", name: "TinEye", landing_url: "https://tineye.com/", terms_url: "https://tineye.com/terms", instructions: "Click the upload arrow and choose the downloaded image." },
+    { key: "yandex_images", name: "Yandex Images", landing_url: "https://yandex.com/images/", terms_url: "https://yandex.com/legal/rules/", instructions: "Click the camera icon and upload the downloaded image." },
+  ];
+  return {
+    notice:
+      "Opening a provider page sends nothing: it is the provider's plain landing page with no " +
+      "information about your evidence. If you then upload the image there yourself, you are " +
+      "sharing that media with the external service under its own terms, outside Vestigo's control.",
+    providers: providers.map((provider) => ({ ...provider, enabled: enabled.includes(provider.key) })),
+  };
+}
+
+export const LEADS_NOTICE =
+  "External leads are analyst statements: the result URL, image URL, and any publication date are " +
+  "recorded exactly as the analyst entered them and are not verified by Vestigo. 'Recorded' is when " +
+  "the lead was saved here; a publication date is analyst-reported and unverified. An earlier-dated " +
+  "result is a lead about prior appearance, never proof of the original source.";
+
+export function externalLead(overrides: Partial<ExternalLead> = {}): ExternalLead {
+  return {
+    lead_id: "lead_" + "1".repeat(32),
+    artifact_id: ARTIFACT_ID,
+    derived_file_id: null,
+    provider: "TinEye",
+    result_url: "https://example.org/results/42",
+    image_url: null,
+    claimed_published_at: null,
+    notes: "",
+    classification: "EXTERNAL",
+    review_state: "UNREVIEWED",
+    recorded_at: NOW,
+    updated_at: null,
     ...overrides,
   };
 }

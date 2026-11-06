@@ -132,6 +132,7 @@ export interface DeletionSummary {
   evidence_records: number;
   review_events: number;
   custody_events?: number;
+  external_leads?: number;
 }
 
 export type ReviewOrigin = "artifact" | "record" | "bulk";
@@ -440,6 +441,8 @@ export interface EvidenceReport {
   review: ReviewInfo;
   /** Newest first. */
   review_history: ReviewEvent[];
+  /** Analyst-recorded external search leads (M5), newest first. */
+  external_leads: ExternalLead[];
 }
 
 export interface JobHistoryItem extends JobSummary {
@@ -501,6 +504,8 @@ export interface EditableSettings {
   default_audio_analysis_options: AudioAnalysisOptions;
   library_page_size: LibraryPageSize;
   auto_analyze_after_upload: boolean;
+  /** Reverse-image search providers the analyst enabled (M5). All disabled by default. */
+  enabled_search_providers: string[];
 }
 
 /** Read-only: set with VESTIGO_* environment variables or .env. */
@@ -686,4 +691,65 @@ export interface CustodyReport {
   notice: string;
   events: CustodyTimelineEvent[];
   derived_files: CustodyDerivedFile[];
+}
+
+// --- Reverse-image search (Milestone 5) -----------------------------------------------------------
+
+export interface SearchProviderInfo {
+  key: string;
+  name: string;
+  landing_url: string;
+  terms_url: string;
+  instructions: string;
+  /** Set by the analyst in Settings; every provider starts disabled. */
+  enabled: boolean;
+}
+
+export interface SearchProvidersResponse {
+  /** The sharing warning, shown before any provider page is opened. */
+  notice: string;
+  providers: SearchProviderInfo[];
+}
+
+/**
+ * One analyst-recorded external result. URLs and the claimed publication date are stored exactly
+ * as entered and never verified; recorded_at is when Vestigo saved the lead.
+ */
+export interface ExternalLead {
+  lead_id: string;
+  artifact_id: string;
+  derived_file_id: string | null;
+  provider: string;
+  result_url: string;
+  image_url: string | null;
+  claimed_published_at: string | null;
+  notes: string;
+  classification: "EXTERNAL";
+  review_state: ReviewState;
+  recorded_at: string;
+  updated_at: string | null;
+}
+
+export interface ExternalLeadsResponse {
+  artifact_id: string;
+  notice: string;
+  leads: ExternalLead[];
+}
+
+export interface ExternalLeadCreate {
+  provider: string;
+  result_url: string;
+  image_url?: string;
+  claimed_published_at?: string;
+  notes?: string;
+  derived_file_id?: string;
+}
+
+export interface ExternalLeadUpdate {
+  provider?: string;
+  result_url?: string;
+  image_url?: string;
+  claimed_published_at?: string;
+  notes?: string;
+  review_state?: ReviewState;
 }

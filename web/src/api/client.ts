@@ -7,6 +7,11 @@ import type {
   ArtifactList,
   ArtifactQuery,
   CustodyReport,
+  ExternalLead,
+  ExternalLeadCreate,
+  ExternalLeadsResponse,
+  ExternalLeadUpdate,
+  SearchProvidersResponse,
   ArtifactUploadResponse,
   BulkReviewResult,
   DeletionSummary,
@@ -292,4 +297,43 @@ export function previewContentUrl(artifactId: string): string {
 
 export function getCustody(artifactId: string): Promise<CustodyReport> {
   return call(http.get<CustodyReport>(`/artifacts/${encodeURIComponent(artifactId)}/custody`));
+}
+
+export function getSearchProviders(): Promise<SearchProvidersResponse> {
+  return call(http.get<SearchProvidersResponse>("/search/providers"));
+}
+
+export function listExternalLeads(artifactId: string): Promise<ExternalLeadsResponse> {
+  return call(http.get<ExternalLeadsResponse>(`/artifacts/${encodeURIComponent(artifactId)}/external-leads`));
+}
+
+export function createExternalLead(artifactId: string, lead: ExternalLeadCreate): Promise<ExternalLead> {
+  return call(http.post<ExternalLead>(`/artifacts/${encodeURIComponent(artifactId)}/external-leads`, lead));
+}
+
+export function updateExternalLead(
+  artifactId: string,
+  leadId: string,
+  update: ExternalLeadUpdate,
+): Promise<ExternalLead> {
+  return call(
+    http.patch<ExternalLead>(
+      `/artifacts/${encodeURIComponent(artifactId)}/external-leads/${encodeURIComponent(leadId)}`,
+      update,
+    ),
+  );
+}
+
+export function deleteExternalLead(artifactId: string, leadId: string): Promise<void> {
+  return call(
+    http.delete<void>(
+      `/artifacts/${encodeURIComponent(artifactId)}/external-leads/${encodeURIComponent(leadId)}`,
+    ),
+  );
+}
+
+/** The original or a derived file as an attachment, for manual upload to a search provider (M5). */
+export function downloadUrl(artifactId: string, derivedFileId?: string | null): string {
+  const base = derivedFileId ? derivedContentUrl(artifactId, derivedFileId) : contentUrl(artifactId);
+  return `${base}?download=true`;
 }

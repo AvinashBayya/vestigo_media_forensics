@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { ARTIFACT_ID, artifactDetail, artifactList, custodyReport, evidenceReport, health, jobHistoryItem, settingsResponse } from "./data";
+import { ARTIFACT_ID, LEADS_NOTICE, artifactDetail, artifactList, custodyReport, evidenceReport, health, jobHistoryItem, searchProviders, settingsResponse } from "./data";
 
 export const API = "/api/v1";
 
@@ -15,6 +15,10 @@ export const server = setupServer(
   http.get(`${API}/artifacts/${ARTIFACT_ID}`, () => HttpResponse.json(artifactDetail())),
   http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () => HttpResponse.json(evidenceReport())),
   http.get(`${API}/artifacts/:artifactId/custody`, () => HttpResponse.json(custodyReport())),
+  http.get(`${API}/search/providers`, () => HttpResponse.json(searchProviders())),
+  http.get(`${API}/artifacts/:artifactId/external-leads`, ({ params }) =>
+    HttpResponse.json({ artifact_id: params.artifactId, notice: LEADS_NOTICE, leads: [] }),
+  ),
   http.get(`${API}/health`, () => HttpResponse.json(health())),
   http.get(`${API}/settings`, () => HttpResponse.json(settingsResponse())),
   http.get(`${API}/library/summary`, () =>

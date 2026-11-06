@@ -21,6 +21,7 @@ import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
 import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { ChainOfCustodyPanel } from "../components/evidence/ChainOfCustodyPanel";
+import { ReverseImageSearchPanel } from "../components/evidence/ReverseImageSearchPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
 import { KeyframeOCRPanel } from "../components/evidence/KeyframeOCRPanel";
 import { KeyframePHashPanel } from "../components/evidence/KeyframePHashPanel";
@@ -351,6 +352,13 @@ export function ArtifactPage() {
               )}
               <MetadataPanel section={report.metadata} />
             </div>
+          )}
+          {artifact.media_type !== "audio" && (
+            <ReverseImageSearchPanel
+              artifactId={artifact.artifact_id}
+              mediaType={artifact.media_type}
+              keyframes={report?.keyframes ?? null}
+            />
           )}
           <ChainOfCustodyPanel
             artifactId={artifact.artifact_id}

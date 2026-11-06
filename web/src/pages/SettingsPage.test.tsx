@@ -66,6 +66,7 @@ describe("SettingsPage", () => {
       default_audio_analysis_options: { metadata: true, c2pa: true, duplicate_search: true },
       library_page_size: 50,
       auto_analyze_after_upload: false,
+      enabled_search_providers: [],
     });
 
     await user.click(screen.getByRole("link", { name: "Library" }));

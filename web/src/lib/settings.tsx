@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS: EditableSettings = {
   default_audio_analysis_options: { ...DEFAULT_AUDIO_OPTIONS },
   library_page_size: 25,
   auto_analyze_after_upload: true,
+  enabled_search_providers: [],
 };
 
 interface SettingsContextValue {
