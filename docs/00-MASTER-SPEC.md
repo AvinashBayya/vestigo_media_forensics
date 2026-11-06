@@ -9,7 +9,7 @@ This is the entry point to the docs. Detailed requirements live in docs 01–10;
 
 Build a local-first media provenance and verification web app that:
 
-- Accepts images (Milestone 1) and videos (Milestone 3).
+- Accepts images (Milestone 1), videos (Milestone 3), and audio files (D19).
 - Runs automated, explainable checks and extracts technical evidence.
 - Shows the method, tool, version, timestamp, source, limitations, and review state behind every result.
 - Leaves conclusions to a human analyst.
@@ -25,7 +25,10 @@ deceptive (see D2 in `09-DECISIONS.md`).
 - Frontend: React + Vite + TypeScript + Tailwind.
 - OCR: Tesseract.
 - Metadata and C2PA detection: ExifTool.
-- Video (Milestone 3): ffmpeg / ffprobe for media information, scene detection, and keyframes.
+- Video (Milestone 3): ffmpeg / ffprobe for media information, scene detection, keyframes, and
+  on-demand playable previews (D19).
+- Audio (D19): the same ffprobe / ExifTool toolchain, header-level inspection only — audio is never
+  decoded, transcribed, or identified.
 - Storage: local filesystem under `data/`.
 - DB: SQLite file at `data/app.db`.
 - Configuration via `.env` (`VESTIGO_*`); no hardcoded secrets.
@@ -82,14 +85,28 @@ See `04-EVIDENCE-MODEL.md`.
 
 Output: a structured JSON evidence report. See `11-BUILD-PLAN.md` §6.
 
-## 9. Later Milestones
+## 9. Milestone status
 
-See `06-ROADMAP.md`: analyst workflow (M2), video (M3), provenance and C2PA validation (M4), permission-gated
-reverse-image search (M5), GEOINT / geo-lite (M6), Vestigo integration (M7).
+Implemented (see `06-ROADMAP.md` and `09-DECISIONS.md` for the approved details):
 
-## 10. API Contract (Milestone 1)
+- **Milestone 1 — Image foundation** (`image.v1`: hashes, metadata, C2PA detection, pHash, OCR,
+  duplicate search). Plan: `11-BUILD-PLAN.md`.
+- **Milestone 2 — Analyst workflow** (Library, review workflow and history, evidence export package,
+  duplicate-library management, settings, Alembic migrations). Plan: `12-MILESTONE-2-PLAN.md`,
+  decisions D15–D16.
+- **Milestone 3 — Video foundation** (`video.v1`: hashes, ffprobe media info, metadata, scene
+  detection, keyframes, keyframe pHash, optional keyframe OCR, cross-media duplicate search). Plan:
+  `13-MILESTONE-3-PLAN.md`, decisions D17–D18.
+- **D19 additions**: rotated/mirrored duplicate matching, AVI/MPEG-TS/WMV/FLV/3GP/M4V containers,
+  audio artifacts (`audio.v1`: hashes, media info, metadata, byte-identical duplicate search), and
+  on-demand playable previews.
 
-Base URL: `http://localhost:8400/api/v1`
+Remaining: provenance and C2PA validation (M4), permission-gated reverse-image search (M5),
+GEOINT / geo-lite (M6), Vestigo integration (M7).
+
+## 10. API Contract
+
+Base URL: `http://localhost:8400/api/v1`. Milestone 1 endpoints:
 
 - `GET /health`
 - `POST /artifacts/upload`
@@ -102,7 +119,13 @@ Base URL: `http://localhost:8400/api/v1`
 - `GET /analysis/jobs/{job_id}`
 - `GET /artifacts/{artifact_id}/evidence` (`?job_id=`, `?download=true`)
 
-See `03-API-SPEC.md` and `11-BUILD-PLAN.md` §2.
+Added by Milestones 2–3 and D19 (all additive; details in `03-API-SPEC.md`): bulk and per-record
+review with history (`POST /artifacts/review`, `PATCH …/evidence/{id}/review`,
+`GET …/review-history`), analysis history (`GET …/jobs`), the evidence package (`GET …/export`),
+duplicate-library management (`PATCH …/duplicate-library`, `GET /library/summary`), settings
+(`GET`/`PATCH /settings`), video and audio analysis (`POST /analysis/video`, `POST /analysis/audio`),
+derived-file content (`GET …/derived/{id}/content`), and playable previews
+(`POST`/`GET …/preview`, `GET …/preview/content`).
 
 ## 11. Non-Functional Requirements
 
@@ -124,7 +147,7 @@ See `03-API-SPEC.md` and `11-BUILD-PLAN.md` §2.
 
 See `07-TEST-PLAN.md`.
 
-## 13. Milestone 1 Scope
+## 13. Milestone 1 Scope (historical — the approved M1 baseline)
 
 - Project skeleton and Dev Container setup.
 - Image upload, listing, preview, and deletion.
@@ -135,7 +158,10 @@ See `07-TEST-PLAN.md`.
 - Minimal React UI: upload, analysis progress, findings, review, download, delete.
 - Core tests.
 
-## 14. Out of Scope (Milestone 1)
+## 14. Out of Scope (Milestone 1 — historical)
+
+Several items below were later implemented under approved plans: video analysis (M3), audio
+artifacts and playable viewing previews (D19). The rest remain excluded until their milestone.
 
 - Verdicts or authenticity scores of any kind.
 - Login and multi-user authentication.

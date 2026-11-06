@@ -68,7 +68,13 @@ Users must be able to delete:
 - Derived files
 - Analysis jobs
 - Evidence records
+- Review events
+- Fingerprint index rows (image and keyframe)
+- Its playable preview, when one was created
 - Database rows
+
+Playable previews are kept only as long as their artifact and are removed with it; nothing is
+deleted automatically.
 
 ## 7. Logging
 

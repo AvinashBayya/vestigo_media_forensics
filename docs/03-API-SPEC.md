@@ -33,7 +33,12 @@ Response:
 
 ### `POST /artifacts/upload`
 
-Uploads an image.
+Uploads an image, video, or audio file. The type comes from the file's bytes, never its name:
+
+- Images: JPEG, PNG, WebP, TIFF.
+- Videos: MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, 3GP, M4V (`media_type: "video"`).
+- Audio: WAV, MP3, FLAC, OGG, M4A (`media_type: "audio"`; an MP4-family or Ogg file without a real
+  video stream is audio).
 
 Request:
 

@@ -104,6 +104,18 @@ Every evidence record must include:
 - Do not silently discard errors.
 - Do not claim external-service results are verified without validation.
 
+The implemented system keeps these specific honesty rules:
+
+- Embedded and container metadata is reported **as written**, never as verified truth; it is easy to
+  edit, and its absence proves nothing.
+- Video and audio **durations are container-reported**, not decode-verified measurements.
+- **OCR output is provisional** best-effort text (D14), never a verified transcription.
+- **Playable previews are derived viewing copies**, clearly labelled, excluded from the evidence
+  package, and never a substitute for the preserved original.
+- **Duplicate matches are similarity leads**, not proof of common origin: they say two artifacts look
+  alike (or are byte-identical), never which came first or that one was derived from the other.
+- No stage ever claims authenticity, manipulation, deepfake status, or location.
+
 ## 7. Deletion rule
 
 Deleting an artifact must delete:
