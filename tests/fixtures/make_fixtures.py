@@ -59,6 +59,11 @@ class FixtureSet:
     blank: Path
     invalid_c2pa: Path
     c2pa: Path
+    c2pa_signed_jpeg: Path
+    c2pa_signed_mp4: Path
+    c2pa_signed_wav: Path
+    c2pa_multi_manifest: Path
+    c2pa_tampered: Path
     gif: Path
     html_named_jpg: Path
     truncated_jpeg: Path
@@ -387,6 +392,158 @@ def build_video_fixtures(path) -> dict[str, Path]:
     }
 
 
+def build_c2pa_fixtures(path) -> dict[str, Path]:
+    """Locally signed C2PA fixtures (Milestone 4): a throwaway test CA signs a JPEG, an MP4, and a
+    WAV; one copy is byte-tampered after signing (hash mismatch -> invalid) and one is signed twice
+    (a two-manifest provenance chain). Certificates live only in the fixture folder."""
+    import json
+
+    import c2pa
+
+    certs = path("c2pa_certs")
+    certs.mkdir(exist_ok=True)
+
+    def openssl(*args: str) -> None:
+        subprocess.run(["openssl", *args], check=True, capture_output=True)
+
+    root_key, root_crt = certs / "root.key", certs / "root.crt"
+    signer_key, signer_csr = certs / "signer.key", certs / "signer.csr"
+    signer_crt, chain, pk8 = certs / "signer.crt", certs / "chain.pem", certs / "signer.pk8"
+    ext = certs / "ext.cnf"
+    openssl("ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", str(root_key))
+    openssl(
+        "req",
+        "-x509",
+        "-new",
+        "-key",
+        str(root_key),
+        "-sha256",
+        "-days",
+        "3650",
+        "-subj",
+        "/O=Vestigo Test/CN=Vestigo Test Root CA",
+        "-out",
+        str(root_crt),
+        "-addext",
+        "basicConstraints=critical,CA:TRUE",
+        "-addext",
+        "keyUsage=critical,keyCertSign,cRLSign",
+    )
+    openssl("ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", str(signer_key))
+    openssl(
+        "req",
+        "-new",
+        "-key",
+        str(signer_key),
+        "-subj",
+        "/O=Vestigo Test/CN=Vestigo Test Signer",
+        "-out",
+        str(signer_csr),
+    )
+    ext.write_text(
+        "basicConstraints=critical,CA:FALSE\n"
+        "keyUsage=critical,digitalSignature\n"
+        "extendedKeyUsage=critical,emailProtection\n"
+    )
+    openssl(
+        "x509",
+        "-req",
+        "-in",
+        str(signer_csr),
+        "-CA",
+        str(root_crt),
+        "-CAkey",
+        str(root_key),
+        "-CAcreateserial",
+        "-days",
+        "3650",
+        "-sha256",
+        "-extfile",
+        str(ext),
+        "-out",
+        str(signer_crt),
+    )
+    chain.write_bytes(signer_crt.read_bytes() + root_crt.read_bytes())
+    openssl("pkcs8", "-topk8", "-nocrypt", "-in", str(signer_key), "-out", str(pk8))
+
+    signer = c2pa.Signer.from_info(
+        c2pa.C2paSignerInfo(
+            alg=b"es256", sign_cert=chain.read_bytes(), private_key=pk8.read_bytes(), ta_url=None
+        )
+    )
+    manifest = json.dumps(
+        {
+            "claim_generator_info": [{"name": "Vestigo Test Fixture", "version": "1.0"}],
+            "title": "Vestigo C2PA fixture",
+            "assertions": [
+                {
+                    "label": "c2pa.actions",
+                    "data": {
+                        "actions": [
+                            {
+                                "action": "c2pa.created",
+                                "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
+                            }
+                        ]
+                    },
+                }
+            ],
+        }
+    )
+
+    def sign(
+        source: Path, target: Path, manifest_json: str = manifest, ingredient: Path | None = None
+    ) -> Path:
+        builder = c2pa.Builder(manifest_json)
+        if ingredient is not None:
+            with ingredient.open("rb") as parent:
+                builder.add_ingredient(
+                    json.dumps({"relationship": "parentOf", "instance_id": "parent-1"}),
+                    "image/jpeg",
+                    parent,
+                )
+        builder.sign_file(str(source), str(target), signer)
+        builder.close()
+        return target
+
+    sign(path("base.jpg"), path("c2pa_signed.jpg"))
+    sign(path("static.mp4"), path("c2pa_signed.mp4"))
+    sign(path("tone.wav"), path("c2pa_signed.wav"))
+    second_pass = json.dumps(
+        {
+            "claim_generator_info": [{"name": "Vestigo Test Fixture Second Pass", "version": "1.0"}],
+            "assertions": [
+                {
+                    "label": "c2pa.actions",
+                    "data": {
+                        "actions": [
+                            {"action": "c2pa.opened", "parameters": {"org.cai.ingredientIds": ["parent-1"]}},
+                            {"action": "c2pa.edited"},
+                        ]
+                    },
+                }
+            ],
+        }
+    )
+    sign(path("c2pa_signed.jpg"), path("c2pa_double.jpg"), second_pass, ingredient=path("c2pa_signed.jpg"))
+    signer.close()
+
+    # Flip two bytes of image data after signing: the manifest's data hash no longer matches.
+    tampered = bytearray(path("c2pa_signed.jpg").read_bytes())
+    index = len(tampered) - 2000
+    tampered[index] ^= 0xFF
+    tampered[index + 1] ^= 0xFF
+    path("c2pa_tampered.jpg").write_bytes(bytes(tampered))
+
+    return {
+        "c2pa_signed_jpeg": path("c2pa_signed.jpg"),
+        "c2pa_signed_mp4": path("c2pa_signed.mp4"),
+        "c2pa_signed_wav": path("c2pa_signed.wav"),
+        "c2pa_multi_manifest": path("c2pa_double.jpg"),
+        "c2pa_tampered": path("c2pa_tampered.jpg"),
+    }
+
+
 def build_fixtures(target: Path) -> FixtureSet:
     target.mkdir(parents=True, exist_ok=True)
     base = textured_image(seed=1)
@@ -437,8 +594,10 @@ def build_fixtures(target: Path) -> FixtureSet:
     path("bomb.png").write_bytes(png_with_dimensions(20_000, 20_000))
 
     videos = build_video_fixtures(path)
+    c2pa_files = build_c2pa_fixtures(path)
 
     return FixtureSet(
+        **c2pa_files,
         **videos,
         jpeg=path("base.jpg"),
         png=path("base.png"),
