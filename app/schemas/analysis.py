@@ -30,6 +30,7 @@ class VideoAnalysisOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     metadata: bool = True
+    c2pa: bool = True
     scene_detection: bool = True
     keyframe_ocr: bool = False
     duplicate_search: bool = True
@@ -42,6 +43,7 @@ class AudioAnalysisOptions(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     metadata: bool = True
+    c2pa: bool = True
     duplicate_search: bool = True
 
 

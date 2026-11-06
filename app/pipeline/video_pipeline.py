@@ -19,6 +19,12 @@ from app.pipeline.image_pipeline import HashesStage, MetadataStage
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
 from app.services import media_info
+from app.services.c2pa import (
+    C2PA_LIMITATIONS,
+    c2pa_validator_version,
+    manifest_payload,
+    read_manifest_store,
+)
 from app.services.duplicates import FrameHash, find_matches
 from app.services.keyframes import (
     DEDUPE_SECONDS,
@@ -89,6 +95,39 @@ class MediaInfoStage(AnalysisStage):
             raise StageFailure("FFPROBE_ERROR", f"ffprobe could not read the stored file: {exc}.") from None
         ctx.derived.write(self.name, "ffprobe_json", "ffprobe.json", probe.raw_output)
         return StageOutput(media_info.summarize(probe.data))
+
+
+class VideoC2PAStage(AnalysisStage):
+    name = "c2pa"
+    media_type = MediaType.VIDEO
+    method = (
+        "The file's C2PA manifest store is read and validated locally with the c2pa-python SDK: "
+        "manifest hashes, claim signatures, and timestamps are checked, and each manifest's claim "
+        "generator, signer certificate details, and assertions are summarised. No trust list is "
+        "configured and no network is used. Containers the validator does not support are reported "
+        "as unverifiable."
+    )
+    classification = EvidenceClassification.OBSERVED
+    source = "artifact:original"
+    tool_name = "c2pa-python"
+    option = "c2pa"
+    limitations = C2PA_LIMITATIONS
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return f"{c2pa_validator_version()}; Vestigo {__version__}"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        read = read_manifest_store(artifact.path)
+        if read.raw_report is not None:
+            ctx.derived.write(self.name, "c2pa_manifest_store", "manifest_store.json", read.raw_report)
+        return StageOutput(
+            {
+                "present": read.manifest_count > 0,
+                "manifest_labels": [manifest.label for manifest in read.manifests],
+                "details": {},
+                **manifest_payload(read),
+            }
+        )
 
 
 class SceneChangesStage(AnalysisStage):
@@ -452,6 +491,7 @@ VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoHashesStage(),
     MediaInfoStage(),
     VideoMetadataStage(),
+    VideoC2PAStage(),
     SceneChangesStage(),
     KeyframesStage(),
     KeyframePHashStage(),

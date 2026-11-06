@@ -13,7 +13,7 @@ Milestone 4 (06-ROADMAP.md).
 import json as _json
 import re
 import struct
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from importlib.metadata import version as _dist_version
 from pathlib import Path
 from typing import Any, Literal
@@ -413,3 +413,35 @@ def read_manifest_store(path: Path) -> ManifestReadResult:
         raw_report=raw,
         error=None,
     )
+
+
+# Shared by the image, video, and audio c2pa stages (M4). These sentences carry the honesty rules.
+C2PA_LIMITATIONS: tuple[str, ...] = (
+    "A 'valid' result means the manifest's hashes and claim signature verify for the data they "
+    "cover. It does NOT prove the media is truthful, accurate, or unmanipulated, and says nothing "
+    "about anything the manifest does not cover.",
+    "No trust list is configured: signature validity does not establish that the signer is who they "
+    "claim to be or that they are trustworthy (the validator reports signingCredential.untrusted "
+    "for every signer).",
+    "Absence of C2PA data is normal - most media has none and many platforms strip it. Absence does "
+    "NOT mean the media is fake, edited, or untrustworthy.",
+    "An invalid or unverifiable result shows the recorded reason; it may stem from re-encoding, "
+    "truncation, or an unsupported container, not necessarily deliberate tampering.",
+    "Manifests stored outside the file and referenced from XMP are not fetched; no network access "
+    "is used. The original file is never modified.",
+)
+
+
+def manifest_payload(read: ManifestReadResult) -> dict[str, Any]:
+    """The validation half of a c2pa stage payload (shared by image, video, and audio stages)."""
+    return {
+        "validation_performed": True,
+        "status": read.status,
+        "validation_state": read.validation_state,
+        "manifest_count": read.manifest_count,
+        "active_manifest": read.active_manifest,
+        "manifests": [asdict(manifest) for manifest in read.manifests],
+        "validation_codes": read.validation_codes,
+        "validator": c2pa_validator_version(),
+        "validator_error": read.error,
+    }

@@ -10,7 +10,12 @@ from dataclasses import asdict
 
 from app import __version__
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageOutput
-from app.pipeline.video_pipeline import MediaInfoStage, VideoHashesStage, VideoMetadataStage
+from app.pipeline.video_pipeline import (
+    MediaInfoStage,
+    VideoC2PAStage,
+    VideoHashesStage,
+    VideoMetadataStage,
+)
 from app.schemas.common import EvidenceClassification, MediaType
 from app.services.duplicates import find_matches
 from app.services.phash import FINGERPRINT_ALGORITHM
@@ -33,6 +38,10 @@ class AudioMediaInfoStage(MediaInfoStage):
 
 
 class AudioMetadataStage(VideoMetadataStage):
+    media_type = MediaType.AUDIO
+
+
+class AudioC2PAStage(VideoC2PAStage):
     media_type = MediaType.AUDIO
 
 
@@ -80,5 +89,6 @@ AUDIO_STAGES: tuple[AnalysisStage, ...] = (
     AudioHashesStage(),
     AudioMediaInfoStage(),
     AudioMetadataStage(),
+    AudioC2PAStage(),
     AudioDuplicatesStage(),
 )

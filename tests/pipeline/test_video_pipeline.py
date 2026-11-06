@@ -120,9 +120,10 @@ def test_video_report_sections(client: TestClient, fixtures: FixtureSet) -> None
     assert media_info["provenance"]["stage"] == "media_info"
     assert media_info["provenance"]["tool"] == "ffprobe"
     assert media_info["provenance"]["classification"] == "OBSERVED"
-    # Image-only sections are null for a video job (duplicates is shared by both pipelines).
-    for section in ("c2pa", "perceptual_hash", "ocr"):
+    # Image-only sections are null for a video job (duplicates and c2pa are shared by all pipelines).
+    for section in ("perceptual_hash", "ocr"):
         assert report[section] is None, section
+    assert report["c2pa"] is not None  # validated for videos since Milestone 4
     assert report["hashes"]["sha256"]
     assert report["artifact"]["duration_seconds"] == pytest.approx(9.0, abs=0.1)
 
@@ -164,6 +165,7 @@ def test_video_defaults_from_settings_apply_when_options_are_omitted(
             json={
                 "default_video_analysis_options": {
                     "metadata": False,
+                    "c2pa": True,
                     "scene_detection": True,
                     "keyframe_ocr": False,
                     "duplicate_search": True,
@@ -185,6 +187,7 @@ def test_video_jobs_appear_in_history_with_their_options(client: TestClient, fix
     assert job["pipeline"] == "video.v1"
     assert job["options"] == {
         "metadata": True,
+        "c2pa": True,
         "scene_detection": True,
         "keyframe_ocr": True,
         "duplicate_search": True,

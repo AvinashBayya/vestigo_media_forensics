@@ -9,7 +9,13 @@ from app.models import EvidenceRecord, ImageFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
-from app.services.c2pa import detect_c2pa
+from app.services.c2pa import (
+    C2PA_LIMITATIONS,
+    c2pa_validator_version,
+    detect_c2pa,
+    manifest_payload,
+    read_manifest_store,
+)
 from app.services.duplicates import FrameHash, find_matches
 from app.services.hashing import hash_file, hashlib_version
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
@@ -114,39 +120,49 @@ class C2PAStage(AnalysisStage):
     name = "c2pa"
     media_type = MediaType.IMAGE
     method = (
-        "Detection only. A byte-level scan of the file container (JPEG APP11 segments, PNG caBX chunks, "
-        "WebP C2PA chunks, TIFF tag 52545) looks for a JUMBF box of type 'c2pa', and ExifTool decodes "
-        "any JUMBF boxes and the claim data inside them. The two checks are reported separately."
+        "A byte-level scan of the file container (JPEG APP11 segments, PNG caBX chunks, WebP C2PA "
+        "chunks, TIFF tag 52545) looks for a JUMBF box of type 'c2pa', and ExifTool decodes any JUMBF "
+        "boxes and the claim data inside them. The manifest store is then read and validated locally "
+        "with the c2pa-python SDK: manifest hashes, claim signatures, and timestamps are checked, and "
+        "each manifest's claim generator, signer certificate details, and assertions are summarised. "
+        "No trust list is configured and no network is used."
     )
     classification = EvidenceClassification.OBSERVED
     source = "artifact:original"
     tool_name = "ExifTool + Vestigo byte-level scan"
     option = "c2pa"
-    limitations = (
-        "Detection only: signatures, certificate chains, timestamps, and hash bindings are NOT validated "
-        "in Milestone 1. A detected manifest may be invalid, altered, or signed by an untrusted party.",
-        "A detected manifest is not proof that the content is authentic or that its claims are true.",
-        "Absence of a manifest is normal (most images have none, and many platforms remove them) and "
-        "proves nothing.",
-        "Manifests stored outside the file and referenced from XMP are not fetched; no network access "
-        "is used.",
-    )
+    limitations = C2PA_LIMITATIONS
 
     def tool_version(self, ctx: StageContext) -> str:
-        return f"ExifTool {ctx.tools.require('exiftool').version}; Vestigo {__version__}"
+        return (
+            f"{c2pa_validator_version()}; ExifTool {ctx.tools.require('exiftool').version}; "
+            f"Vestigo {__version__}"
+        )
 
     def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
         tool = ctx.tools.require("exiftool")
         detection = detect_c2pa(tool, artifact.path, artifact.mime_type, ctx.settings.tool_timeout_seconds)
         ctx.derived.write(self.name, "exiftool_c2pa_json", "exiftool.json", detection.raw_output)
+        read = read_manifest_store(artifact.path)
+        if read.raw_report is not None:
+            ctx.derived.write(self.name, "c2pa_manifest_store", "manifest_store.json", read.raw_report)
+        warnings = [StageError(type="C2PA_STRUCTURE_WARNING", message=text) for text in detection.warnings]
+        if detection.present and read.status == "unverifiable":
+            warnings.append(
+                StageError(
+                    type="C2PA_VALIDATION_UNAVAILABLE",
+                    message=f"C2PA data was detected but could not be validated: {read.error}.",
+                )
+            )
+        labels = [manifest.label for manifest in read.manifests] or detection.manifest_labels
         return StageOutput(
             {
-                "present": detection.present,
-                "validation_performed": False,
-                "manifest_labels": detection.manifest_labels,
+                "present": detection.present or read.manifest_count > 0,
+                "manifest_labels": labels,
                 "details": detection.details,
+                **manifest_payload(read),
             },
-            warnings=[StageError(type="C2PA_STRUCTURE_WARNING", message=text) for text in detection.warnings],
+            warnings=warnings,
         )
 
 

@@ -18,11 +18,12 @@ DEFAULT_OPTIONS = {"metadata": True, "c2pa": True, "ocr": True, "duplicate_searc
 # Keyframe OCR is off by default (decision M3-3).
 DEFAULT_VIDEO_OPTIONS = {
     "metadata": True,
+    "c2pa": True,
     "scene_detection": True,
     "keyframe_ocr": False,
     "duplicate_search": True,
 }
-DEFAULT_AUDIO_OPTIONS = {"metadata": True, "duplicate_search": True}
+DEFAULT_AUDIO_OPTIONS = {"metadata": True, "c2pa": True, "duplicate_search": True}
 
 
 def test_defaults_and_environment(client: TestClient, settings: Settings) -> None:

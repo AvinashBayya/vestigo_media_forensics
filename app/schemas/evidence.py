@@ -71,11 +71,37 @@ class MetadataSection(BaseModel):
     provenance: Provenance
 
 
+class C2PAManifestInfo(BaseModel):
+    """One manifest in the store (M4): who claims to have produced it and how it was signed."""
+
+    label: str
+    title: str | None = None
+    claim_generator: str | None = None
+    signature_issuer: str | None = None
+    signature_common_name: str | None = None
+    signature_cert_serial: str | None = None
+    signature_time: str | None = None
+    signature_algorithm: str | None = None
+    assertion_labels: list[str] = []
+    ingredient_count: int = 0
+
+
 class C2PASection(BaseModel):
     present: bool | None
-    validation_performed: Literal[False] = False
+    # False on records made before Milestone 4 (detection only); True since local validation (D20).
+    validation_performed: bool = False
     manifest_labels: list[str]
     details: dict[str, Any]
+    # Vestigo's summary of the validator outcome: valid, invalid, unverifiable, or absent.
+    # "Valid" means hashes and signature verify - never that content is truthful or the signer trusted.
+    status: Literal["valid", "invalid", "unverifiable", "absent"] | None = None
+    validation_state: str | None = None
+    manifest_count: int | None = None
+    active_manifest: str | None = None
+    manifests: list[C2PAManifestInfo] = []
+    validation_codes: dict[str, list[dict[str, str | None]]] | None = None
+    validator: str | None = None
+    validator_error: str | None = None
     provenance: Provenance
 
 

@@ -82,8 +82,17 @@ def _metadata(payload: dict[str, Any], provenance: Provenance) -> MetadataSectio
 def _c2pa(payload: dict[str, Any], provenance: Provenance) -> C2PASection:
     return C2PASection(
         present=payload.get("present"),
+        validation_performed=payload.get("validation_performed", False),
         manifest_labels=payload.get("manifest_labels", []),
         details=payload.get("details", {}),
+        status=payload.get("status"),
+        validation_state=payload.get("validation_state"),
+        manifest_count=payload.get("manifest_count"),
+        active_manifest=payload.get("active_manifest"),
+        manifests=payload.get("manifests", []),
+        validation_codes=payload.get("validation_codes"),
+        validator=payload.get("validator"),
+        validator_error=payload.get("validator_error"),
         provenance=provenance,
     )
 

@@ -53,7 +53,13 @@ def test_audio_pipeline_runs_header_level_stages_only(
     job = client.get(f"/api/v1/analysis/jobs/{job_id}").json()
     assert job["pipeline"] == "audio.v1"
     assert job["status"] == "completed"
-    assert [stage["stage"] for stage in job["stages"]] == ["hashes", "media_info", "metadata", "duplicates"]
+    assert [stage["stage"] for stage in job["stages"]] == [
+        "hashes",
+        "media_info",
+        "metadata",
+        "c2pa",
+        "duplicates",
+    ]
 
     report = client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json()
     assert report["hashes"]["sha256"]
@@ -141,7 +147,9 @@ def test_audio_metadata_can_be_disabled_via_saved_defaults(
     assert (
         client.patch(
             "/api/v1/settings",
-            json={"default_audio_analysis_options": {"metadata": False, "duplicate_search": True}},
+            json={
+                "default_audio_analysis_options": {"metadata": False, "c2pa": True, "duplicate_search": True}
+            },
         ).status_code
         == 200
     )
