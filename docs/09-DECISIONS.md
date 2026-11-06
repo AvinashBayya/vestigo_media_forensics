@@ -251,3 +251,29 @@ default on).
   `tests/fixtures/make_fixtures.py` (valid JPEG/MP4/WAV, a two-manifest chain, and a byte-tampered
   copy), plus one real public Content Credentials sample. Originals are never modified by analysis;
   signing happens only in the fixture builder.
+
+## D21 — Milestone 4 part 2: chain of custody and derived-file lineage
+
+Implemented 2026-11-06 (approved plan `14-MILESTONE-4B-PLAN.md`, decisions M4B-1…7 confirmed by the
+user, including: timeline granularity is jobs and major actions, never per-stage records; the
+lineage tree lives inside the Chain of custody panel).
+
+- **Honest definition.** The chain of custody is what Vestigo recorded on this machine since
+  upload. It is not a legal chain of custody, says nothing about the file before upload, and never
+  infers or backfills events: exports and duplicate-library changes made before revision 0005 were
+  not recorded anywhere and do not appear — the notice says so.
+- **Schema (Alembic 0005, schema_version 5, additive).** `custody_events` is append-only (database
+  triggers, cascade-delete with the artifact) and records only the three actions that previously
+  left no trace: evidence-package export (package SHA-256, original_included, counts),
+  duplicate-library changes (before/after; a no-op save records nothing), and preview creation
+  (once; the idempotent path records nothing). `derived_files` gains nullable `source_kind` and
+  `source_derived_file_id`; keyframe-OCR TSVs point at the exact keyframe thumbnail they read,
+  everything else records "original", and pre-0005 rows stay NULL ("source not recorded").
+- **API.** `GET /artifacts/{id}/custody` merges upload, jobs (started/finished with evidence and
+  derived-file counts), review changes (states and whether notes changed; note text stays in the
+  review history), and custody events into one chronological timeline, each entry naming its source
+  table, plus every derived file with its lineage. The export package gains `custody.json`, hashed
+  in the manifest; a package is built before its own export event is recorded, so each export
+  appears in the next package's custody.json (stated in the README inside the package).
+- **UI.** One Chain of custody panel on the artifact page (no separate page): notice, timeline,
+  and the indented lineage tree. `DeletionSummary` counts `custody_events`; deletion removes them.

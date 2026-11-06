@@ -66,6 +66,13 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 - The validator's raw manifest-store report is kept as an auditable derived file, exported in the evidence package and deleted with the artifact
 - Honesty rules: valid never means truthful or trusted (no trust list is configured, and the standing `signingCredential.untrusted` code stays visible); absence proves nothing
 
+### Milestone 4 part 2 — Chain of custody (D21)
+
+- A Chain of custody panel on every artifact page: what Vestigo recorded on this machine since upload — upload, analyses, review changes, exports, duplicate-library changes, and preview creation — merged chronologically, each entry naming the table it came from
+- Honest by construction: not a legal chain of custody, nothing about the file before upload, and nothing inferred — actions from before schema revision 0005 that were never recorded do not appear, and the notice says so
+- Derived-file lineage: every new derived file records what it was read from (a keyframe-OCR TSV points at its exact keyframe thumbnail); older rows read "source not recorded", never guessed
+- `GET /artifacts/{id}/custody`, custody.json in the evidence export package (hashed in the manifest), an append-only custody_events table (Alembic 0005), and custody events counted in deletion
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
@@ -92,7 +99,6 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 
 - Reverse-image search integrations
 - GEOINT / geo-lite analysis
-- Chain-of-custody view and derived-file relationships (rest of Milestone 4)
 - Optional Vestigo integration through a versioned evidence API
 
 ## Tech stack
@@ -203,6 +209,14 @@ With both servers running, open http://localhost:5180.
 4. **Audio.** Upload a WAV/MP3/FLAC/OGG/M4A: it plays in the built-in audio player, with media information (codec, channels, sample rate, container-reported duration) and ID3/container metadata as evidence. Upload the identical file again: duplicate search reports "Same file (identical bytes)". Re-encode it (e.g. WAV → MP3) and upload: no match, and the evidence's limitations explain that only byte-identical audio matches.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
+
+## Manual test of the chain of custody (M4B)
+
+1. **Timeline.** Open any artifact: the Chain of custody panel lists the upload and each analysis with its record and file counts, and states it is not a legal chain of custody. Change the review state, exclude the artifact from the duplicate library, or export the evidence package — the timeline gains one factual line per action (reload or switch jobs to refresh after an export).
+2. **Lineage.** On a video analysed with keyframe OCR, the lineage tree shows the TSVs indented under the exact keyframe thumbnails they were read from; everything else sits directly under "original upload".
+3. **Export.** Unzip an evidence package: `custody.json` is listed in `manifest.json` and `SHA256SUMS`. Export twice — the second package's custody.json contains the first export with its package SHA-256, and never its own.
+4. **No invented history.** A no-op library save adds nothing; artifacts analysed before this version show their derived files with "source not recorded".
+5. **Deletion.** Delete an artifact: the deletion summary counts its custody events, and they are gone with everything else.
 
 ## Manual test of Milestone 4 (C2PA)
 

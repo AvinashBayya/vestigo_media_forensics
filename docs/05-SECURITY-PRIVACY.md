@@ -74,6 +74,7 @@ Users must be able to delete:
 - Review events
 - Fingerprint index rows (image and keyframe)
 - Its playable preview, when one was created
+- Custody events (append-only until the artifact itself is deleted)
 - Database rows
 
 Playable previews are kept only as long as their artifact and are removed with it; nothing is

@@ -353,6 +353,30 @@ served by the derived-content endpoint, included in the evidence package, and de
 artifact. Detected-but-unreadable C2PA data makes the stage `partial` with warning code
 `C2PA_VALIDATION_UNAVAILABLE`; an invalid manifest is a finding, not a stage failure.
 
+## Milestone 4 part 2 — Chain of custody (D21)
+
+### `GET /artifacts/{artifact_id}/custody`
+
+The chain of custody Vestigo recorded on this machine since upload, merged chronologically at read
+time from the existing tables plus `custody_events` — nothing duplicated, inferred, or backfilled.
+Response: `{artifact_id, notice, events, derived_files}`.
+
+- `events`: `{type, at, source_table, detail}`, oldest first. Types: `uploaded` (filename, media
+  type, size, SHA-256), `analysis_started` / `analysis_finished` per job (pipeline, status,
+  evidence-record and derived-file counts; one entry per job, never per stage), `review_changed`
+  (origin, states, whether notes changed — the note text stays in the review history), `exported`
+  (package SHA-256, `original_included`, counts), `library_changed` (before/after), and
+  `preview_created` (the viewing copy's hash and dimensions). Exports and library changes from
+  before schema revision 0005 were never recorded and do not appear; the `notice` says so.
+- `derived_files`: every derived file with `source_kind` (`"original"`, `"derived_file"`, or null
+  for pre-0005 rows, reported as "source not recorded") and `source_derived_file_id` (a
+  keyframe-OCR TSV points at the exact keyframe thumbnail it read).
+
+The evidence export package gains `custody.json` (the same report), hashed in `manifest.json` and
+`SHA256SUMS`. A package is built before its own export event is recorded, so each export appears in
+the next package's custody.json. `DeletionSummary` adds `custody_events`; the table is append-only
+(database triggers) and cascade-deletes with the artifact.
+
 ## Review state values
 
 - `UNREVIEWED`

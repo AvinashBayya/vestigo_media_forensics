@@ -222,7 +222,29 @@ Frontend:
   version, and renders on image, video, and audio pages; pre-M4 records render as detection-only.
 - The `c2pa` check appears in the upload options and settings defaults for video and audio.
 
-## 9. Container tests
+## 9. Milestone 4 part 2 tests (chain of custody, D21)
+
+Backend:
+
+- custody_events is append-only (updates and deletes rejected by triggers) until the artifact's
+  cascade delete; v1/v2 databases upgrade in place to schema_version 5 with every row unchanged;
+  derived-file source columns are NULL on pre-0005 rows and foreign-key-checked on new ones.
+- Every recording point: a successful export records the package SHA-256 and original_included
+  (and each export appears in the next package's custody.json, never its own); the library toggle
+  records before/after and a no-op save records nothing; preview creation records once and the
+  idempotent path records nothing.
+- Lineage: keyframe-OCR TSVs point at the exact keyframe thumbnail they read; every other derived
+  file records "original".
+- The custody timeline merges upload, jobs (with evidence and derived-file counts), review changes
+  (note text never included), and custody events chronologically, each entry naming its source
+  table; invalid and unknown artifact ids return 404.
+- custody.json is in the export package with a verified hash; deletion removes custody events and
+  counts them in the deletion summary.
+
+Frontend: the panel shows the honesty notice, one factual line per event type, the indented
+lineage tree, "source not recorded" for pre-0005 rows, and a load error with retry.
+
+## 10. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

@@ -1,6 +1,8 @@
-# Milestone 4 (part 2) Build Plan — Chain of Custody and Derived-File Relationships (DRAFT)
+# Milestone 4 (part 2) Build Plan — Chain of Custody and Derived-File Relationships (approved)
 
-**Status: draft — awaiting approval. Nothing below is implemented.**
+Approved: 2026-11-06 (the user confirmed all proposed decisions, choosing jobs-level timeline
+granularity and the lineage tree inside the panel). Implemented: 2026-11-06 (decision record in
+`09-DECISIONS.md` D21).
 
 The C2PA validation and provenance half of Milestone 4 is complete (D20). This plan covers the
 remaining roadmap scope: the **chain-of-custody view** and **derived-file relationship tracking**,

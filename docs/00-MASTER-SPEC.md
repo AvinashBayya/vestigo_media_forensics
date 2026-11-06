@@ -101,13 +101,14 @@ Implemented (see `06-ROADMAP.md` and `09-DECISIONS.md` for the approved details)
 - **D19 additions**: rotated/mirrored duplicate matching, AVI/MPEG-TS/WMV/FLV/3GP/M4V containers,
   audio artifacts (`audio.v1`: hashes, media info, metadata, byte-identical duplicate search), and
   on-demand playable previews.
-- **Milestone 4 (first part) — C2PA validation and provenance** (D20): local manifest validation
-  in all three pipelines with a four-way outcome (valid / invalid / unverifiable / absent),
-  per-manifest signer and assertion summaries, the raw manifest store as a derived file, and a
-  provenance panel in the UI.
+- **Milestone 4 — Provenance** (D20, D21): local C2PA manifest validation in all three pipelines
+  with a four-way outcome (valid / invalid / unverifiable / absent), per-manifest signer and
+  assertion summaries, the raw manifest store as a derived file, and a provenance panel in the UI;
+  plus the chain of custody (D21) — an append-only custody_events table, derived-file lineage,
+  `GET /artifacts/{id}/custody`, custody.json in the export package, and the Chain of custody panel.
 
-Remaining: the rest of M4 (chain-of-custody view, derived-file relationship tracking),
-permission-gated reverse-image search (M5), GEOINT / geo-lite (M6), Vestigo integration (M7).
+Remaining: permission-gated reverse-image search (M5), GEOINT / geo-lite (M6), Vestigo
+integration (M7).
 
 ## 10. API Contract
 

@@ -63,6 +63,8 @@ playable previews all use the existing ffmpeg/ffprobe, ExifTool, Pillow, and ima
   version string reported at runtime.
 - Test fixtures are signed with a throwaway ES256 CA created by `openssl` (already in the
   container); no signing library is a runtime dependency.
+- The chain of custody (M4B, D21) added no dependencies: Alembic 0005, SQLite triggers, and the
+  existing FastAPI/SQLAlchemy/React toolchain.
 
 ## Future dependencies
 

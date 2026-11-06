@@ -179,3 +179,21 @@ never silently left out.
   `C2PA_VALIDATION_UNAVAILABLE` and the validator's error. Records made before M4 keep
   `validation_performed: false` and still render as detection-only.
 
+## 12. Chain of custody (Milestone 4 part 2, D21)
+
+- The chain of custody is **what Vestigo recorded on this machine since upload** — never a legal
+  chain of custody, never anything about the file before upload, and never inferred or backfilled.
+- `custody_events` (append-only, like review events) records only the actions no other table holds:
+  evidence-package exports (package SHA-256, whether the original was included), duplicate-library
+  changes (before/after; no-ops record nothing), and preview creation. Upload, jobs, evidence, and
+  review changes stay in their own tables; `GET /artifacts/{id}/custody` merges all sources at read
+  time, one entry per job rather than per stage, each entry naming its source table.
+- Every derived file records its source: the original upload, or the exact derived file it was read
+  from (a keyframe-OCR TSV points at its keyframe thumbnail). Rows from before revision 0005 have
+  no recorded source and are reported as such, never guessed.
+- The export package carries `custody.json`, hashed in the manifest like every other file. A
+  package is built before its own export event is recorded, so each export appears in the *next*
+  package's custody.json; the package README states this.
+- Custody events carry no note text (review notes stay in the review history) and no user identity
+  (single-analyst tool). Deletion removes them with the artifact and counts them.
+
