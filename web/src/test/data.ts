@@ -2,6 +2,7 @@ import type {
   ArtifactDetail,
   ArtifactList,
   ArtifactListItem,
+  C2PASection,
   HealthResponse,
   JobHistoryItem,
   SettingsResponse,
@@ -116,6 +117,36 @@ export function jobStatus(status: JobStatusResponse["status"], stages: StageStat
   };
 }
 
+export const VALIDATOR = "c2pa-python 0.38.1 (c2pa-rs 0.91.3)";
+
+/** A validated C2PA section (M4). Defaults to the usual case: no C2PA data in the file. */
+export function c2paSection(overrides: Partial<C2PASection> = {}): C2PASection {
+  return {
+    present: false,
+    validation_performed: true,
+    manifest_labels: [],
+    details: {
+      detectors: {
+        byte_scan: { found: false, container: "jpeg_app11", segments: 0, bytes: 0 },
+        exiftool: { found: false, jumbf_boxes: 0 },
+      },
+      manifests: [],
+      active_manifest_label: null,
+      xmp_provenance: null,
+    },
+    status: "absent",
+    validation_state: null,
+    manifest_count: 0,
+    active_manifest: null,
+    manifests: [],
+    validation_codes: { success: [], informational: [], failure: [] },
+    validator: VALIDATOR,
+    validator_error: null,
+    provenance: provenance("c2pa", { classification: "OBSERVED" }),
+    ...overrides,
+  };
+}
+
 export function evidenceReport(overrides: Partial<EvidenceReport> = {}): EvidenceReport {
   return {
     schema_version: "1.2",
@@ -139,21 +170,7 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
       composite: { Composite: { ImageSize: "640x480" } },
       provenance: provenance("metadata", { classification: "OBSERVED", tool: "ExifTool", tool_version: "13.25" }),
     },
-    c2pa: {
-      present: false,
-      validation_performed: false,
-      manifest_labels: [],
-      details: {
-        detectors: {
-          byte_scan: { found: false, container: "jpeg_app11", segments: 0, bytes: 0 },
-          exiftool: { found: false, jumbf_boxes: 0 },
-        },
-        manifests: [],
-        active_manifest_label: null,
-        xmp_provenance: null,
-      },
-      provenance: provenance("c2pa", { classification: "OBSERVED" }),
-    },
+    c2pa: c2paSection(),
     perceptual_hash: {
       algorithm: "pHash",
       bits: 64,
@@ -265,11 +282,12 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
       default_analysis_options: { metadata: true, c2pa: true, ocr: true, duplicate_search: true },
       default_video_analysis_options: {
         metadata: true,
+        c2pa: true,
         scene_detection: true,
         keyframe_ocr: false,
         duplicate_search: true,
       },
-      default_audio_analysis_options: { metadata: true, duplicate_search: true },
+      default_audio_analysis_options: { metadata: true, c2pa: true, duplicate_search: true },
       library_page_size: 25,
       auto_analyze_after_upload: true,
       ...editable,
@@ -319,7 +337,7 @@ export function videoDetail(overrides: Partial<ArtifactDetail> = {}): ArtifactDe
 
 export function videoReport(overrides: Partial<EvidenceReport> = {}): EvidenceReport {
   const base = evidenceReport({
-    c2pa: null,
+    c2pa: c2paSection({ details: {} }),
     perceptual_hash: null,
     ocr: null,
     media_info: {

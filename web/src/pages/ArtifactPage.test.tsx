@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { ARTIFACT_ID, JOB_ID, OTHER_ARTIFACT_ID, artifactDetail, evidenceReport, jobStatus, provenance } from "../test/data";
+import { ARTIFACT_ID, JOB_ID, OTHER_ARTIFACT_ID, artifactDetail, c2paSection, evidenceReport, jobStatus, provenance } from "../test/data";
 import { renderApp } from "../test/render";
 import { API, apiError, server } from "../test/server";
 
@@ -295,12 +295,12 @@ describe("ArtifactPage", () => {
     expect(within(duplicates).getByText(/Run the analysis again to search the current library/)).toBeInTheDocument();
   });
 
-  it("describes C2PA results as detection only", async () => {
+  it("describes pre-M4 C2PA records as detection only", async () => {
     server.use(
       http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, () =>
         HttpResponse.json(
           evidenceReport({
-            c2pa: {
+            c2pa: c2paSection({
               present: true,
               validation_performed: false,
               manifest_labels: ["contentauth:urn:uuid:1234"],
@@ -317,8 +317,11 @@ describe("ArtifactPage", () => {
                 ],
                 active_manifest_label: "contentauth:urn:uuid:1234",
               },
-              provenance: provenance("c2pa"),
-            },
+              status: null,
+              manifest_count: null,
+              validation_codes: null,
+              validator: null,
+            }),
           }),
         ),
       ),
@@ -328,6 +331,7 @@ describe("ArtifactPage", () => {
     const c2pa = await screen.findByRole("region", { name: "Content Credentials (C2PA)" });
     expect(within(c2pa).getByText(/manifest was found in the file/)).toBeInTheDocument();
     expect(within(c2pa).getByText(/not proof that the content is authentic/)).toBeInTheDocument();
+    expect(within(c2pa).getByText(/Run the analysis again to validate/)).toBeInTheDocument();
     expect(within(c2pa).getByText("present (not checked)")).toBeInTheDocument();
     expect(within(c2pa).getByText("make_test_images/0.16.1")).toBeInTheDocument();
   });

@@ -174,6 +174,7 @@ export interface BulkReviewResult {
 /** Video analysis options; keyframe OCR is off by default (M3-3). */
 export interface VideoAnalysisOptions {
   metadata: boolean;
+  c2pa: boolean;
   scene_detection: boolean;
   keyframe_ocr: boolean;
   duplicate_search: boolean;
@@ -182,6 +183,7 @@ export interface VideoAnalysisOptions {
 /** Audio options (D19): header-level stages only; no audio is ever decoded. */
 export interface AudioAnalysisOptions {
   metadata: boolean;
+  c2pa: boolean;
   duplicate_search: boolean;
 }
 
@@ -282,11 +284,49 @@ export interface C2PADetails {
   xmp_provenance?: string | null;
 }
 
+/**
+ * Vestigo's summary of the validator outcome (M4). "valid" means the manifest's hashes and claim
+ * signature verify — never that the content is truthful or the signer trusted.
+ */
+export type C2PAStatus = "valid" | "invalid" | "unverifiable" | "absent";
+
+/** One manifest as summarized by the validator (M4). */
+export interface C2PAManifestInfo {
+  label: string;
+  title: string | null;
+  claim_generator: string | null;
+  signature_issuer: string | null;
+  signature_common_name: string | null;
+  signature_cert_serial: string | null;
+  signature_time: string | null;
+  signature_algorithm: string | null;
+  assertion_labels: string[];
+  ingredient_count: number;
+}
+
+export interface C2PAValidationCode {
+  code: string | null;
+  explanation: string | null;
+}
+
+/** Grouped by the validator: "success", "informational", and "failure". */
+export type C2PAValidationCodes = Record<string, C2PAValidationCode[]>;
+
 export interface C2PASection {
   present: boolean | null;
-  validation_performed: false;
+  /** False on records made before Milestone 4, which detected manifests without validating them. */
+  validation_performed: boolean;
   manifest_labels: string[];
   details: C2PADetails;
+  /** All null on pre-M4 detection-only records. */
+  status: C2PAStatus | null;
+  validation_state: string | null;
+  manifest_count: number | null;
+  active_manifest: string | null;
+  manifests: C2PAManifestInfo[];
+  validation_codes: C2PAValidationCodes | null;
+  validator: string | null;
+  validator_error: string | null;
   provenance: Provenance;
 }
 

@@ -311,6 +311,7 @@ export function ArtifactPage() {
               {artifact.media_type === "audio" ? (
                 <>
                   <MediaInfoPanel section={report.media_info} />
+                  <C2PAPanel section={report.c2pa} />
                   <DuplicatesPanel
                     section={report.duplicates}
                     addedSince={viewingEarlier ? null : artifact.added_since_analysis}
@@ -320,6 +321,7 @@ export function ArtifactPage() {
               ) : artifact.media_type === "video" ? (
                 <>
                   <MediaInfoPanel section={report.media_info} />
+                  <C2PAPanel section={report.c2pa} />
                   <SceneChangesPanel section={report.scene_changes} />
                   <KeyframesPanel artifactId={artifact.artifact_id} section={report.keyframes} />
                   <DuplicatesPanel

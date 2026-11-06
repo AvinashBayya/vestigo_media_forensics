@@ -53,8 +53,8 @@ describe("Video artifact page", () => {
     expect(keyframes).toHaveTextContent("scene change (0.5788)");
     expect(keyframes).toHaveTextContent("8 of 8 selected frames extracted (limit 40)");
 
-    // Image-only panels are absent for a video.
-    expect(screen.queryByRole("region", { name: "Content Credentials (C2PA)" })).not.toBeInTheDocument();
+    // Content Credentials are validated for videos too (M4); image-only panels stay absent.
+    expect(screen.getByRole("region", { name: "Content Credentials (C2PA)" })).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Text in image (OCR)" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Perceptual hash" })).not.toBeInTheDocument();
   });

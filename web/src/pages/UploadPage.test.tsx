@@ -47,7 +47,8 @@ describe("UploadPage", () => {
     const ocr = screen.getByRole("checkbox", { name: "Text in keyframes (OCR, English, up to 10 frames)" });
     expect(ocr).not.toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Scene-change detection" })).toBeChecked();
-    expect(screen.queryByRole("checkbox", { name: "Content Credentials (C2PA) detection" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Content Credentials (C2PA) validation" })).toBeChecked();
+    expect(screen.queryByRole("checkbox", { name: "Text in image (OCR, English)" })).not.toBeInTheDocument();
     expect(screen.getByText(/keyframes, and keyframe perceptual hashes always run/)).toBeInTheDocument();
 
     await user.click(ocr);
@@ -56,6 +57,7 @@ describe("UploadPage", () => {
     await screen.findByRole("heading", { name: "harbour.jpg" });
     expect(posted).toEqual({
       metadata: true,
+      c2pa: true,
       scene_detection: true,
       keyframe_ocr: true,
       duplicate_search: true,
@@ -95,7 +97,7 @@ describe("UploadPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
     await screen.findByRole("heading", { name: "harbour.jpg" });
-    expect(posted).toEqual({ metadata: true, duplicate_search: true });
+    expect(posted).toEqual({ metadata: true, c2pa: true, duplicate_search: true });
   });
 
   it("rejects a video over the 500 MB limit without uploading", async () => {

@@ -58,11 +58,12 @@ describe("SettingsPage", () => {
       default_analysis_options: { metadata: true, c2pa: true, ocr: false, duplicate_search: true },
       default_video_analysis_options: {
         metadata: true,
+        c2pa: true,
         scene_detection: true,
         keyframe_ocr: false,
         duplicate_search: true,
       },
-      default_audio_analysis_options: { metadata: true, duplicate_search: true },
+      default_audio_analysis_options: { metadata: true, c2pa: true, duplicate_search: true },
       library_page_size: 50,
       auto_analyze_after_upload: false,
     });
@@ -224,7 +225,7 @@ describe("Settings applied elsewhere", () => {
     renderApp("/upload");
 
     await waitFor(() => expect(screen.getByRole("checkbox", { name: "Text in image (OCR, English)" })).not.toBeChecked());
-    expect(screen.getByRole("checkbox", { name: "Content Credentials (C2PA) detection" })).not.toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Content Credentials (C2PA) validation" })).not.toBeChecked();
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile());
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
 
