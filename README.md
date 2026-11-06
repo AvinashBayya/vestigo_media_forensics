@@ -58,6 +58,28 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 - On-demand playable previews: a video the browser cannot play can get a re-encoded viewing copy, clearly labelled, never part of the evidence
 - Clearer keyframe and keyframe-OCR panels: per-frame numbers, reasons, statuses, raw OCR output, and honest empty states
 
+## Supported formats and limits
+
+| Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
+|---|---|---|
+| Images | JPEG, PNG, WebP, TIFF | 50 MB (`VESTIGO_MAX_UPLOAD_BYTES`), 100 MP (`VESTIGO_MAX_IMAGE_PIXELS`) |
+| Videos | MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, 3GP, M4V | 500 MB (`VESTIGO_MAX_VIDEO_UPLOAD_BYTES`), 15 min (`VESTIGO_MAX_VIDEO_DURATION_SECONDS`), 4K per frame (`VESTIGO_MAX_VIDEO_PIXELS`) |
+| Audio | WAV, MP3, FLAC, OGG, M4A | 200 MB (`VESTIGO_MAX_AUDIO_UPLOAD_BYTES`), 2 h (`VESTIGO_MAX_AUDIO_DURATION_SECONDS`) |
+
+Analysis pipelines (every stage records method, tool, version, timestamps, source, limitations,
+errors, and review state):
+
+- `image.v1`: hashes → metadata → C2PA detection → perceptual hash → OCR → duplicate search
+- `video.v1`: hashes → media information (ffprobe) → metadata → scene detection → keyframes →
+  keyframe perceptual hashes → keyframe OCR (optional, off by default, ≤ 10 frames) → duplicate
+  search (keyframes vs. images and other videos' keyframes, including rotated and mirrored variants;
+  limit `VESTIGO_MAX_KEYFRAMES`, scene threshold `VESTIGO_SCENE_THRESHOLD`)
+- `audio.v1`: hashes → media information → metadata → duplicate search (byte-identical SHA-256 only —
+  no audio content is ever decoded or compared)
+
+Playable previews (videos only, on demand): one re-encoded H.264/AAC viewing copy per artifact,
+clearly labelled, excluded from the evidence package, kept until the artifact is deleted.
+
 ## Later phases
 
 - Reverse-image search integrations
@@ -206,7 +228,7 @@ vestigo-media-forensics/
 │   ├── schemas/          # Pydantic request/response schemas
 │   ├── services/         # tool wrappers, library, review, export, settings, reports
 │   ├── migrations/       # Alembic revisions (0001 = Milestone 1 baseline)
-│   └── pipeline/         # stage interface, image and video pipelines, job runner
+│   └── pipeline/         # stage interface, image/video/audio pipelines, job runner
 ├── web/                  # React + Vite + TypeScript + Tailwind frontend
 ├── tests/                # pytest suites and test fixtures
 ├── samples/              # local media for manual testing (gitignored)

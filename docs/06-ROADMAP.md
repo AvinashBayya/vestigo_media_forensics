@@ -2,6 +2,8 @@
 
 ## Milestone 1 — Image foundation
 
+**Status: complete** (approved plan `11-BUILD-PLAN.md`).
+
 Goal: reliable local image-analysis API and minimal UI.
 
 Scope:
@@ -22,6 +24,8 @@ FFmpeg and ffprobe are installed and verified during setup but are not invoked i
 
 ## Milestone 2 — Analyst workflow
 
+**Status: complete** (approved plan `12-MILESTONE-2-PLAN.md`, decisions D15–D16).
+
 Goal: make evidence easier to review and manage.
 
 Scope:
@@ -37,6 +41,11 @@ Scope:
 
 ## Milestone 3 — Video foundation
 
+**Status: complete**, closed 2026-11-06 after a documentation reconciliation pass (approved plan
+`13-MILESTONE-3-PLAN.md`, decisions D17–D18), including the approved D19 additions: rotated and
+mirrored duplicate matching, the AVI/MPEG-TS/WMV/FLV/3GP/M4V containers, audio artifacts with
+byte-identical duplicate search, and on-demand playable previews.
+
 Goal: add responsible video analysis.
 
 Scope:
@@ -50,6 +59,8 @@ Scope:
 - Video evidence report
 
 ## Milestone 4 — Provenance
+
+**Status: next.**
 
 Goal: strengthen origin and history analysis.
 
