@@ -125,6 +125,15 @@ Returns the complete evidence report.
   },
   "c2pa": {
     "present": false,
+    "validation_performed": true,
+    "status": "absent",
+    "validation_state": null,
+    "manifest_count": 0,
+    "active_manifest": null,
+    "manifests": [],
+    "validation_codes": {"success": [], "informational": [], "failure": []},
+    "validator": "c2pa-python 0.38.1 (c2pa-rs 0.91.3)",
+    "validator_error": null,
     "details": {}
   },
   "perceptual_hash": {
@@ -270,8 +279,8 @@ on the other media type).
 
 ### `POST /analysis/video`
 
-Queues the `video.v1` pipeline. Options: `metadata`, `scene_detection`, `keyframe_ocr`
-(default **false**, M3-3), `duplicate_search`. Hashes, media info, keyframes, and keyframe
+Queues the `video.v1` pipeline. Options: `metadata`, `c2pa` (default **true**, M4/D20),
+`scene_detection`, `keyframe_ocr` (default **false**, M3-3), `duplicate_search`. Hashes, media info, keyframes, and keyframe
 perceptual hashes always run. Omitted `options` use the saved `default_video_analysis_options`.
 
 ### `GET /artifacts/{id}/derived/{derived_file_id}/content`
@@ -306,7 +315,8 @@ duplicate searches also cover video keyframes, and vice versa (M3-4).
   and WAV, MP3, FLAC, OGG, M4A audio (`media_type: "audio"`, dimensions null, duration
   container-reported). New error codes: `INVALID_AUDIO`, `AUDIO_TOO_LONG`, `PREVIEW_FAILED`.
 - **`POST /analysis/audio`** queues `audio.v1` (hashes, media info, metadata, byte-identical
-  duplicate search); options `{metadata, duplicate_search}`; saved defaults in
+  duplicate search, plus C2PA validation since M4); options `{metadata, c2pa,
+  duplicate_search}`; saved defaults in
   `default_audio_analysis_options`. Audio duplicate matching is SHA-256 only, by design.
 - **Duplicate matches**: `frame_matches` entries add `rotation_degrees` (counter-clockwise) and
   `mirrored`, recording the orientation under which the pair matched; 0/false is an upright match.
@@ -316,6 +326,32 @@ duplicate searches also cover video keyframes, and vice versa (M3-4).
   `has_playable_preview`; `DeletionSummary` adds `preview_files`; the library summary's storage
   adds `preview_bytes`. Non-videos are refused with `WRONG_MEDIA_TYPE`.
 - **Settings environment** adds `max_audio_upload_bytes` and `max_audio_duration_seconds`.
+
+## Milestone 4 — C2PA validation (D20)
+
+The `c2pa` evidence section is shared by all three pipelines (`details` holds the image pipeline's
+detection results and is empty for video and audio). Since M4 it carries the local validation
+outcome:
+
+- `validation_performed` — `false` only on records made before M4 (detection only).
+- `status` — Vestigo's summary: `valid` | `invalid` | `unverifiable` | `absent`. `valid` means the
+  manifest's hashes and claim signature verify for the data they cover — never that the content is
+  truthful or the signer trusted (no trust list is configured).
+- `validation_state` — the SDK's own state, as reported.
+- `manifest_count`, `active_manifest`, and `manifests` — per manifest: `label`, `title`,
+  `claim_generator`, `signature_issuer`, `signature_common_name`, `signature_cert_serial`,
+  `signature_time`, `signature_algorithm`, `assertion_labels`, `ingredient_count`. All recorded as
+  written, not verified against any registry.
+- `validation_codes` — the validator's codes for the active manifest, grouped `success` /
+  `informational` / `failure` (the standing `signingCredential.untrusted` appears for every signer
+  because no trust list is configured).
+- `validator` — the exact validator version (`c2pa-python 0.38.1 (c2pa-rs 0.91.3)`).
+- `validator_error` — the recorded reason when `status` is `unverifiable`.
+
+The validator's raw manifest-store report is stored as a derived file (`manifest_store.json`),
+served by the derived-content endpoint, included in the evidence package, and deleted with the
+artifact. Detected-but-unreadable C2PA data makes the stage `partial` with warning code
+`C2PA_VALIDATION_UNAVAILABLE`; an invalid manifest is a finding, not a stage failure.
 
 ## Review state values
 

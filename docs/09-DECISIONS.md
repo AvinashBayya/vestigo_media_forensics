@@ -218,3 +218,36 @@ Approved 2026-11-04 as one pass, all additive; nothing existing was removed or r
   outside the OCR limit), keeps the provisional (D14) labelling prominent, and words an empty result
   as "no text was detected", never "the frame contains no text".
 
+
+## D20 — Milestone 4: local C2PA validation and provenance evidence
+
+Implemented 2026-11-06. The `c2pa` stage validates manifests instead of only detecting them, and it
+runs for images, videos, and audio (a new optional `c2pa` stage in `video.v1` and `audio.v1`,
+default on).
+
+- **Validator.** `c2pa-python` 0.38.1, which bundles the Rust c2pa-rs SDK 0.91.3. Validation is
+  entirely local: no trust list is configured and no network is used. The evidence records the exact
+  validator version string (`c2pa-python 0.38.1 (c2pa-rs 0.91.3)`).
+- **Four-way outcome.** Every record carries a Vestigo summary `status`: `valid` (hashes and claim
+  signature verify), `invalid` (data present but a check failed), `unverifiable` (data detected or
+  claimed but the validator could not read it, e.g. an unsupported container — recorded with the
+  validator's own error), or `absent`. The SDK's own `validation_state` and its grouped validation
+  codes (success / informational / failure) are stored verbatim.
+- **Honesty rules.** `valid` never means truthful, accurate, or unmanipulated, and without a trust
+  list it never establishes the signer's identity (the standing `signingCredential.untrusted` code
+  is surfaced, not hidden). Absence is normal and proves nothing. An invalid manifest is a finding,
+  not a stage failure; detected-but-unreadable C2PA data makes the stage `partial` with
+  `C2PA_VALIDATION_UNAVAILABLE`. Manifest names and certificate fields are recorded as written.
+- **Evidence.** Per manifest: claim generator, title, signer certificate issuer / common name /
+  serial / time / algorithm, assertion labels, and ingredient count, plus the manifest count and
+  active manifest. The validator's full manifest-store report is stored as a derived file
+  (`manifest_store.json`), so it is exported in the evidence package and deleted with the artifact
+  like any other derived evidence.
+- **Compatibility.** The report section grew additively; `validation_performed` stays `false` on
+  records made before M4 and the UI renders those as detection-only with a pointer to re-run. The
+  image stage keeps its byte-level and ExifTool detection alongside validation. No schema migration
+  was needed (payloads and derived files reuse the v4 schema).
+- **Fixtures.** Test media is signed by a throwaway OpenSSL ES256 CA built in
+  `tests/fixtures/make_fixtures.py` (valid JPEG/MP4/WAV, a two-manifest chain, and a byte-tampered
+  copy), plus one real public Content Credentials sample. Originals are never modified by analysis;
+  signing happens only in the fixture builder.

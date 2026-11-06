@@ -58,6 +58,14 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 - On-demand playable previews: a video the browser cannot play can get a re-encoded viewing copy, clearly labelled, never part of the evidence
 - Clearer keyframe and keyframe-OCR panels: per-frame numbers, reasons, statuses, raw OCR output, and honest empty states
 
+### Milestone 4 — C2PA validation and provenance (D20)
+
+- Content Credentials (C2PA) manifests are validated locally with c2pa-python 0.38.1 (c2pa-rs SDK 0.91.3) for images, videos, and audio — no network, no modification of the original
+- Four-way outcome: **valid** (hashes and claim signature verify), **invalid**, **unverifiable** (with the recorded reason), or **absent**
+- Per manifest: claim generator, signer certificate details, signature time and algorithm, assertion labels, and ingredient count — recorded as written, not verified against any registry
+- The validator's raw manifest-store report is kept as an auditable derived file, exported in the evidence package and deleted with the artifact
+- Honesty rules: valid never means truthful or trusted (no trust list is configured, and the standing `signingCredential.untrusted` code stays visible); absence proves nothing
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
@@ -69,12 +77,12 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 Analysis pipelines (every stage records method, tool, version, timestamps, source, limitations,
 errors, and review state):
 
-- `image.v1`: hashes → metadata → C2PA detection → perceptual hash → OCR → duplicate search
-- `video.v1`: hashes → media information (ffprobe) → metadata → scene detection → keyframes →
+- `image.v1`: hashes → metadata → C2PA detection and validation → perceptual hash → OCR → duplicate search
+- `video.v1`: hashes → media information (ffprobe) → metadata → C2PA validation (optional, default on) → scene detection → keyframes →
   keyframe perceptual hashes → keyframe OCR (optional, off by default, ≤ 10 frames) → duplicate
   search (keyframes vs. images and other videos' keyframes, including rotated and mirrored variants;
   limit `VESTIGO_MAX_KEYFRAMES`, scene threshold `VESTIGO_SCENE_THRESHOLD`)
-- `audio.v1`: hashes → media information → metadata → duplicate search (byte-identical SHA-256 only —
+- `audio.v1`: hashes → media information → metadata → C2PA validation (optional, default on) → duplicate search (byte-identical SHA-256 only —
   no audio content is ever decoded or compared)
 
 Playable previews (videos only, on demand): one re-encoded H.264/AAC viewing copy per artifact,
@@ -84,8 +92,7 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 
 - Reverse-image search integrations
 - GEOINT / geo-lite analysis
-- C2PA validation and provenance reporting
-- Chain-of-custody view and derived-file relationships (Milestone 4)
+- Chain-of-custody view and derived-file relationships (rest of Milestone 4)
 - Optional Vestigo integration through a versioned evidence API
 
 ## Tech stack
@@ -94,6 +101,7 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 - Database: SQLite
 - Frontend: React + Vite + TypeScript
 - Media tooling: ExifTool, Tesseract OCR, FFmpeg, ffprobe
+- C2PA validation: c2pa-python 0.38.1 (c2pa-rs SDK 0.91.3), entirely local
 - Container: Docker Dev Container
 
 ## Ports
@@ -196,9 +204,18 @@ With both servers running, open http://localhost:5180.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
 
+## Manual test of Milestone 4 (C2PA)
+
+1. **Signed media.** Build the fixtures (`python -m tests.fixtures.make_fixtures`, which writes to `samples/generated/`) and upload `samples/generated/c2pa_signed.jpg`, `c2pa_signed.mp4`, or `c2pa_signed.wav`: the Content Credentials panel shows **Valid** with the test signer's details, the assertion labels, the `signingCredential.untrusted` code (no trust list), and the caveat that valid never means truthful.
+2. **Tampered copy.** Upload `samples/generated/c2pa_tampered.jpg`: the panel shows **Invalid** with the recorded hash-mismatch code, worded as a finding, not a tampering verdict.
+3. **Two manifests.** Upload `samples/generated/c2pa_double.jpg`: the panel lists both manifests with the active one flagged and the ingredient chain counted.
+4. **Ordinary media.** Upload any unsigned photo, video, or audio file: the panel shows **Absent** and explains that absence proves nothing.
+5. **Audit trail.** Export the evidence package: `manifest_store.json` is inside with a verified hash. Delete the artifact: the raw report is removed with everything else.
+6. **Option.** Untick "Content Credentials (C2PA) validation" when uploading a video or audio file (or in Settings defaults): the stage is skipped with a recorded reason.
+
 ## Limitations
 
-- C2PA / Content Credentials are **detected, not validated**. Signatures, certificates, and hash bindings are not checked until Milestone 4 (video C2PA is also Milestone 4).
+- A **valid** C2PA / Content Credentials result means the manifest's hashes and claim signature verify — never that the content is truthful, accurate, or unmanipulated. No trust list is configured, so the signer's identity is not established. Absence of C2PA data proves nothing; most media has none and many platforms strip it.
 - OCR is best-effort and English only; its output is provisional, not a verified transcription (D14). Keyframe OCR reads at most 10 sampled frames.
 - Duplicate search covers only artifacts in the local library, as it was when each analysis ran. Video matching compares sampled keyframes (including rotated and mirrored variants); content between keyframes is not searched.
 - Audio duplicate search is byte-identical only: a re-encoded copy of the same recording will not match, because no audio content is ever decoded or compared.

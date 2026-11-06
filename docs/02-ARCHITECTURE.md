@@ -93,7 +93,7 @@ upload
 → store original
 → calculate SHA-256 and MD5
 → extract EXIF / XMP / IPTC
-→ detect C2PA / Content Credentials
+→ detect and validate C2PA / Content Credentials (validation since M4, D20)
 → generate perceptual hash
 → run OCR
 → search local duplicates

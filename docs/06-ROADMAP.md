@@ -60,16 +60,20 @@ Scope:
 
 ## Milestone 4 — Provenance
 
-**Status: next.**
+**Status: C2PA validation and provenance evidence complete** (2026-11-06, decision D20): local
+manifest validation with c2pa-python for images, videos, and audio, a four-way outcome
+(valid / invalid / unverifiable / absent) with honest limitations, per-manifest signer and assertion
+summaries, the raw manifest store kept as auditable derived evidence, and a provenance panel in the
+UI. The remaining scope below is not started.
 
 Goal: strengthen origin and history analysis.
 
 Scope:
 
-- C2PA validation
-- Provenance report
-- Chain-of-custody view
-- Derived-file relationship tracking
+- C2PA validation — **done** (D20)
+- Provenance report — **done** (D20; the evidence report's C2PA section)
+- Chain-of-custody view — not started
+- Derived-file relationship tracking — not started
 
 ## Milestone 5 — Reverse-image search
 

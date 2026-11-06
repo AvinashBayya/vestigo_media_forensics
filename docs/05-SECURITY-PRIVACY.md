@@ -20,6 +20,9 @@ The backend must:
 - Never execute uploaded media (ffprobe and ffmpeg run with argument lists and timeouts)
 - A playable preview re-encodes the stored original locally with ffmpeg, on demand only; the output
   stays on the user's machine and the original is never modified
+- C2PA validation (Milestone 4) runs entirely locally with the c2pa-python library: no network
+  access, no trust-list download, and the original is only ever read — C2PA data is never added,
+  removed, or rewritten
 
 ## 3. Allowed inputs
 

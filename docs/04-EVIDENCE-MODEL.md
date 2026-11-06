@@ -114,6 +114,10 @@ The implemented system keeps these specific honesty rules:
   package, and never a substitute for the preserved original.
 - **Duplicate matches are similarity leads**, not proof of common origin: they say two artifacts look
   alike (or are byte-identical), never which came first or that one was derived from the other.
+- **A valid C2PA manifest is a verified signature, not verified truth** (M4, D20): it means the
+  covered data has not changed since signing, never that the content is truthful, accurate, or
+  unmanipulated, and without a trust list it never establishes who the signer is. Absence of C2PA
+  data proves nothing — most media has none and many platforms strip it.
 - No stage ever claims authenticity, manipulation, deepfake status, or location.
 
 ## 7. Deletion rule
@@ -159,4 +163,19 @@ never silently left out.
 - Duplicate frame pairs record the orientation (rotation/mirroring) under which they matched.
 - A playable preview is a re-encoded viewing copy, not evidence: it is excluded from the evidence
   package, labelled in the UI, and deleted with the artifact. The original is never modified.
+
+## 11. C2PA provenance evidence (Milestone 4, D20)
+
+- The `c2pa` stage runs for images, videos, and audio, and is OBSERVED: it reads and validates the
+  file's manifest store locally with c2pa-python and records what the manifests and their
+  certificates say, as written. The original file is never modified, and no network is used.
+- Every record carries the four-way outcome (`valid` / `invalid` / `unverifiable` / `absent`), the
+  SDK's own validation state and grouped validation codes, the exact validator version, and per
+  manifest the claim generator, signer certificate details, assertion labels, and ingredient count.
+- The validator's raw manifest-store report is a derived file (`manifest_store.json`): auditable,
+  exported in the evidence package, and deleted with the artifact.
+- Failure semantics: an invalid manifest is a finding (the stage succeeds and records why);
+  C2PA data that is detected but unreadable makes the stage `partial` with
+  `C2PA_VALIDATION_UNAVAILABLE` and the validator's error. Records made before M4 keep
+  `validation_performed: false` and still render as detection-only.
 

@@ -56,6 +56,14 @@
 No new dependencies: the added formats, audio support, orientation-aware duplicate search, and
 playable previews all use the existing ffmpeg/ffprobe, ExifTool, Pillow, and imagehash toolchain.
 
+## Backend — Milestone 4 (D20)
+
+- `c2pa-python` 0.38.1 (pinned `>=0.38` in `pyproject.toml`), bundling the Rust c2pa-rs SDK 0.91.3.
+  Local C2PA manifest reading and validation; no network access. The evidence records the exact
+  version string reported at runtime.
+- Test fixtures are signed with a throwaway ES256 CA created by `openssl` (already in the
+  container); no signing library is a runtime dependency.
+
 ## Future dependencies
 
 ### Reverse-image search
@@ -71,8 +79,7 @@ playable previews all use the existing ffmpeg/ffprobe, ExifTool, Pillow, and ima
 
 ### C2PA
 
-- C2PA validation library or CLI
-- Provenance report generator
+Done in Milestone 4: `c2pa-python` (see above).
 
 ## Explicit exclusions
 

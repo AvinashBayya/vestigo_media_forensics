@@ -38,9 +38,10 @@
 
 ### C2PA tests
 
-- File without C2PA returns `present: false`
+- File without C2PA returns `present: false` (and, since M4, `status: "absent"`)
 - File with C2PA returns detected status
 - Invalid C2PA does not crash pipeline
+- Milestone 4 validation tests are in §9
 
 ### pHash tests
 
@@ -190,7 +191,38 @@ Settings, and the read-only video limits.
   keyframe captions, orientations, empty, error+retry, and per-job keyframes; per-frame OCR status,
   no-text wording, failure rows, disabled state, raw output.
 
-## 8. Container tests
+## 8. Milestone 4 tests (C2PA validation and provenance, D20)
+
+Validation unit tests (locally signed fixtures from a throwaway test CA, plus one real public
+Content Credentials sample):
+
+- The validator version string names the exact library and SDK versions.
+- A validly signed JPEG, MP4, and WAV each return `status: "valid"` with the signer's certificate
+  details, assertion labels, and the standing `signingCredential.untrusted` failure code (no trust
+  list) — surfaced, never hidden.
+- A byte-tampered signed file returns `invalid` with the hash-mismatch code recorded.
+- A re-signed file with an ingredient chain reports both manifests and the active one.
+- A file without C2PA data returns `absent`; an unsupported container returns `unverifiable` with
+  the validator's error.
+
+End-to-end API tests:
+
+- Valid signed media analysed through each pipeline (image, video, audio) reports the full
+  validated section, and the honesty limitations are present on every record.
+- The raw manifest store is a derived file: served by the derived-content endpoint, included in the
+  evidence package, and removed by deletion with everything else.
+- Disabling the `c2pa` option skips the stage with a recorded skip reason (video and audio).
+- Original files are byte-identical before and after analysis.
+- Pre-M4 records (`validation_performed: false`) still render.
+
+Frontend:
+
+- The provenance panel shows all four states with their badges and caveats (valid ≠ truthful,
+  absence proves nothing), signer details marked recorded-as-written, failure codes, the validator
+  version, and renders on image, video, and audio pages; pre-M4 records render as detection-only.
+- The `c2pa` check appears in the upload options and settings defaults for video and audio.
+
+## 9. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

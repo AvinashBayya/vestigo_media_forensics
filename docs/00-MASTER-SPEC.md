@@ -25,6 +25,7 @@ deceptive (see D2 in `09-DECISIONS.md`).
 - Frontend: React + Vite + TypeScript + Tailwind.
 - OCR: Tesseract.
 - Metadata and C2PA detection: ExifTool.
+- C2PA validation (Milestone 4, D20): c2pa-python 0.38.1 (c2pa-rs SDK 0.91.3), entirely local.
 - Video (Milestone 3): ffmpeg / ffprobe for media information, scene detection, keyframes, and
   on-demand playable previews (D19).
 - Audio (D19): the same ffprobe / ExifTool toolchain, header-level inspection only — audio is never
@@ -78,7 +79,7 @@ See `04-EVIDENCE-MODEL.md`.
 
 - SHA-256 and MD5 hashing.
 - EXIF, XMP, and IPTC metadata extraction.
-- C2PA / Content Credentials detection (detection only; validation is Milestone 4).
+- C2PA / Content Credentials detection and local validation (validation since Milestone 4, D20).
 - Perceptual hash (pHash).
 - OCR (English).
 - Local duplicate / near-duplicate search.
@@ -100,9 +101,13 @@ Implemented (see `06-ROADMAP.md` and `09-DECISIONS.md` for the approved details)
 - **D19 additions**: rotated/mirrored duplicate matching, AVI/MPEG-TS/WMV/FLV/3GP/M4V containers,
   audio artifacts (`audio.v1`: hashes, media info, metadata, byte-identical duplicate search), and
   on-demand playable previews.
+- **Milestone 4 (first part) — C2PA validation and provenance** (D20): local manifest validation
+  in all three pipelines with a four-way outcome (valid / invalid / unverifiable / absent),
+  per-manifest signer and assertion summaries, the raw manifest store as a derived file, and a
+  provenance panel in the UI.
 
-Remaining: provenance and C2PA validation (M4), permission-gated reverse-image search (M5),
-GEOINT / geo-lite (M6), Vestigo integration (M7).
+Remaining: the rest of M4 (chain-of-custody view, derived-file relationship tracking),
+permission-gated reverse-image search (M5), GEOINT / geo-lite (M6), Vestigo integration (M7).
 
 ## 10. API Contract
 
