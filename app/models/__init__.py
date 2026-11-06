@@ -5,6 +5,7 @@ from app.models.analysis_job import AnalysisJob
 from app.models.app_setting import AppSetting
 from app.models.artifact import Artifact
 from app.models.base import Base
+from app.models.custody_event import CustodyEvent
 from app.models.derived_file import DerivedFile
 from app.models.evidence_record import EvidenceRecord
 from app.models.fingerprint import ImageFingerprint
@@ -25,6 +26,7 @@ __all__ = [
     "AppSetting",
     "Artifact",
     "Base",
+    "CustodyEvent",
     "DerivedFile",
     "EvidenceRecord",
     "ImageFingerprint",

@@ -20,3 +20,7 @@ class DerivedFile(Base):
     sha256: Mapped[str] = mapped_column(String(64))
     size_bytes: Mapped[int]
     created_at: Mapped[datetime]
+    # What this file was made from (M4B): "original" or "derived_file". NULL on rows written
+    # before revision 0005 — reported as "source not recorded", never guessed.
+    source_kind: Mapped[str | None] = mapped_column(String(16))
+    source_derived_file_id: Mapped[str | None] = mapped_column(ForeignKey("derived_files.id"))

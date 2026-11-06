@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "4")]
+    assert after.pop("schema_meta") == [("schema_version", "5")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -378,7 +378,7 @@ def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m2_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "4")]
+    assert after.pop("schema_meta") == [("schema_version", "5")]
     before.pop("schema_meta")
     assert after == before
     with sqlite3.connect(path) as connection:
@@ -428,3 +428,57 @@ def test_playable_previews_table_defaults_and_cascade(tmp_path: Path) -> None:
         connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
         connection.commit()
         assert connection.execute("SELECT count(*) FROM playable_previews").fetchone() == (0,)
+
+
+# --- Chain of custody (0005) -------------------------------------------------------------------------
+
+
+def test_custody_events_are_append_only_until_the_artifact_is_deleted(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute(
+            "INSERT INTO custody_events VALUES (?, ?, 'library_changed', ?, ?)",
+            ("cde_" + "1" * 32, ART_A, json.dumps({"included": False}), T1),
+        )
+        connection.commit()
+
+        for statement in (
+            "UPDATE custody_events SET event_type = 'changed'",
+            "DELETE FROM custody_events",
+        ):
+            with pytest.raises(sqlite3.DatabaseError, match="custody events are append-only"):
+                connection.execute(statement)
+        assert connection.execute("SELECT count(*) FROM custody_events").fetchone() == (1,)
+
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        assert connection.execute("SELECT count(*) FROM custody_events").fetchone() == (0,)
+
+
+def test_derived_file_source_columns_are_null_on_old_rows_and_validated_on_new(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        # The pre-0005 row keeps NULL in both columns: its source was never recorded.
+        assert connection.execute(
+            "SELECT source_kind, source_derived_file_id FROM derived_files WHERE id = ?", (DF_A,)
+        ).fetchone() == (None, None)
+        # A new row may point at an existing derived file…
+        connection.execute(
+            "INSERT INTO derived_files VALUES (?, ?, ?, 'keyframe_ocr', 'ocr_tsv', ?, ?, 10, ?, "
+            "'derived_file', ?)",
+            ("df_" + "b" * 32, ART_A, JOB_A, f"artifacts/{ART_A}/derived/{JOB_A}/x.tsv", "e" * 64, T1, DF_A),
+        )
+        # …but never at a derived file that does not exist.
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO derived_files VALUES (?, ?, ?, 's', 'k', ?, ?, 10, ?, 'derived_file', ?)",
+                ("df_" + "c" * 32, ART_A, JOB_A, f"artifacts/{ART_A}/y.tsv", "e" * 64, T1, "df_" + "9" * 32),
+            )
