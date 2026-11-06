@@ -32,7 +32,7 @@ from app.schemas.evidence import (
     SceneChangesSection,
     StageError,
 )
-from app.services import review
+from app.services import leads, review
 from app.services.analysis import active_job, latest_job, to_job_summary
 from app.services.artifacts import get_artifact, to_review_info, to_summary
 from app.services.errors import analysis_in_progress, job_not_found
@@ -245,6 +245,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
             derived.setdefault(file.stage, []).append(file)
         latest = latest_job(session, artifact_id)
         review_history = review.history(session, artifact_id)
+        external_leads = leads.list_leads(session, artifact_id)
         duplicates = records.get("duplicates")
         matches = duplicates.payload.get("matches", []) if duplicates else []
         matched_ids = {match["artifact_id"] for match in matches}
@@ -284,5 +285,6 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         job=to_job_summary(job),
         review=to_review_info(artifact),
         review_history=review_history,
+        external_leads=external_leads,
         **sections,
     )

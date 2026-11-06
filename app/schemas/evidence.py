@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.schemas.analysis import JobSummary
 from app.schemas.artifact import ArtifactSummary, ReviewInfo
 from app.schemas.common import EvidenceClassification, MediaType, ReviewState, StageStatus
+from app.schemas.leads import ExternalLeadInfo
 from app.schemas.review import ReviewEventOut
 
 REPORT_NOTICE = (
@@ -343,5 +344,7 @@ class EvidenceReport(BaseModel):
     keyframe_phash: KeyframePHashSection | None = None
     keyframe_ocr: KeyframeOCRSection | None = None
     review: ReviewInfo
+    # Analyst-recorded external search leads (M5), newest first; artifact-level like the history.
+    external_leads: list[ExternalLeadInfo] = []
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

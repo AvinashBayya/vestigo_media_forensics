@@ -20,6 +20,7 @@ from app.schemas.artifact import (
 from app.schemas.common import ErrorCode, MediaType
 from app.schemas.custody import CustodyReport
 from app.schemas.evidence import EvidenceReport
+from app.schemas.leads import ExternalLeadCreate, ExternalLeadInfo, ExternalLeadsResponse, ExternalLeadUpdate
 from app.schemas.library import DuplicateLibraryUpdate
 from app.schemas.review import (
     BulkReviewRequest,
@@ -28,7 +29,7 @@ from app.schemas.review import (
     RecordReviewUpdate,
     ReviewHistory,
 )
-from app.services import analysis, artifacts, custody, exports, library, previews, reports, review
+from app.services import analysis, artifacts, custody, exports, leads, library, previews, reports, review
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -83,14 +84,15 @@ def get_artifact(services: Services, artifact_id: str) -> ArtifactDetail:
 
 
 @router.get("/{artifact_id}/content", response_class=FileResponse)
-def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
-    """The original file, for preview in the browser."""
+def get_artifact_content(services: Services, artifact_id: str, download: bool = False) -> FileResponse:
+    """The original file: inline for preview, or as an attachment with `download=true` (M5, e.g.
+    to upload manually to a search provider)."""
     artifact = artifacts.get_artifact(services.db, artifact_id)
     return FileResponse(
         services.storage.resolve(artifact.stored_path),
         media_type=artifact.mime_type,
         filename=artifact.original_filename,
-        content_disposition_type="inline",
+        content_disposition_type="attachment" if download else "inline",
         headers={
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
@@ -100,14 +102,17 @@ def get_artifact_content(services: Services, artifact_id: str) -> FileResponse:
 
 
 @router.get("/{artifact_id}/derived/{derived_file_id}/content", response_class=FileResponse)
-def get_derived_file_content(services: Services, artifact_id: str, derived_file_id: str) -> FileResponse:
-    """A derived file (for example a keyframe thumbnail), for display in the browser."""
+def get_derived_file_content(
+    services: Services, artifact_id: str, derived_file_id: str, download: bool = False
+) -> FileResponse:
+    """A derived file (for example a keyframe thumbnail): inline for display, or as an attachment
+    with `download=true` (M5)."""
     derived = artifacts.get_derived_file(services.db, artifact_id, derived_file_id)
     return FileResponse(
         services.storage.resolve(derived.stored_path),
         media_type=DERIVED_MIME_TYPES.get(derived.kind, "application/octet-stream"),
         filename=Path(derived.stored_path).name,
-        content_disposition_type="inline",
+        content_disposition_type="attachment" if download else "inline",
         headers={
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'; sandbox",
@@ -216,6 +221,37 @@ def export_evidence_package(
         headers={EXPORT_SHA256_HEADER: package.sha256, "Cache-Control": "no-store"},
         background=BackgroundTask(package.path.unlink, missing_ok=True),
     )
+
+
+@router.get("/{artifact_id}/external-leads", response_model=ExternalLeadsResponse)
+def list_external_leads(services: Services, artifact_id: str) -> ExternalLeadsResponse:
+    """The analyst-recorded external search leads for this artifact, newest first (M5). Leads are
+    analyst statements: URLs and dates are stored as entered and never verified."""
+    return ExternalLeadsResponse(artifact_id=artifact_id, leads=leads.get_leads(services, artifact_id))
+
+
+@router.post("/{artifact_id}/external-leads", response_model=ExternalLeadInfo, status_code=201)
+def create_external_lead(
+    services: Services, artifact_id: str, payload: ExternalLeadCreate
+) -> ExternalLeadInfo:
+    """Record one externally found result (M5). The subject is the original image, or - for a
+    video - the searched keyframe (derived_file_id). Recorded as a lead_recorded custody event."""
+    return leads.create_lead(services, artifact_id, payload)
+
+
+@router.patch("/{artifact_id}/external-leads/{lead_id}", response_model=ExternalLeadInfo)
+def update_external_lead(
+    services: Services, artifact_id: str, lead_id: str, update: ExternalLeadUpdate
+) -> ExternalLeadInfo:
+    """Edit a lead's fields, notes, or review state. Every actual change is a lead_updated custody
+    event naming the changed fields; a no-op save records nothing."""
+    return leads.update_lead(services, artifact_id, lead_id, update)
+
+
+@router.delete("/{artifact_id}/external-leads/{lead_id}", status_code=204)
+def delete_external_lead(services: Services, artifact_id: str, lead_id: str) -> None:
+    """Delete a lead. The deletion itself stays in the custody trail (lead_deleted)."""
+    leads.delete_lead(services, artifact_id, lead_id)
 
 
 @router.get("/{artifact_id}/custody", response_model=CustodyReport)

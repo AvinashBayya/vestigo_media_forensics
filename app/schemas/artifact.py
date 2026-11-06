@@ -165,6 +165,7 @@ class DeletionSummary(BaseModel):
     review_events: int = 0
     preview_files: int = 0
     custody_events: int = 0
+    external_leads: int = 0
 
 
 class PreviewInfo(BaseModel):

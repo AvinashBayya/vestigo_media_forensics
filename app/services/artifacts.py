@@ -22,6 +22,7 @@ from app.models import (
     CustodyEvent,
     DerivedFile,
     EvidenceRecord,
+    ExternalLead,
     PlayablePreview,
     ReviewEvent,
 )
@@ -425,6 +426,7 @@ def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
                 review_events=_count(session, ReviewEvent, artifact_id),
                 preview_files=1 if session.get(PlayablePreview, artifact_id) is not None else 0,
                 custody_events=_count(session, CustodyEvent, artifact_id),
+                external_leads=_count(session, ExternalLead, artifact_id),
             )
             trashed = storage.move_to_trash(artifact_id)
             _delete_rows(session, artifact_id)
