@@ -8,6 +8,7 @@ from app.models.base import Base
 from app.models.custody_event import CustodyEvent
 from app.models.derived_file import DerivedFile
 from app.models.evidence_record import EvidenceRecord
+from app.models.external_lead import ExternalLead
 from app.models.fingerprint import ImageFingerprint
 from app.models.keyframe_fingerprint import KeyframeFingerprint
 from app.models.playable_preview import PlayablePreview
@@ -29,6 +30,7 @@ __all__ = [
     "CustodyEvent",
     "DerivedFile",
     "EvidenceRecord",
+    "ExternalLead",
     "ImageFingerprint",
     "KeyframeFingerprint",
     "PlayablePreview",

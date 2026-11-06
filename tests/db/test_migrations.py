@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "5")]
+    assert after.pop("schema_meta") == [("schema_version", "6")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -378,7 +378,7 @@ def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m2_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "5")]
+    assert after.pop("schema_meta") == [("schema_version", "6")]
     before.pop("schema_meta")
     assert after == before
     with sqlite3.connect(path) as connection:
@@ -482,3 +482,36 @@ def test_derived_file_source_columns_are_null_on_old_rows_and_validated_on_new(t
                 "INSERT INTO derived_files VALUES (?, ?, ?, 's', 'k', ?, ?, 10, ?, 'derived_file', ?)",
                 ("df_" + "c" * 32, ART_A, JOB_A, f"artifacts/{ART_A}/y.tsv", "e" * 64, T1, "df_" + "9" * 32),
             )
+
+
+# --- External leads (0006) -----------------------------------------------------------------------------
+
+
+def test_external_leads_table_shape_and_cascade(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        # A lead for the original (no keyframe) and one tied to an existing derived file.
+        connection.execute(
+            "INSERT INTO external_leads VALUES (?, ?, NULL, 'TinEye', 'https://example.org/r', "
+            "NULL, NULL, '', 'UNREVIEWED', ?, NULL)",
+            ("lead_" + "1" * 32, ART_A, T1),
+        )
+        connection.execute(
+            "INSERT INTO external_leads VALUES (?, ?, ?, 'Google Lens', 'https://example.org/r2', "
+            "'https://example.org/i.jpg', 'about 2019 (analyst-reported)', 'note', 'UNREVIEWED', ?, ?)",
+            ("lead_" + "2" * 32, ART_A, DF_A, T1, T1),
+        )
+        # Rejected: the keyframe reference must be a real derived file.
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO external_leads VALUES "
+                "(?, ?, ?, 'p', 'u', NULL, NULL, '', 'UNREVIEWED', ?, NULL)",
+                ("lead_" + "3" * 32, ART_A, "df_" + "9" * 32, T1),
+            )
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        assert connection.execute("SELECT count(*) FROM external_leads").fetchone() == (0,)
