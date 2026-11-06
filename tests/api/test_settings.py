@@ -35,6 +35,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
         "default_audio_analysis_options": DEFAULT_AUDIO_OPTIONS,
         "library_page_size": 25,
         "auto_analyze_after_upload": True,
+        "enabled_search_providers": [],
     }
     assert body["updated_at"] is None
     env = body["environment"]
@@ -67,6 +68,7 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
         "default_audio_analysis_options": DEFAULT_AUDIO_OPTIONS,
         "library_page_size": 50,
         "auto_analyze_after_upload": False,
+        "enabled_search_providers": [],
     }
 
 

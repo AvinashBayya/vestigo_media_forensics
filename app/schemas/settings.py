@@ -6,13 +6,25 @@ every duplicate-search result.
 """
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.analysis import AnalysisOptions, AudioAnalysisOptions, VideoAnalysisOptions
+from app.services.search_providers import PROVIDER_KEYS
 
 LibraryPageSize = Literal[10, 25, 50, 100]
+
+
+def _known_provider_keys(keys: list[str]) -> list[str]:
+    unknown = sorted(set(keys) - PROVIDER_KEYS)
+    if unknown:
+        raise ValueError(f"Unknown search provider(s): {', '.join(unknown)}.")
+    return sorted(set(keys))
+
+
+# Registry keys only, deduplicated; validated the same way for API updates and stored values.
+EnabledSearchProviders = Annotated[list[str], AfterValidator(_known_provider_keys)]
 
 
 class EditableSettings(BaseModel):
@@ -23,6 +35,8 @@ class EditableSettings(BaseModel):
     library_page_size: LibraryPageSize = 25
     # Start the analysis as soon as an upload finishes.
     auto_analyze_after_upload: bool = True
+    # Reverse-image search providers the analyst has enabled (M5). All disabled by default (05 §4).
+    enabled_search_providers: EnabledSearchProviders = Field(default_factory=list)
 
 
 class EnvironmentSettings(BaseModel):
@@ -63,6 +77,7 @@ class SettingsUpdate(BaseModel):
     default_audio_analysis_options: AudioAnalysisOptions | None = None
     library_page_size: LibraryPageSize | None = None
     auto_analyze_after_upload: bool | None = None
+    enabled_search_providers: EnabledSearchProviders | None = None
 
     @model_validator(mode="before")
     @classmethod
