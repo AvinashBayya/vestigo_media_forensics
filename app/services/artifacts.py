@@ -16,10 +16,18 @@ from app.core.database import Database
 from app.core.errors import AppError
 from app.core.logging import get_logger, log_event
 from app.core.storage import Storage
-from app.models import AnalysisJob, Artifact, DerivedFile, EvidenceRecord, PlayablePreview, ReviewEvent
+from app.models import (
+    AnalysisJob,
+    Artifact,
+    CustodyEvent,
+    DerivedFile,
+    EvidenceRecord,
+    PlayablePreview,
+    ReviewEvent,
+)
 from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
-from app.services import analysis, library
+from app.services import analysis, custody, library
 from app.services.errors import analysis_in_progress, artifact_not_found
 from app.services.hashing import CHUNK_SIZE, FileHasher, FileHashes
 from app.services.validation import (
@@ -352,7 +360,15 @@ def set_duplicate_library(db: Database, artifact_id: str, included: bool) -> Non
         artifact = session.get(Artifact, artifact_id)
         if artifact is None:
             raise artifact_not_found(artifact_id)
+        changed = bool(artifact.in_duplicate_library) != included
         library.set_duplicate_library(session, artifact, included)
+        if changed:  # a no-op save is not a custody event
+            custody.record_event(
+                session,
+                artifact_id,
+                custody.LIBRARY_CHANGED,
+                {"included_before": not included, "included_after": included},
+            )
     log_event(
         logger,
         logging.INFO,
@@ -408,6 +424,7 @@ def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
                 evidence_records=_count(session, EvidenceRecord, artifact_id),
                 review_events=_count(session, ReviewEvent, artifact_id),
                 preview_files=1 if session.get(PlayablePreview, artifact_id) is not None else 0,
+                custody_events=_count(session, CustodyEvent, artifact_id),
             )
             trashed = storage.move_to_trash(artifact_id)
             _delete_rows(session, artifact_id)

@@ -83,6 +83,9 @@ class StageResult(BaseModel):
 class PendingDerivedFile:
     info: DerivedFileInfo
     stored_path: str
+    # What the file was made from (M4B): the original upload, or another derived file of this job.
+    source_kind: str
+    source_derived_file_id: str | None
 
 
 class DerivedFileWriter:
@@ -93,7 +96,17 @@ class DerivedFileWriter:
         self._directory = storage.derived_dir(artifact_id, job_id)
         self._pending: dict[str, list[PendingDerivedFile]] = {}
 
-    def write(self, stage: str, kind: str, suffix: str, data: bytes) -> DerivedFileInfo:
+    def write(
+        self,
+        stage: str,
+        kind: str,
+        suffix: str,
+        data: bytes,
+        *,
+        source_derived_file_id: str | None = None,
+    ) -> DerivedFileInfo:
+        """Write a derived file. Its recorded source is the original upload, unless the stage read
+        another derived file of the same job and passes that file's id (M4B lineage)."""
         self._directory.mkdir(parents=True, exist_ok=True)
         path = self._directory / f"{stage}.{suffix}"
         path.write_bytes(data)
@@ -103,7 +116,14 @@ class DerivedFileWriter:
             sha256=hashlib.sha256(data).hexdigest(),
             size_bytes=len(data),
         )
-        self._pending.setdefault(stage, []).append(PendingDerivedFile(info, self._storage.relative(path)))
+        self._pending.setdefault(stage, []).append(
+            PendingDerivedFile(
+                info,
+                self._storage.relative(path),
+                source_kind="derived_file" if source_derived_file_id else "original",
+                source_derived_file_id=source_derived_file_id,
+            )
+        )
         return info
 
     def stored_file(self, stage: str, suffix: str) -> Path:

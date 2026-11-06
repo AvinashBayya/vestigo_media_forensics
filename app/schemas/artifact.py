@@ -164,6 +164,7 @@ class DeletionSummary(BaseModel):
     evidence_records: int
     review_events: int = 0
     preview_files: int = 0
+    custody_events: int = 0
 
 
 class PreviewInfo(BaseModel):

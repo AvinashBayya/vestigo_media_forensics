@@ -34,7 +34,7 @@ from app.core.logging import get_logger, log_event
 from app.models import DerivedFile, EvidenceRecord
 from app.schemas.common import ErrorCode
 from app.schemas.evidence import REPORT_NOTICE
-from app.services import reports, review
+from app.services import custody, reports, review
 from app.services.artifacts import get_artifact, to_review_info
 
 logger = get_logger("exports")
@@ -260,9 +260,25 @@ def build_export(
         count=len(files),
         status="with_problems" if problems else "ok",
     )
+    package_sha256 = _sha256_file(package_path)
+    # Custody (M4B): a built package is a copy of the evidence leaving this tool, so it is recorded.
+    # This event is naturally part of the NEXT export's custody.json, not its own.
+    with services.db.writer() as session, session.begin():
+        custody.record_event(
+            session,
+            artifact_id,
+            custody.EXPORTED,
+            {
+                "job_id": report.job_id,
+                "package_sha256": package_sha256,
+                "original_included": include_original,
+                "file_count": len(files),
+                "problem_count": len(problems),
+            },
+        )
     return ExportPackage(
         path=package_path,
         filename=f"vestigo-evidence-{artifact_id}-{report.job_id}.zip",
-        sha256=_sha256_file(package_path),
+        sha256=package_sha256,
         size_bytes=package_path.stat().st_size,
     )

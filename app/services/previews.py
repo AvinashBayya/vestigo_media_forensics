@@ -15,6 +15,7 @@ from app.core.logging import get_logger, log_event
 from app.core.tools import ToolError, run_tool
 from app.models import PlayablePreview
 from app.schemas.common import ErrorCode, MediaType
+from app.services import custody
 from app.services.artifacts import get_artifact
 from app.services.errors import wrong_media_type
 from app.services.validation import InvalidVideoError, probe_video
@@ -124,5 +125,16 @@ def create_preview(services: AppServices, artifact_id: str) -> PlayablePreview:
             storage.purge(storage.resolve(stored_path).parent)
             return current
         session.add(preview)
+        custody.record_event(
+            session,
+            artifact_id,
+            custody.PREVIEW_CREATED,
+            {
+                "sha256": preview.sha256,
+                "size_bytes": preview.size_bytes,
+                "width": preview.width,
+                "height": preview.height,
+            },
+        )
     log_event(logger, logging.INFO, "preview.created", artifact_id=artifact_id)
     return preview

@@ -389,6 +389,8 @@ class KeyframeOCRStage(AnalysisStage):
                         f"tesseract_tsv_{ocr_pass.variant}",
                         f"{frame['seq']:04d}.{ocr_pass.variant}.tsv",
                         ocr_pass.recognition.tsv,
+                        # Lineage (M4B): the TSV was read from this keyframe thumbnail, not the original.
+                        source_derived_file_id=frame["derived_file_id"],
                     )
             if result.variant_error is not None:
                 warnings.append(

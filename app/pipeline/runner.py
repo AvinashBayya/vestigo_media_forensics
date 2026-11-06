@@ -199,6 +199,8 @@ class PipelineRunner:
                         sha256=pending.info.sha256,
                         size_bytes=pending.info.size_bytes,
                         created_at=result.completed_at,
+                        source_kind=pending.source_kind,
+                        source_derived_file_id=pending.source_derived_file_id,
                     )
                 )
             session.flush()
