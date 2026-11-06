@@ -131,6 +131,7 @@ export interface DeletionSummary {
   jobs: number;
   evidence_records: number;
   review_events: number;
+  custody_events?: number;
 }
 
 export type ReviewOrigin = "artifact" | "record" | "bulk";
@@ -651,4 +652,38 @@ export interface PreviewInfo {
   width: number | null;
   height: number | null;
   created_at: string;
+}
+
+// --- Chain of custody (Milestone 4 part 2) -------------------------------------------------------
+
+/** One recorded action. `source_table` names where the fact lives; nothing is inferred. */
+export interface CustodyTimelineEvent {
+  type: string;
+  at: string;
+  source_table: string;
+  detail: Record<string, unknown>;
+}
+
+/**
+ * One derived file with its recorded lineage. A null `source_kind` means the row was written
+ * before schema revision 0005 and its source was not recorded — never guessed.
+ */
+export interface CustodyDerivedFile {
+  derived_file_id: string;
+  job_id: string;
+  stage: string;
+  kind: string;
+  filename: string;
+  sha256: string;
+  size_bytes: number;
+  created_at: string;
+  source_kind: "original" | "derived_file" | null;
+  source_derived_file_id: string | null;
+}
+
+export interface CustodyReport {
+  artifact_id: string;
+  notice: string;
+  events: CustodyTimelineEvent[];
+  derived_files: CustodyDerivedFile[];
 }

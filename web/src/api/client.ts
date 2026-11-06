@@ -6,6 +6,7 @@ import type {
   ArtifactDetail,
   ArtifactList,
   ArtifactQuery,
+  CustodyReport,
   ArtifactUploadResponse,
   BulkReviewResult,
   DeletionSummary,
@@ -287,4 +288,8 @@ export function createPlayablePreview(artifactId: string): Promise<PreviewInfo> 
 
 export function previewContentUrl(artifactId: string): string {
   return `${API_BASE}/artifacts/${encodeURIComponent(artifactId)}/preview/content`;
+}
+
+export function getCustody(artifactId: string): Promise<CustodyReport> {
+  return call(http.get<CustodyReport>(`/artifacts/${encodeURIComponent(artifactId)}/custody`));
 }

@@ -3,6 +3,7 @@ import type {
   ArtifactList,
   ArtifactListItem,
   C2PASection,
+  CustodyReport,
   HealthResponse,
   JobHistoryItem,
   SettingsResponse,
@@ -482,4 +483,77 @@ export function videoReport(overrides: Partial<EvidenceReport> = {}): EvidenceRe
     },
   });
   return { ...base, ...overrides };
+}
+
+/** A custody report for an uploaded-and-analysed image (M4B). */
+export function custodyReport(overrides: Partial<CustodyReport> = {}): CustodyReport {
+  return {
+    artifact_id: ARTIFACT_ID,
+    notice:
+      "This chain of custody lists what Vestigo recorded on this machine since the file was " +
+      "uploaded. It is not a legal chain of custody, it says nothing about the file's history " +
+      "before upload, and no event is ever inferred: evidence-package exports and duplicate-library " +
+      "changes made before schema revision 0005 were not recorded anywhere and therefore do not " +
+      "appear. Derived files written before that revision have no recorded source.",
+    events: [
+      {
+        type: "uploaded",
+        at: "2026-11-02T08:59:00.000000Z",
+        source_table: "artifacts",
+        detail: {
+          filename: "harbour.jpg",
+          media_type: "image",
+          mime_type: "image/jpeg",
+          size_bytes: 36_000,
+          sha256: "a".repeat(64),
+        },
+      },
+      {
+        type: "analysis_started",
+        at: NOW,
+        source_table: "analysis_jobs",
+        detail: { job_id: JOB_ID, pipeline: "image.v1", app_version: "0.1.0" },
+      },
+      {
+        type: "analysis_finished",
+        at: "2026-11-02T09:00:20.000000Z",
+        source_table: "analysis_jobs",
+        detail: {
+          job_id: JOB_ID,
+          pipeline: "image.v1",
+          app_version: "0.1.0",
+          status: "completed",
+          evidence_records: 6,
+          derived_files: 2,
+        },
+      },
+    ],
+    derived_files: [
+      {
+        derived_file_id: "df_" + "7".repeat(32),
+        job_id: JOB_ID,
+        stage: "metadata",
+        kind: "exiftool_json",
+        filename: "metadata.exiftool.json",
+        sha256: "c".repeat(64),
+        size_bytes: 2048,
+        created_at: NOW,
+        source_kind: "original",
+        source_derived_file_id: null,
+      },
+      {
+        derived_file_id: "df_" + "8".repeat(32),
+        job_id: JOB_ID,
+        stage: "keyframe_ocr",
+        kind: "tesseract_tsv_grayscale",
+        filename: "keyframe_ocr.0001.grayscale.tsv",
+        sha256: "d".repeat(64),
+        size_bytes: 512,
+        created_at: NOW,
+        source_kind: "derived_file",
+        source_derived_file_id: "df_" + "7".repeat(32),
+      },
+    ],
+    ...overrides,
+  };
 }

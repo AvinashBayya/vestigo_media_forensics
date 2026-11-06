@@ -20,6 +20,7 @@ import { DeleteArtifactDialog } from "../components/DeleteArtifactDialog";
 import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
 import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
+import { ChainOfCustodyPanel } from "../components/evidence/ChainOfCustodyPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
 import { KeyframeOCRPanel } from "../components/evidence/KeyframeOCRPanel";
 import { KeyframePHashPanel } from "../components/evidence/KeyframePHashPanel";
@@ -351,6 +352,10 @@ export function ArtifactPage() {
               <MetadataPanel section={report.metadata} />
             </div>
           )}
+          <ChainOfCustodyPanel
+            artifactId={artifact.artifact_id}
+            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}`}
+          />
         </div>
       </div>
 
