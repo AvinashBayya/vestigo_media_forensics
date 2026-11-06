@@ -59,7 +59,9 @@ def test_report_keeps_the_03_shape_and_adds_provenance(client: TestClient, fixtu
     assert set(report["metadata"]) >= {"exif", "xmp", "iptc"}
     assert report["metadata"]["exif"]["IFD0"]["Make"] == "VestigoTestCam"
     assert report["c2pa"]["present"] is False
-    assert report["c2pa"]["validation_performed"] is False
+    # Since M4 (D20) the stage validates; a file without C2PA data is a validated "absent".
+    assert report["c2pa"]["validation_performed"] is True
+    assert report["c2pa"]["status"] == "absent"
     assert report["perceptual_hash"]["algorithm"] == "pHash"
     assert report["ocr"]["engine"] == "tesseract"
     assert report["duplicates"]["matches"] == []
