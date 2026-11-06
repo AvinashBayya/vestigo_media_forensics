@@ -18,6 +18,7 @@ from app.schemas.artifact import (
     ReviewUpdate,
 )
 from app.schemas.common import ErrorCode, MediaType
+from app.schemas.custody import CustodyReport
 from app.schemas.evidence import EvidenceReport
 from app.schemas.library import DuplicateLibraryUpdate
 from app.schemas.review import (
@@ -27,7 +28,7 @@ from app.schemas.review import (
     RecordReviewUpdate,
     ReviewHistory,
 )
-from app.services import analysis, artifacts, exports, library, previews, reports, review
+from app.services import analysis, artifacts, custody, exports, library, previews, reports, review
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -215,6 +216,14 @@ def export_evidence_package(
         headers={EXPORT_SHA256_HEADER: package.sha256, "Cache-Control": "no-store"},
         background=BackgroundTask(package.path.unlink, missing_ok=True),
     )
+
+
+@router.get("/{artifact_id}/custody", response_model=CustodyReport)
+def get_custody(services: Services, artifact_id: str) -> CustodyReport:
+    """The chain of custody recorded by Vestigo on this machine since upload (M4B): upload,
+    analysis jobs, review changes, exports, library changes, and previews, merged chronologically,
+    plus every derived file with its recorded lineage. Nothing is inferred or backfilled."""
+    return custody.build_custody_report(services.db, artifact_id)
 
 
 @router.get("/{artifact_id}/evidence", response_model=EvidenceReport)

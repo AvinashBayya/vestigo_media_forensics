@@ -80,6 +80,11 @@ report.json     The evidence report: every check with its method, tool, version,
                 source, limitations, errors, and review state.
 review.json     The analyst's artifact review, the review of each evidence record, and the full
                 review history (append-only, with complete note text).
+custody.json    The chain of custody Vestigo recorded on this machine since upload: upload,
+                analyses, review changes, exports, library changes, previews, and each derived
+                file's recorded lineage. Not a legal chain of custody; nothing before upload, and
+                nothing is inferred. This package's own export event is recorded after the package
+                is built, so it appears in the NEXT export, not in this file.
 derived/        Raw tool outputs and other files derived during this analysis.
 original/       The original upload (only if it was chosen when exporting).
 manifest.json   SHA-256 and size of every file above, and export details. Recorded files that were
@@ -161,6 +166,12 @@ def build_export(
 
             add_bytes("report.json", _json_bytes(report.model_dump(mode="json")), "Evidence report")
             add_bytes("review.json", _json_bytes(review_data), "Analyst review and review history")
+            custody_report = custody.build_custody_report(services.db, artifact_id)
+            add_bytes(
+                "custody.json",
+                _json_bytes(custody_report.model_dump(mode="json")),
+                "Chain of custody recorded by Vestigo on this machine (M4B)",
+            )
 
             for item in derived:
                 name = f"derived/{Path(item.stored_path).name}"

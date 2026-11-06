@@ -57,7 +57,15 @@ def test_package_contents_and_verification(
         f'attachment; filename="vestigo-evidence-{artifact_id}-{job_id}.zip"'
     )
     names = set(package.namelist())
-    assert names == {"report.json", "review.json", "README.txt", "manifest.json", "SHA256SUMS", *DERIVED}
+    assert names == {
+        "report.json",
+        "review.json",
+        "custody.json",
+        "README.txt",
+        "manifest.json",
+        "SHA256SUMS",
+        *DERIVED,
+    }
     assert not any(name.startswith("original/") for name in names)  # not included by default
 
     assert manifest["format"] == "vestigo-evidence-package"

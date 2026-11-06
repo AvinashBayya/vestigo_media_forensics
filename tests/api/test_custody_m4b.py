@@ -112,3 +112,106 @@ def test_custody_events_are_deleted_with_the_artifact_and_counted(
     assert events_for(services, artifact_id) == []
     with services.db.reader() as session:
         assert session.scalars(select(CustodyEvent)).first() is None
+
+
+def test_custody_timeline_merges_all_sources_chronologically(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    artifact_id, job_id = analyse(client, fixtures.jpeg)
+    client.patch(
+        f"/api/v1/artifacts/{artifact_id}/review",
+        json={"state": "IN_REVIEW", "analyst_notes": "Looking at it."},
+    )
+    client.patch(f"/api/v1/artifacts/{artifact_id}/duplicate-library", json={"included": False})
+    client.get(f"/api/v1/artifacts/{artifact_id}/export")
+
+    response = client.get(f"/api/v1/artifacts/{artifact_id}/custody")
+    assert response.status_code == 200, response.text
+    report = response.json()
+
+    assert report["artifact_id"] == artifact_id
+    assert "not a legal chain of custody" in report["notice"]
+    assert "never" in report["notice"] or "do not appear" in report["notice"]
+
+    events = report["events"]
+    assert [event["type"] for event in events] == [
+        "uploaded",
+        "analysis_started",
+        "analysis_finished",
+        "review_changed",
+        "library_changed",
+        "exported",
+    ]
+    stamps = [event["at"] for event in events]
+    assert stamps == sorted(stamps)
+
+    uploaded, started, finished, review, library, exported = events
+    assert uploaded["source_table"] == "artifacts"
+    assert uploaded["detail"]["filename"] == fixtures.jpeg.name
+    assert len(uploaded["detail"]["sha256"]) == 64
+    assert started["detail"] == {
+        "job_id": job_id,
+        "pipeline": "image.v1",
+        "app_version": finished["detail"]["app_version"],
+    }
+    assert finished["detail"]["status"] == "completed"
+    assert finished["detail"]["evidence_records"] == 6
+    assert finished["detail"]["derived_files"] > 0
+    assert review["source_table"] == "review_events"
+    assert review["detail"]["to_state"] == "IN_REVIEW"
+    assert review["detail"]["notes_changed"] is True
+    assert "Looking at it." not in str(review)  # note text stays in the review history
+    assert library["detail"]["included_after"] is False
+    assert exported["detail"]["job_id"] == job_id
+
+    derived = report["derived_files"]
+    assert derived and all(entry["source_kind"] == "original" for entry in derived)
+    assert {entry["job_id"] for entry in derived} == {job_id}
+
+    missing = client.get(f"/api/v1/artifacts/{'art_' + '0' * 32}/custody")
+    assert missing.status_code == 404
+    assert client.get("/api/v1/artifacts/not-an-id/custody").status_code == 404
+
+
+def test_pre_m4b_derived_files_report_source_not_recorded(
+    client: TestClient, services: AppServices, fixtures: FixtureSet
+) -> None:
+    artifact_id, _ = analyse(client, fixtures.jpeg)
+    with services.db.writer() as session, session.begin():
+        row = session.scalars(select(DerivedFile).where(DerivedFile.artifact_id == artifact_id)).first()
+        assert row is not None
+        row.source_kind = None  # as a row written before revision 0005 would be
+        row.source_derived_file_id = None
+        nulled_id = row.id
+
+    report = client.get(f"/api/v1/artifacts/{artifact_id}/custody").json()
+    entry = next(e for e in report["derived_files"] if e["derived_file_id"] == nulled_id)
+    assert entry["source_kind"] is None
+    assert entry["source_derived_file_id"] is None
+    assert "no recorded source" in report["notice"]
+
+
+def test_custody_json_is_exported_and_covers_earlier_exports_only(
+    client: TestClient, fixtures: FixtureSet
+) -> None:
+    import io
+    import json
+    import zipfile
+
+    artifact_id, _ = analyse(client, fixtures.jpeg)
+
+    def exported_events(content: bytes) -> list[dict]:
+        package = zipfile.ZipFile(io.BytesIO(content))
+        manifest = json.loads(package.read("manifest.json"))
+        assert any(entry["path"] == "custody.json" for entry in manifest["files"])
+        custody_report = json.loads(package.read("custody.json"))
+        assert "not a legal chain of custody" in custody_report["notice"]
+        return [e for e in custody_report["events"] if e["type"] == "exported"]
+
+    first = client.get(f"/api/v1/artifacts/{artifact_id}/export")
+    # The first package was built before its own export event existed: no exported events inside.
+    assert exported_events(first.content) == []
+
+    second = client.get(f"/api/v1/artifacts/{artifact_id}/export")
+    (event,) = exported_events(second.content)
+    assert event["detail"]["package_sha256"] == first.headers["x-vestigo-export-sha256"]
