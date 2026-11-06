@@ -10,11 +10,15 @@ Nothing here verifies signatures, certificates, or hash bindings. Validation is 
 Milestone 4 (06-ROADMAP.md).
 """
 
+import json as _json
 import re
 import struct
 from dataclasses import dataclass, field
+from importlib.metadata import version as _dist_version
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+import c2pa as _c2pa
 
 from app.core.tools import ToolStatus
 from app.services.metadata import run_exiftool_json
@@ -284,4 +288,128 @@ def detect_c2pa(tool: ToolStatus, path: Path, mime_type: str, timeout: float) ->
         details=details,
         warnings=warnings,
         raw_output=raw,
+    )
+
+
+# --- Manifest reading and validation (Milestone 4, decision D20) ------------------------------------
+#
+# Local validation with c2pa-python (c2pa-rs). No trust list is configured, so a "valid" result means
+# the manifest's hashes and signature verify for the data they cover - it does not establish that the
+# signer is trustworthy, and never that the content is truthful or unmanipulated.
+
+# Vestigo's summary of the validator outcome for one artifact.
+ValidationSummary = Literal["valid", "invalid", "unverifiable", "absent"]
+
+
+def c2pa_validator_version() -> str:
+    return f"c2pa-python {_dist_version('c2pa-python')} (c2pa-rs {_c2pa.sdk_version()})"
+
+
+@dataclass(frozen=True)
+class ManifestSummary:
+    label: str
+    title: str | None
+    claim_generator: str | None
+    signature_issuer: str | None
+    signature_common_name: str | None
+    signature_cert_serial: str | None
+    signature_time: str | None
+    signature_algorithm: str | None
+    assertion_labels: list[str]
+    ingredient_count: int
+
+
+@dataclass(frozen=True)
+class ManifestReadResult:
+    status: ValidationSummary
+    # The validator's own state (Trusted, Valid, Invalid) when it could read the file.
+    validation_state: str | None
+    manifest_count: int
+    active_manifest: str | None
+    manifests: list[ManifestSummary]
+    # The active manifest's validation codes, grouped: success, informational, failure.
+    validation_codes: dict[str, list[dict[str, str | None]]]
+    # The validator's full manifest-store report, stored as a derived evidence file.
+    raw_report: bytes | None
+    error: str | None
+
+
+def _claim_generator(manifest: dict) -> str | None:
+    if manifest.get("claim_generator"):
+        return str(manifest["claim_generator"])
+    info = manifest.get("claim_generator_info") or []
+    parts = [
+        " ".join(str(entry.get(key)) for key in ("name", "version") if entry.get(key))
+        for entry in info
+        if isinstance(entry, dict)
+    ]
+    return "; ".join(part for part in parts if part) or None
+
+
+def _summarize_manifest(label: str, manifest: dict) -> ManifestSummary:
+    signature = manifest.get("signature_info") or {}
+    return ManifestSummary(
+        label=label,
+        title=manifest.get("title"),
+        claim_generator=_claim_generator(manifest),
+        signature_issuer=signature.get("issuer"),
+        signature_common_name=signature.get("common_name"),
+        signature_cert_serial=signature.get("cert_serial_number"),
+        signature_time=signature.get("time"),
+        signature_algorithm=signature.get("alg"),
+        assertion_labels=[
+            str(assertion.get("label"))
+            for assertion in manifest.get("assertions") or []
+            if assertion.get("label")
+        ],
+        ingredient_count=len(manifest.get("ingredients") or []),
+    )
+
+
+def _grouped_codes(validation_results: dict) -> dict[str, list[dict[str, str | None]]]:
+    active = validation_results.get("activeManifest") or {}
+    grouped: dict[str, list[dict[str, str | None]]] = {}
+    for group in ("success", "informational", "failure"):
+        grouped[group] = [
+            {"code": entry.get("code"), "explanation": entry.get("explanation")}
+            for entry in active.get(group) or []
+        ]
+    return grouped
+
+
+def read_manifest_store(path: Path) -> ManifestReadResult:
+    """Read and validate the file's C2PA manifest store locally. Never modifies the file."""
+    empty_codes: dict[str, list[dict[str, str | None]]] = {"success": [], "informational": [], "failure": []}
+    try:
+        reader = _c2pa.Reader(str(path))
+    except Exception as exc:  # the SDK raises typed C2paError subclasses
+        name = type(exc).__name__
+        if "ManifestNotFound" in name:
+            return ManifestReadResult("absent", None, 0, None, [], empty_codes, None, None)
+        reason = "unsupported format" if "NotSupported" in name else "read error"
+        return ManifestReadResult("unverifiable", None, 0, None, [], empty_codes, None, f"{reason}: {exc}")
+    try:
+        state = str(reader.get_validation_state())
+        raw = reader.json().encode("utf-8")
+        store = _json.loads(raw)
+        validation_results = reader.get_validation_results() or {}
+    except Exception as exc:  # noqa: BLE001 - a malformed store must be reported, not crash the stage
+        reader.close()
+        return ManifestReadResult(
+            "unverifiable", None, 0, None, [], empty_codes, None, f"manifest store unreadable: {exc}"
+        )
+    reader.close()
+    manifests = [
+        _summarize_manifest(label, manifest) for label, manifest in (store.get("manifests") or {}).items()
+    ]
+    status: ValidationSummary = "valid" if state in ("Valid", "Trusted") else "invalid"
+    return ManifestReadResult(
+        status=status,
+        validation_state=state,
+        manifest_count=len(manifests),
+        active_manifest=store.get("active_manifest"),
+        manifests=manifests,
+        validation_codes=_grouped_codes(validation_results if isinstance(validation_results, dict) else {}),
+        raw_report=raw,
+        error=None,
     )
