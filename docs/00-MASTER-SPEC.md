@@ -26,6 +26,8 @@ deceptive (see D2 in `09-DECISIONS.md`).
 - OCR: Tesseract.
 - Metadata and C2PA detection: ExifTool.
 - C2PA validation (Milestone 4, D20): c2pa-python 0.38.1 (c2pa-rs SDK 0.91.3), entirely local.
+- Location clues (Milestone 6, D23): the same ExifTool, read numerically for coordinates. No map
+  tiles, no geocoding, no new dependency.
 - Video (Milestone 3): ffmpeg / ffprobe for media information, scene detection, keyframes, and
   on-demand playable previews (D19).
 - Audio (D19): the same ffprobe / ExifTool toolchain, header-level inspection only — audio is never
@@ -112,7 +114,13 @@ Implemented (see `06-ROADMAP.md` and `09-DECISIONS.md` for the approved details)
   nothing, subject downloads (original image or a selected keyframe, never the preview), and
   analyst-recorded EXTERNAL leads with custody-trailed edits.
 
-Remaining: GEOINT / geo-lite (M6), Vestigo integration (M7).
+- **Milestone 6 — GEOINT / geo-lite** (D23): a `location_clues` stage in all three pipelines
+  (coordinates in decimal beside the as-written strings, altitude, timestamps, device fields,
+  place-name tags, container ISO 6709 locations, ranges validated and invalid values flagged rather
+  than corrected), analyst location candidates classified UNVERIFIED with their own assessment
+  labels and supporting-evidence references, and one opt-in client-built OpenStreetMap link.
+
+Remaining: Vestigo integration (M7).
 
 ## 10. API Contract
 

@@ -81,6 +81,15 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 - Findings come back as analyst-recorded **EXTERNAL leads**: provider, result URL, optional image URL, notes, and the publication date exactly as entered, always labelled analyst-reported and unverified, separate from when the lead was recorded; an earlier result is never called the original source
 - Lead creates, edits, and deletes are append-only custody events; leads travel in the evidence report and export package and are deleted and counted with the artifact (Alembic 0006, schema v6)
 
+### Milestone 6 — GEOINT / geo-lite (D23)
+
+- Location **clues**, never claims: a `location_clues` stage (all three media types, on by default) reports GPS coordinates in decimal beside the original as-written strings and hemisphere refs, altitude, GPS and EXIF/container timestamps, camera make/model/orientation, IPTC and XMP place-name fields, and container ISO 6709 locations — each labelled with the tag it came from
+- Coordinate ranges are validated; an out-of-range or half-present value is flagged with its reason and kept **exactly as written** — never corrected, normalised, or dropped
+- Disagreeing metadata sources are shown side by side; Vestigo never decides which is right, and never extracts place names from OCR text — it points the analyst at the OCR evidence to read for themselves
+- Analyst **location candidates**, classified UNVERIFIED: a stated place, a required basis in the analyst's own words, their own assessment label (speculative / possible / likely — never machine-derived), optional validated coordinates, and typed links to supporting evidence of the same artifact
+- One opt-in **OpenStreetMap link**, off by default, built in the browser and opened only on click, with a warning that clicking sends those coordinates to openstreetmap.org. No map tiles, no embedded map, no API key, no reverse geocoding, and no coordinates in Vestigo's logs
+- Candidate creates, edits, and deletes are append-only custody events; candidates travel in the evidence report and export package and are deleted and counted with the artifact (Alembic 0007, schema v7)
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
@@ -92,12 +101,12 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 Analysis pipelines (every stage records method, tool, version, timestamps, source, limitations,
 errors, and review state):
 
-- `image.v1`: hashes → metadata → C2PA detection and validation → perceptual hash → OCR → duplicate search
-- `video.v1`: hashes → media information (ffprobe) → metadata → C2PA validation (optional, default on) → scene detection → keyframes →
+- `image.v1`: hashes → metadata → location clues → C2PA detection and validation → perceptual hash → OCR → duplicate search
+- `video.v1`: hashes → media information (ffprobe) → metadata → C2PA validation → location clues → scene detection → keyframes →
   keyframe perceptual hashes → keyframe OCR (optional, off by default, ≤ 10 frames) → duplicate
   search (keyframes vs. images and other videos' keyframes, including rotated and mirrored variants;
   limit `VESTIGO_MAX_KEYFRAMES`, scene threshold `VESTIGO_SCENE_THRESHOLD`)
-- `audio.v1`: hashes → media information → metadata → C2PA validation (optional, default on) → duplicate search (byte-identical SHA-256 only —
+- `audio.v1`: hashes → media information → metadata → C2PA validation → location clues (metadata only) → duplicate search (byte-identical SHA-256 only —
   no audio content is ever decoded or compared)
 
 Playable previews (videos only, on demand): one re-encoded H.264/AAC viewing copy per artifact,
@@ -105,8 +114,7 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 
 ## Later phases
 
-- Paid or official reverse-image search provider APIs (each needs separate approval)
-- GEOINT / geo-lite analysis
+- Paid or official reverse-image search provider APIs, reverse geocoding, and map tile services (each needs separate approval)
 - Optional Vestigo integration through a versioned evidence API
 
 ## Tech stack
@@ -218,6 +226,18 @@ With both servers running, open http://localhost:5180.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
 
+## Manual test of location clues (M6)
+
+1. **Coordinates as written.** Upload `samples/generated/with_metadata.jpg` (build fixtures with `python -m tests.fixtures.make_fixtures`): the Location clues panel shows `51.5, -0.12` beside the original `51 deg 30' 0.00" (North)` / `(West)` strings, the IPTC city "Testville", the EXIF date, and the camera fields — each with its tag, and the footer repeating that every value is as written and never proof of where the media was captured.
+2. **Southern hemisphere and altitude.** Upload `southern_location.jpg`: `-33.8688, 151.2093`, altitude 58.4 m (Above Sea Level), GPS date/time, and the XMP place tags.
+3. **A bad value stays bad.** Upload `invalid_location.jpg`: the coordinate is badged "Unusable value" with "latitude 191.5 is outside ±90", kept exactly as written, and offered no map link; the stage shows as partial.
+4. **Absence.** Upload any plain photo: "No location metadata was found. Absence proves nothing."
+5. **Video container location.** Upload `video_location.mp4`: coordinates parsed from the container tag, with the tag listed under "Container location tags".
+6. **Map link, opt-in.** With the setting off, the panel says external map links are off. Enable "External map links" in Settings (note the warning and OSM terms link) and reload: "Open in OpenStreetMap (external)" appears with its warning; clicking opens a new tab whose URL carries exactly those coordinates. Vestigo loads no tiles and never sends anything by itself.
+7. **Candidates.** Record a candidate: place, a basis, an assessment you must choose yourself, optional coordinates, and a tick against a supporting evidence record. It lists as UNVERIFIED with "the analyst's own judgment, not a measurement". Change the assessment → the Chain of custody panel gains "Location candidate edited" naming the field; delete it (two-step) → "Location candidate deleted" with the earlier events intact.
+8. **Export and deletion.** An exported package's `report.json` carries both `location_clues` and the candidates, `custody.json` their events; deleting the artifact counts `location_candidates` and removes everything.
+9. **Logs.** Grep the backend log: no coordinates anywhere, only artifact ids and event names.
+
 ## Manual test of reverse-image search (M5)
 
 1. **Gating.** On a fresh database, open an image artifact: the Reverse-image search panel lists every provider as "enable in Settings". In Settings, tick TinEye (note the terms link and the policy note), save, and reload the artifact: "Open TinEye" appears with upload instructions.
@@ -247,6 +267,7 @@ With both servers running, open http://localhost:5180.
 
 ## Limitations
 
+- Location metadata is a **clue, not a location**: it is read as written, is trivially edited or copied, and never proves where media was captured. Absence proves nothing. Flagged coordinates are kept as written, disagreeing sources are both shown, and no place names are extracted from OCR text. Location candidates are analyst statements (UNVERIFIED) with the analyst's own assessment label — never a machine confidence score, and never a finding that media was captured somewhere.
 - A **valid** C2PA / Content Credentials result means the manifest's hashes and claim signature verify — never that the content is truthful, accurate, or unmanipulated. No trust list is configured, so the signer's identity is not established. Absence of C2PA data proves nothing; most media has none and many platforms strip it.
 - OCR is best-effort and English only; its output is provisional, not a verified transcription (D14). Keyframe OCR reads at most 10 sampled frames.
 - Duplicate search covers only artifacts in the local library, as it was when each analysis ran. Video matching compares sampled keyframes (including rotated and mirrored variants); content between keyframes is not searched.

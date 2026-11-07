@@ -54,6 +54,15 @@ provider's own site under its terms. The backend makes no outbound HTTP requests
 scraping, CAPTCHA bypass, browser automation, rate-limit evasion, and automatic uploads are
 prohibited; paid or official provider APIs each require separate approval.
 
+Milestone 6 (D23) adds one deliberate carve-out to the "nothing evidence-derived" sentence above,
+which was written for M5's static provider landing pages: an **opt-in** OpenStreetMap link for
+coordinates already on screen. It is off by default, built entirely in the analyst's browser (the
+backend never constructs, stores, transmits, or logs a coordinate-bearing URL), opens only on an
+explicit click, and carries its own warning that clicking sends those coordinates to
+openstreetmap.org. Vestigo loads no map tiles and embeds no map — tiles would transmit coordinates
+on every page view, which the covert-tracking prohibition in §5 forbids. Reverse geocoding is not
+enabled, and no map service requiring an API key may be added without separate approval.
+
 ## 5. Prohibited capabilities
 
 The system must not include:
@@ -83,6 +92,7 @@ Users must be able to delete:
 - Its playable preview, when one was created
 - Custody events (append-only until the artifact itself is deleted)
 - External leads (M5)
+- Location candidates (M6)
 - Database rows
 
 Playable previews are kept only as long as their artifact and are removed with it; nothing is
@@ -93,7 +103,8 @@ deleted automatically.
 Logs must not contain:
 
 - Full image contents
-- Sensitive EXIF data
+- Sensitive EXIF data, including GPS coordinates — and, since M6, analyst-entered coordinates,
+  location descriptions, and the basis text of location candidates
 - API keys
 - User credentials
 - Library search terms (query strings are redacted from access logs)

@@ -271,7 +271,43 @@ lead rows with EXTERNAL, "Recorded" vs "Publication date (analyst-reported, unve
 never-proof-of-origin notice; review select and two-step delete; the panel absent on audio pages;
 Settings toggles off by default with the policy note.
 
-## 11. Container tests
+## 11. Milestone 6 tests (GEOINT / geo-lite, D23)
+
+Backend:
+
+- Clues from the GPS fixture: decimal conversion with the hemisphere ref applied (51.5 / −0.12), the
+  as-written strings and refs kept beside it, IPTC city, EXIF dates, and camera fields each with
+  their tag; the southern/eastern fixture (−33.8688 / 151.2093) with altitude, its reference, GPS
+  date/time, and XMP place tags; the out-of-range fixture flagged with its reason, kept exactly as
+  written, and making the stage `partial` with `LOCATION_VALUE_UNUSABLE`; a video's container
+  location tag parsed and recorded as written; media with no location producing empty lists and no
+  warnings; audio running the same metadata-only reader; `ocr_available` true only when the
+  analysis produced OCR text, with no place names ever extracted from it; limitations and the raw
+  ExifTool derived file; the option switched off giving a skipped record.
+- Candidates: recorded as entered with fixed UNVERIFIED classification and UNREVIEWED review; the
+  assessment required and constrained to speculative / possible / likely (no "confirmed", no
+  numbers); field and coordinate validation (ranges, pairs, empty strings, extra fields, 404s);
+  supports must exist and belong to the same artifact (another artifact's evidence, unknown ids,
+  wrong-prefix ids, and unknown types all refused), including an external lead as support; edits
+  custody-trailed with field names only, no-op saves recording nothing, explicit nulls rejected,
+  coordinates cleared as a pair, and the trail surviving deletion; candidates in the report, the
+  export package's report.json, custody.json, and the deletion summary; coordinates and analyst
+  words never reaching the logs across record, edit, and delete.
+- Settings: `enable_external_map_links` off by default, toggleable, non-boolean rejected.
+- Migrations: v1–v6 databases upgrade in place to schema_version 7 with every row unchanged; the
+  `location_candidates` table shape with and without coordinates, FK validation, and cascade.
+
+Frontend: decimal coordinates beside the as-written strings with the as-written and
+disagreement wording; a flagged value badged, explained, kept, and never mapped; the
+absence-proves-nothing empty state; the OCR pointer; the OpenStreetMap link absent while the
+setting is off and, once on, client-built with `mlat`/`mlon`, `noopener`, and its own
+coordinate-sharing warning; the candidate form requiring place, basis, and an explicitly chosen
+assessment, and the payload it sends; candidate rows showing UNVERIFIED and "the analyst's own
+judgment, not a measurement" with basis, supports, review and assessment edits, and a two-step
+delete; the custody panel labelling the three candidate events and refetching after a candidate
+change; the error/retry path; the Settings map toggle off by default with its warning copy.
+
+## 12. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

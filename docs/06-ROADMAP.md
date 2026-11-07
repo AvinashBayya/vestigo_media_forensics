@@ -96,16 +96,23 @@ Paid or official provider API integrations were explicitly deferred: each needs 
 
 ## Milestone 6 — GEOINT / geo-lite
 
+**Status: complete** (2026-11-07, decision D23, approved plan `16-MILESTONE-6-PLAN.md`): machine
+location *clues* read as written, analyst location candidates classified UNVERIFIED with their own
+assessment labels, and one opt-in OpenStreetMap link built client-side. No stage claims a location.
+
 Goal: add location-context analysis without overclaiming.
 
 Scope:
 
-- EXIF GPS extraction
-- Coordinate validation
-- Map preview
-- Reverse geocoding
-- Terrain and landmark clues
-- Analyst confidence labels
+- EXIF GPS extraction — **done** (plus XMP/IPTC place tags and container ISO 6709 locations)
+- Coordinate validation — **done** (ranges checked per value; invalid values flagged, never corrected)
+- Map preview — **done** as an opt-in external link, off by default, built in the browser; no tiles,
+  no embedded map, no API key
+- Reverse geocoding — **not enabled** (an external lookup service; needs its own approval)
+- Terrain and landmark clues — **not started** (terrain analysis is explicitly out of scope; visible
+  landmarks are for the analyst to read in the OCR evidence and record as a candidate's basis)
+- Analyst confidence labels — **done** as analyst assessments (speculative / possible / likely),
+  always the analyst's own judgment and never machine-derived
 
 ## Milestone 7 — Vestigo integration
 

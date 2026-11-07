@@ -118,7 +118,9 @@ The implemented system keeps these specific honesty rules:
   covered data has not changed since signing, never that the content is truthful, accurate, or
   unmanipulated, and without a trust list it never establishes who the signer is. Absence of C2PA
   data proves nothing — most media has none and many platforms strip it.
-- No stage ever claims authenticity, manipulation, deepfake status, or location.
+- No stage ever claims authenticity, manipulation, deepfake status, or location. Location
+  metadata is reported as clues read from the file (M6, D23); **no stage ever claims a location
+  is confirmed**, and any interpretation is an analyst statement, labelled as such.
 
 ## 7. Deletion rule
 
@@ -211,4 +213,31 @@ never silently left out.
   per-lead state starting UNREVIEWED.
 - Leads appear in the evidence report (artifact-level, newest first), travel in the export package,
   and are deleted and counted with the artifact.
+
+## 14. Location clues and candidates (Milestone 6, D23)
+
+Machine and analyst work are separate records with different classifications:
+
+- **`location_clues` is OBSERVED**: coordinates, altitude, timestamps, device fields, place-name
+  tags, and container location strings, each read **as written** and labelled with the tag it came
+  from. Coordinates are additionally shown in decimal degrees for readability, with the original
+  strings and hemisphere refs beside them. Sources that disagree are both shown as found; Vestigo
+  never reconciles or prioritises them. Coordinate ranges are checked and an out-of-range or
+  half-present value is flagged with its reason and kept exactly as written — never corrected,
+  normalised, or discarded. Embedded location data is trivially edited and is never proof of where
+  media was captured; its absence is normal and proves nothing.
+- **Nothing is inferred from content**: no place names are extracted from OCR text and nothing is
+  read from audio. The section records only whether the analysis produced OCR text, so the analyst
+  reads the visible signs, addresses, and clocks themselves.
+- **A location candidate is an analyst statement, classified UNVERIFIED**: the stated place, the
+  required basis in the analyst's own words, their required assessment label (speculative /
+  possible / likely — their judgment, never machine-derived, never displayed automatically, and
+  with no "confirmed" value), any coordinates, and typed references to supporting evidence of the
+  same artifact. EXTERNAL stays reserved for provider leads and externally sourced references.
+  `recorded_at` is when Vestigo saved the candidate, nothing more.
+- Candidates are editable; every create, update, and delete is an append-only custody event (with
+  field names only — never coordinates), so the history survives edits and deletions. Review is the
+  lightweight per-candidate state starting UNREVIEWED.
+- Candidates appear in the evidence report (artifact-level, newest first), travel in the export
+  package, and are deleted and counted with the artifact.
 

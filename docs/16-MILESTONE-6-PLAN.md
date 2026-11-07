@@ -1,6 +1,8 @@
-# Milestone 6 Build Plan — GEOINT / Geo-Lite (DRAFT)
+# Milestone 6 Build Plan — GEOINT / Geo-Lite (approved)
 
-**Status: draft — awaiting approval. Nothing below is implemented.**
+Approved: 2026-11-07 with the proposed defaults (UNVERIFIED classification; speculative / possible /
+likely assessment labels; the gated OpenStreetMap link; audio included). Implemented: 2026-11-07
+(decision record in `09-DECISIONS.md` D23).
 
 Location-context analysis without overclaiming, on the evidence-first architecture of Milestones
 1–5. Machine output is **location clues** — observable facts recorded as written — and everything

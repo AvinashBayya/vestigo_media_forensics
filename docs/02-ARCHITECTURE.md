@@ -114,7 +114,7 @@ It will use:
 
 FFmpeg and ffprobe are installed in the Dev Container from the beginning, but Milestone 1 does not invoke them.
 
-## 7. Future GEOINT module
+## 7. GEOINT module (implemented in Milestone 6, D23)
 
 GEOINT will be a separate, opt-in analysis module.
 

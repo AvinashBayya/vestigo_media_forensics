@@ -415,6 +415,45 @@ Both `GET /artifacts/{id}/content` and `GET /artifacts/{id}/derived/{derived_fil
 take `download=true` to answer as an attachment (honest filename, protective headers unchanged),
 so the analyst can save the exact subject file for a manual provider upload.
 
+## Milestone 6 — Location clues and candidates (D23)
+
+### Evidence report: `location_clues` (per job, null when the stage did not run)
+
+Machine-read clues, all as written: `coordinates` (each with `source`, decimal `latitude`/
+`longitude`, `latitude_as_written`/`longitude_as_written` including hemisphere refs, `valid`, and
+`problem` when flagged), `altitude_meters` with `altitude_as_written` and `altitude_reference`,
+`text_clues` / `timestamps` / `device` / `iso6709` (each `{tag, value}`), and `ocr_available` —
+true when this analysis produced OCR text for the analyst to read. Vestigo never interprets that
+text, never reconciles disagreeing sources, and never corrects a flagged coordinate. The stage is
+`partial` with `LOCATION_VALUE_UNUSABLE` when a coordinate is out of range or half present. The
+analysis options gain `location_clues` (default **true**) for all three media types.
+
+### Location candidates
+
+- `GET /artifacts/{id}/location-candidates` — newest first, with the honesty notice.
+- `POST /artifacts/{id}/location-candidates` (201) — body: `description`, `basis`, and
+  `analyst_assessment` (`speculative` | `possible` | `likely`) are **required**; optional
+  `latitude`/`longitude` (range-validated, and must be given together), `notes`, and `supports`
+  (`[{type: "evidence_record" | "derived_file" | "external_lead", id}]`, each checked to exist and
+  belong to this artifact, else 404).
+- `PATCH /artifacts/{id}/location-candidates/{candidate_id}` — any subset plus `review_state`;
+  explicit null is rejected 422 on the required fields, and coordinates change or clear as a pair.
+- `DELETE /artifacts/{id}/location-candidates/{candidate_id}` (204).
+
+A candidate answers with `candidate_id`, the stored fields, fixed `classification: "UNVERIFIED"`,
+`review_state` (starting UNREVIEWED), `recorded_at` (when Vestigo saved it) and `updated_at`.
+Creates, updates, and deletes write `location_candidate_recorded` / `_updated` (changed field names)
+/ `_deleted` custody events, which carry no coordinates. The evidence report gains an artifact-level
+`location_candidates` list (so they travel in the export package's `report.json`), and
+`DeletionSummary` gains `location_candidates`.
+
+### Settings
+
+`editable` gains `enable_external_map_links` (default **false**). Vestigo exposes no map endpoint:
+when the flag is on, the artifact page builds an OpenStreetMap link in the browser, so the backend
+never constructs, stores, transmits, or logs a coordinate-bearing URL. Reverse geocoding is not
+offered.
+
 ## Review state values
 
 - `UNREVIEWED`

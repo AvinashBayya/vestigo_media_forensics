@@ -72,13 +72,20 @@ No new dependencies: the manual-first reverse-image search uses the existing Fas
 React toolchain and makes no outbound HTTP requests. Provider-specific SDKs or HTTP clients were
 not needed and remain out of scope until a paid/official API integration is separately approved.
 
+## Backend — Milestone 6 (D23)
+
+No new dependencies: location clues come from the ExifTool already installed (read a second time
+with numeric output), coordinate validation is a range check in `app/services/location.py`, and the
+only map affordance is a plain link built in the browser. The "GEOINT" future-dependency list below
+(reverse-geocoding service, map rendering library, coordinate validation utilities) was therefore
+not needed; a geocoding service or tile provider would each require separate approval.
+
 ## Future dependencies
 
 ### GEOINT
 
-- Reverse-geocoding service
-- Map rendering library
-- Coordinate validation utilities
+Done in Milestone 6 with no new dependencies (see above). Still unapproved, should they ever be
+wanted: a reverse-geocoding service, a map rendering/tile library.
 
 ### C2PA
 

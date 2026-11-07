@@ -311,3 +311,54 @@ lightweight lead review).
   artifact.
 - **Refused capabilities**: automated scraping, CAPTCHA bypass, browser automation, rate-limit
   evasion, automatic media uploads.
+
+## D23 — Milestone 6: GEOINT / geo-lite, clues not claims
+
+Implemented 2026-11-07 (approved plan `16-MILESTONE-6-PLAN.md`, decisions M6-1…11 confirmed by the
+user with the proposed defaults: UNVERIFIED classification, speculative/possible/likely assessment
+labels, the gated OpenStreetMap link, and audio included).
+
+- **Machine clues, read as written.** A new `location_clues` stage (optional, default on) runs in
+  all three pipelines. Two ExifTool passes give numeric values and the as-written strings:
+  coordinates are reported in decimal beside the originals (hemisphere refs applied from the signed
+  Composite pair, or from the raw EXIF pair plus its refs), with altitude and its reference,
+  location-relevant timestamps, device/orientation fields, and the location-named IPTC/XMP text
+  fields — each labelled with the tag it came from. Container location tags (QuickTime/Matroska
+  ISO 6709) are recorded as written and parsed when readable, in raw or ExifTool-normalised form.
+  Sources that disagree are both shown; nothing is reconciled or prioritised. OBSERVED
+  classification; raw ExifTool output kept as a derived file.
+- **Validation, never correction.** Latitude within ±90 and longitude within ±180 are checked per
+  value; out-of-range or half-present pairs are flagged with the reason and kept exactly as
+  written, making the stage `partial` with `LOCATION_VALUE_UNUSABLE`. Nothing is dropped, fixed, or
+  normalised.
+- **No inference from content.** No place names are extracted from OCR text and nothing is inferred
+  from audio: the section records only whether the analysis produced OCR text, and the UI points the
+  analyst at it. Audio runs the same metadata-only reader; no audio is decoded.
+- **Analyst interpretation is separate and labelled.** `location_candidates` (Alembic 0007,
+  schema_version 7, additive, `loc_` prefix) holds the analyst's stated place, required basis,
+  required assessment label (speculative / possible / likely — their own judgment, never derived or
+  displayed automatically, and deliberately without a "confirmed" value), optional range-validated
+  coordinate pair, notes, and typed references to supporting evidence of the same artifact
+  (evidence records, derived files, external leads — each checked to exist and belong to it).
+  Classification is fixed **UNVERIFIED**: an analyst interpretation of Vestigo-held evidence, with
+  EXTERNAL reserved for provider leads and externally sourced references. Lightweight review starts
+  UNREVIEWED.
+- **Custody and lifecycle.** Create, update (changed field names only), and delete write append-only
+  custody events (`location_candidate_recorded` / `_updated` / `_deleted`); no-op saves record
+  nothing; custody details carry no coordinates, only whether any were given. Candidates flow into
+  the evidence report, export package, custody.json, and deletion summary, and cascade-delete with
+  the artifact.
+- **The only external map affordance** is an opt-in OpenStreetMap link (`enable_external_map_links`,
+  default false). The URL is built entirely in the browser — the backend never constructs, stores,
+  transmits, or logs a coordinate-bearing URL — and opens in a new tab on click, with its own
+  warning that clicking sends those coordinates to openstreetmap.org. No tiles, no iframe, no
+  auto-loading, no API key, no other map provider. Reverse geocoding is **not** enabled in this
+  milestone. This is a deliberate carve-out from the M5 wording in 05 §4 ("no query parameters,
+  nothing evidence-derived"), which was written for static provider landing pages.
+- **Privacy.** Coordinates are sensitive EXIF (05 §7): they never appear in backend logs, which a
+  test enforces across record, edit, and delete. The backend makes no outbound HTTP request.
+- **Refused in this milestone**: facial recognition, biometrics, person tracking, covert
+  surveillance, automated geolocation verdicts, satellite imagery, terrain analysis, shadow/solar
+  positioning, advanced geolocation automation, social-media intelligence, AI captions,
+  transcription, steganography, scraping, CAPTCHA or rate-limit evasion, cloud-first processing,
+  Vestigo integration, multi-user login, and cloud storage.
