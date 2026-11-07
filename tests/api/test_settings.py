@@ -48,6 +48,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
         "library_page_size": 25,
         "auto_analyze_after_upload": True,
         "enabled_search_providers": [],
+        "enable_external_map_links": False,
     }
     assert body["updated_at"] is None
     env = body["environment"]
@@ -81,6 +82,7 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
         "library_page_size": 50,
         "auto_analyze_after_upload": False,
         "enabled_search_providers": [],
+        "enable_external_map_links": False,
     }
 
 
@@ -138,3 +140,18 @@ def test_setting_values_are_not_logged(client: TestClient, caplog: pytest.LogCap
     assert "count=2" in caplog.text
     assert "100" not in caplog.text
     assert "False" not in caplog.text
+
+
+def test_external_map_links_are_off_by_default_and_toggleable(client: TestClient) -> None:
+    """M6: the only external map affordance is opt-in, and the backend never builds a map URL."""
+    assert client.get("/api/v1/settings").json()["editable"]["enable_external_map_links"] is False
+
+    response = client.patch("/api/v1/settings", json={"enable_external_map_links": True})
+    assert response.status_code == 200, response.text
+    assert response.json()["editable"]["enable_external_map_links"] is True
+
+    assert_error(
+        client.patch("/api/v1/settings", json={"enable_external_map_links": "yes please"}),
+        422,
+        "VALIDATION_ERROR",
+    )

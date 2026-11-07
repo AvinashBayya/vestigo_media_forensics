@@ -37,6 +37,9 @@ class EditableSettings(BaseModel):
     auto_analyze_after_upload: bool = True
     # Reverse-image search providers the analyst has enabled (M5). All disabled by default (05 §4).
     enabled_search_providers: EnabledSearchProviders = Field(default_factory=list)
+    # Off by default (M6): when on, the artifact page offers an OpenStreetMap link for coordinates
+    # found in metadata. The link is built in the browser; the backend never constructs or logs one.
+    enable_external_map_links: bool = False
 
 
 class EnvironmentSettings(BaseModel):
@@ -78,6 +81,7 @@ class SettingsUpdate(BaseModel):
     library_page_size: LibraryPageSize | None = None
     auto_analyze_after_upload: bool | None = None
     enabled_search_providers: EnabledSearchProviders | None = None
+    enable_external_map_links: bool | None = None
 
     @model_validator(mode="before")
     @classmethod
