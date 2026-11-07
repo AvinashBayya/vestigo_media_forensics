@@ -54,6 +54,14 @@ provider's own site under its terms. The backend makes no outbound HTTP requests
 scraping, CAPTCHA bypass, browser automation, rate-limit evasion, and automatic uploads are
 prohibited; paid or official provider APIs each require separate approval.
 
+Pass 1 (D24) adds local AI on strict terms: inference runs on this machine, every capability is off
+by default, and the third-party runtime's telemetry is forced off in-process
+(`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`) before it can load, asserted by a
+test. No media, prompt, embedding, question, or answer is ever transmitted; the backend makes no
+outbound request; `NEEDLE_API_KEY` is never read and no fine-tuning entry point exists, so the
+vendor's platform fine-tuning (which uploads files to its GPUs) is unreachable. Model weights are
+supplied by the analyst as local files; nothing downloads at import.
+
 Milestone 6 (D23) adds one deliberate carve-out to the "nothing evidence-derived" sentence above,
 which was written for M5's static provider landing pages: an **opt-in** OpenStreetMap link for
 coordinates already on screen. It is off by default, built entirely in the analyst's browser (the
@@ -90,6 +98,7 @@ Users must be able to delete:
 - Review events
 - Fingerprint index rows (image and keyframe)
 - Its playable preview, when one was created
+- AI drafts, machine transcripts, and embedding indexes (Pass 1)
 - Custody events (append-only until the artifact itself is deleted)
 - External leads (M5)
 - Location candidates (M6)
@@ -103,6 +112,7 @@ deleted automatically.
 Logs must not contain:
 
 - Full image contents
+- AI prompts, model output, draft field values, transcript text, and embedding vectors (Pass 1)
 - Sensitive EXIF data, including GPS coordinates — and, since M6, analyst-entered coordinates,
   location descriptions, and the basis text of location candidates
 - API keys

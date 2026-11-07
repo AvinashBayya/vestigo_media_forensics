@@ -307,7 +307,44 @@ judgment, not a measurement" with basis, supports, review and assessment edits, 
 delete; the custody panel labelling the three candidate events and refetching after a candidate
 change; the error/retry path; the Settings map toggle off by default with its warning copy.
 
-## 12. Container tests
+## 12. Pass 1 tests (local AI foundation, D24)
+
+Every test runs with fakes: nothing installs the runtime, downloads weights, or reaches the network.
+
+Backend:
+
+- Runtime: the telemetry variables are forced in-process and reported by `/ai/status`;
+  `NEEDLE_API_KEY` is never present; every capability is off by default with an actionable reason;
+  the label and limitations are served; the known models carry Apache-2.0 and their Hugging Face
+  sources with `installed: false`; enabling a capability without the runtime names
+  `pip install cactus-needle`; model paths validate; the disabled provider refuses every capability.
+- Drafts: refused with 409 `AI_UNAVAILABLE` while AI is off; model provenance and the model's own
+  confidence recorded (and `null` left alone when the model gives none); the model actually reads the
+  held material; per-field accept / edit / reject with the model's value kept beside an edit; an edit
+  requiring a value and the other actions refusing one; unknown field 404; custody events carrying
+  field names but no content; **the evidence report byte-identical after accepting an edit**.
+- Transcripts: images refused; segments, word timing, language, duration, and model provenance
+  stored; the analyst's correction kept beside the model's verbatim text; custody for create, edit,
+  and delete; a video's audio track extracted to a derived file and served.
+- Semantic search: refused until enabled; indexing covers notes, OCR text, metadata, and the
+  analyst's own candidates; search ranks their notes; answers always carry sources, draft no prose
+  without a generator, and change no stored evidence; scoping to chosen artifacts; the index
+  rebuildable, clearable, custody-trailed, counted, and deleted with the artifact.
+- Export and deletion: `ai/` area with its README and `drafts.json`, `report.json` free of AI
+  material, and all three tables counted in the deletion summary.
+- Migrations: v1–v7 databases upgrade in place to schema_version 8 with every row unchanged; table
+  shapes, the SET NULL on evidence deletion, and the cascade.
+
+Frontend: the panel's AI label and never-a-finding wording; the model's confidence shown as its own
+and "no confidence given by the model" where absent; per-field accept/edit/reject payloads; the
+model's value kept beside an analyst edit; the draft request payload; timestamped transcripts with
+the machine-generated caveat, model provenance, and the extracted-audio source; a correction that
+does not overwrite; no transcript section for an image; the search page's local-only wording,
+matches with their source kind and score, answers always showing "Sources - read these", the
+no-generator path returning material instead of prose, the empty-index explanation, and errors with
+retry; Settings switches off by default with the local-only wording.
+
+## 13. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

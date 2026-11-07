@@ -90,6 +90,17 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 - One opt-in **OpenStreetMap link**, off by default, built in the browser and opened only on click, with a warning that clicking sends those coordinates to openstreetmap.org. No map tiles, no embedded map, no API key, no reverse geocoding, and no coordinates in Vestigo's logs
 - Candidate creates, edits, and deletes are append-only custody events; candidates travel in the evidence report and export package and are deleted and counted with the artifact (Alembic 0007, schema v7)
 
+### Pass 1 — Local AI foundation (D24)
+
+Local, optional, and off by default. All three tools are Cactus Compute's, Apache-2.0, CPU-only and tens of megabytes; install them yourself with `pip install cactus-needle` and point Vestigo at the model files. A stock build installs nothing, downloads nothing, and sends nothing.
+
+- **AI output is never evidence.** Drafts, transcripts, and indexes live in their own tables, are absent from the evidence report, travel in the export package's separate `ai/` folder with its own "not evidence" README, and are labelled **"AI-generated, unverified — analyst must review"** everywhere
+- **Needle structured extraction**: ask a local model for named fields from material you already hold (metadata, OCR text, your notes, a transcript), then accept, edit, or reject **each field** — an edit is stored beside the model's value, never over it, and nothing is ever written back onto metadata or evidence
+- **Whistle transcription** (16.9 MB): timestamped local speech-to-text for audio and video, with word-level timing where the model gives it; the model's text is kept verbatim beside your corrections and the original audio is only ever read
+- **Local semantic search and question answering** over your own notes, OCR text, transcripts, metadata, leads, and location candidates; answers always come with the sources they drew on, and are never stored or citable as findings
+- **Confidence only where the model supplies it** — Vestigo never calculates one
+- **Vendor telemetry is forced off** in-process (`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`) before the runtime can load, asserted by a test; `NEEDLE_API_KEY` is never read, so the vendor's upload-to-their-GPUs fine-tuning is unreachable
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
@@ -123,6 +134,7 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 - Database: SQLite
 - Frontend: React + Vite + TypeScript
 - Media tooling: ExifTool, Tesseract OCR, FFmpeg, ffprobe
+- Local AI (optional, analyst-installed): Cactus / Needle / Whistle (Apache-2.0, CPU-only)
 - C2PA validation: c2pa-python 0.38.1 (c2pa-rs SDK 0.91.3), entirely local
 - Container: Docker Dev Container
 
@@ -225,6 +237,16 @@ With both servers running, open http://localhost:5180.
 4. **Audio.** Upload a WAV/MP3/FLAC/OGG/M4A: it plays in the built-in audio player, with media information (codec, channels, sample rate, container-reported duration) and ID3/container metadata as evidence. Upload the identical file again: duplicate search reports "Same file (identical bytes)". Re-encode it (e.g. WAV → MP3) and upload: no match, and the evidence's limitations explain that only byte-identical audio matches.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
+
+## Manual test of local AI (Pass 1)
+
+Everything below works with local AI **off** except where it says otherwise — that is the point.
+
+1. **Off by default.** Open any artifact: the "AI assistant (drafts, not evidence)" panel shows the AI-generated-unverified label, says nothing here is a finding, reports that vendor telemetry is disabled, and the "Ask the local model" button is disabled with the reason given. `curl localhost:8400/api/v1/ai/status` shows every capability false, `telemetry_disabled: true`, and both models listed with Apache-2.0 and their Hugging Face URLs, `installed: false`.
+2. **Semantic search with no model at all.** Enable "Semantic search" in Settings. Add a note to an artifact, then press "Index" from the AI panel (or `POST /api/v1/ai/artifacts/<id>/index`). Go to **Search**, search a word from your note: your own record comes back with its source kind and score. Ask a question: the answer section says no local generator is available and returns your material exactly as recorded — no invented prose.
+3. **Drafts and transcription (needs the runtime).** `pip install cactus-needle`, download `needle3.cact` and `whistle.cact`, set their paths in Settings, and enable "AI drafts" and "Transcription". Ask for fields from metadata: each proposed field shows the model's value, its own confidence where given, and Accept / Edit / Reject. Edit one — the model's value stays visible beside yours, and the evidence report is unchanged. Transcribe an audio or video file: timestamped segments appear with the machine-generated caveat and the model's provenance.
+4. **Nothing leaks.** Grep the backend log: no prompts, draft values, transcript text, or vectors — only artifact ids and event names.
+5. **Custody, export, deletion.** The Chain of custody panel gains the AI events (names only). Export the package: `ai/README.txt` says it is not evidence, `ai/drafts.json` and `ai/transcripts.json` hold the material, and `report.json` has none of it. Delete the artifact: the summary counts `ai_drafts`, `transcripts`, and `embedding_chunks`, and all are gone.
 
 ## Manual test of location clues (M6)
 

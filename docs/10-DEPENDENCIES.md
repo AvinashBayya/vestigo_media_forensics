@@ -80,6 +80,24 @@ only map affordance is a plain link built in the browser. The "GEOINT" future-de
 (reverse-geocoding service, map rendering library, coordinate validation utilities) was therefore
 not needed; a geocoding service or tile provider would each require separate approval.
 
+## Backend — Pass 1 local AI (D24), optional and analyst-installed
+
+Not declared in `pyproject.toml` and not required to run or test Vestigo: a stock build has local AI
+disabled and every test uses fakes. The analyst installs these themselves if they want live
+inference.
+
+- `cactus-needle` (3.2.10 at time of writing), import name `needle`, **Apache-2.0** —
+  [github.com/cactus-compute/needle](https://github.com/cactus-compute/needle). Provides tool
+  calling, structured extraction, and speech-to-text on a CPU engine.
+- `cactus-compute` (4.0.1), **Apache-2.0** —
+  [github.com/cactus-compute/cactus](https://github.com/cactus-compute/cactus). The inference
+  engine; the vendor's documentation site also describes paid tiers for cloud hybrid inference,
+  custom models, and extra hardware acceleration, none of which Vestigo uses or can reach.
+- Model weights, **Apache-2.0**, supplied as local files by the analyst:
+  [Cactus-Compute/needle3](https://huggingface.co/Cactus-Compute/needle3) (2-bit, 8–29 MB) and
+  [Cactus-Compute/whistle](https://huggingface.co/Cactus-Compute/whistle) (16.9 MB speech-to-text).
+- No GPU, no account, and no recurring cost. Vendor telemetry is forced off in-process (D24).
+
 ## Future dependencies
 
 ### GEOINT

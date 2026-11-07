@@ -362,3 +362,54 @@ labels, the gated OpenStreetMap link, and audio included).
   positioning, advanced geolocation automation, social-media intelligence, AI captions,
   transcription, steganography, scraping, CAPTCHA or rate-limit evasion, cloud-first processing,
   Vestigo integration, multi-user login, and cloud storage.
+
+## D24 — Pass 1: local intelligence foundation (Cactus, Needle, Whistle)
+
+Implemented 2026-11-07 (plan `17-CONSOLIDATED-CAPABILITY-ROADMAP.md`). The three named tools are all
+Cactus Compute's, all Apache-2.0, CPU-only and tens of megabytes: **Cactus** (inference engine,
+`pip install cactus-compute`), **Needle** (tool calling, structured extraction, embeddings, ASR
+host; `pip install cactus-needle`, `import needle`, weights
+`huggingface.co/Cactus-Compute/needle3`) and **Whistle** (16.9 MB speech-to-text on the Needle
+engine, weights `huggingface.co/Cactus-Compute/whistle`). Licence names and source URLs are recorded
+in the roadmap and in every stored artifact's provenance; the user handles licence and deployment
+approval.
+
+- **AI output is never evidence.** It lives in `ai_drafts`, `transcripts`, and `embedding_chunks`
+  (Alembic 0008, schema_version 8, additive), never in `evidence_records`, carries no
+  OBSERVED/DERIVED classification, is absent from the evidence report, and travels in the export
+  package's separate `ai/` area with its own README stating it is not evidence. Every surface shows
+  "AI-generated, unverified - analyst must review".
+- **Telemetry is killed, not trusted.** The Needle binary ships telemetry enabled; Vestigo forces
+  `NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, and `CACTUS_TELEMETRY=0` at import, before any provider
+  can load the runtime, and a test asserts the invariant. Nothing reads `NEEDLE_API_KEY` and no
+  fine-tuning entry point exists, so the vendor's upload-to-their-GPUs path is unreachable.
+- **Default-off, dependency-free.** Three opt-in settings (`ai_enabled`, `transcription_enabled`,
+  `semantic_search_enabled`) plus optional local model paths. Capabilities sit behind protocols with
+  Needle-backed providers, a dependency-free deterministic embedder, and a disabled default that
+  refuses with an actionable reason; a stock build installs nothing, downloads nothing, and the
+  whole suite runs with fakes. Requesting AI while it is off returns 409 `AI_UNAVAILABLE` naming the
+  reason.
+- **Confidence only where the model gives it.** Needle returns its own `confidence`; it is recorded
+  as the model's estimate and shown as such. Vestigo never calculates or infers one, and the UI says
+  "no confidence given by the model" when there is none.
+- **Drafts** propose named fields from held material (metadata, OCR text, analyst notes, a
+  transcript), recording the evidence record read as lineage. The analyst accepts, edits, or rejects
+  **each field**; an edit is stored beside the model's value, never over it, and nothing is ever
+  written back onto metadata or evidence (a test pins the evidence report unchanged).
+- **Transcripts** are machine-generated, unverified, and derived: timestamped segments with
+  word-level timing where the model supplies it, the model's text kept verbatim beside any analyst
+  correction, the original audio only ever read, and a video's audio track extracted with ffmpeg to
+  a derived file so the lineage is explicit.
+- **Semantic search** indexes only the analyst's own text (notes, record notes, OCR output,
+  transcripts, selected metadata, their leads and candidates) with the producing model recorded per
+  chunk, so indexes are never mixed. Answers always return their sources; a drafted answer appears
+  only when a local generator exists, is labelled, is never stored, and never becomes evidence. When
+  none exists, the material is returned with a notice saying why.
+- **Custody, deletion, logs.** Generation, per-field decisions, transcript edits, indexing, and
+  deletions write append-only custody events carrying ids, model names, and field names only - never
+  content. All three tables are counted in the deletion summary and cascade with the artifact.
+  Nothing AI-related is logged beyond the artifact id.
+- **Known limitation, stated rather than hidden.** The published Python API exposes audio embeddings
+  but no confirmed text-embedding call, so semantic search uses Vestigo's own deterministic
+  embedder, which matches shared wording rather than meaning. Swapping in Needle text vectors is a
+  change in one resolver, because every chunk records its model.

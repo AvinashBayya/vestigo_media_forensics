@@ -454,6 +454,55 @@ when the flag is on, the artifact page builds an OpenStreetMap link in the brows
 never constructs, stores, transmits, or logs a coordinate-bearing URL. Reverse geocoding is not
 offered.
 
+## Pass 1 — Local AI (D24)
+
+All local, all off by default. Nothing downloads at import, and the backend makes no outbound
+request. Asking for AI work while a capability is off returns **409 `AI_UNAVAILABLE`** with the
+reason and the fix.
+
+### `GET /ai/status`
+
+Runtime availability, the three analyst switches, what is unavailable and why, the telemetry state
+(`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`, forced in-process), the standing AI
+label and limitations, and the known models with licence, source URL, quantization, and whether a
+local file is in place.
+
+### Drafts — `/ai/artifacts/{id}/drafts`
+
+`GET` lists them newest first with the label and notice. `POST` (201) takes `source_kind`
+(`metadata` | `ocr_text` | `analyst_notes` | `transcript`) and `fields` (1–25 names) and returns the
+proposed fields with the model's own `confidence` where it supplied one, its `reasoning`, warnings,
+and full model provenance. `PATCH /{draft_id}` takes `{field, action, value?}` where action is
+`accepted` | `edited` | `rejected` — `value` is required for an edit and refused otherwise, and the
+model's value is always kept beside it. `DELETE /{draft_id}` (204). Drafts never appear in the
+evidence report and are never written back onto metadata or evidence.
+
+### Transcripts — `/ai/artifacts/{id}/transcripts`
+
+`GET` lists them with the machine-generated notice. `POST` (201) takes an optional `language` and
+transcribes the artifact's audio locally — for a video, ffmpeg extracts the audio track to a derived
+file first, so the lineage is explicit; images are refused with `WRONG_MEDIA_TYPE`. The response
+carries timestamped `segments` (with word-level timing and the model's probabilities where
+available), the model's `text` verbatim, `edited_text`, language, duration, warnings, review state,
+and model provenance. `PATCH /{transcript_id}` takes `edited_text` and/or `review_state`; the
+model's text is never overwritten. `DELETE /{transcript_id}` (204) leaves the extracted audio as a
+derived file of its analysis.
+
+### Semantic search — `/ai/artifacts/{id}/index`, `/ai/search`, `/ai/answer`
+
+`POST …/index` rebuilds that artifact's index from the analyst's own held text and reports the chunk
+count, model, and sources; `DELETE …/index` drops it. `GET /ai/search?q=&limit=` ranks indexed
+chunks and returns the analyst's own records as pointers with a score. `POST /ai/answer` takes
+`{question, artifact_ids?}` and **always** returns `sources`; `answer` is present only when a local
+generator is available, is labelled, and is never stored or turned into an evidence record.
+
+### Settings and deletion
+
+`editable` gains `ai_enabled`, `transcription_enabled`, `semantic_search_enabled`, `ai_model_path`,
+and `transcription_model_path` (all off or empty). `DeletionSummary` gains `ai_drafts`,
+`transcripts`, and `embedding_chunks`. The export package gains a separated `ai/` area
+(`README.txt`, `drafts.json`, `transcripts.json`); `report.json` stays free of AI material.
+
 ## Review state values
 
 - `UNREVIEWED`

@@ -241,3 +241,27 @@ Machine and analyst work are separate records with different classifications:
 - Candidates appear in the evidence report (artifact-level, newest first), travel in the export
   package, and are deleted and counted with the artifact.
 
+## 15. AI output is not evidence (Pass 1, D24)
+
+- **Separate by construction.** Model output lives in `ai_drafts`, `transcripts`, and
+  `embedding_chunks`, never in `evidence_records`. It carries no classification, never appears in
+  the evidence report, and travels in the export package's `ai/` area with its own README stating
+  plainly that it is not evidence. Every surface shows "AI-generated, unverified - analyst must
+  review".
+- **Provenance is mandatory**: model name, version, quantization, source URL, licence, runtime, and
+  the local file it was loaded from, plus timestamps, warnings, errors, and what held material the
+  model read.
+- **Confidence is the model's or nobody's.** A confidence figure is recorded only when the model
+  supplies one, labelled as the model's own estimate. Vestigo never calculates, infers, or displays
+  a confidence of its own.
+- **The analyst owns every acceptance.** Fields are accepted, edited, or rejected one at a time; an
+  edit is stored beside the model's value, never over it; and nothing is ever written back onto
+  metadata, evidence, or any existing analyst record. Transcripts keep the model's text verbatim
+  beside the analyst's correction, and the original audio is only ever read.
+- **Retrieval shows its sources.** A generated answer never stands alone: the analyst's own records
+  it drew on are always returned, the answer is labelled, and it is never stored or citable as a
+  finding.
+- **Custody and deletion**: generation, per-field decisions, edits, indexing, and deletions are
+  append-only custody events carrying ids, model names, and field names only - never content. All
+  three tables are counted in the deletion summary and cascade with the artifact.
+
