@@ -8,7 +8,7 @@ analyst-reported publication date are separate facts. Classification is always E
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.common import ReviewState
 
@@ -54,6 +54,18 @@ class ExternalLeadUpdate(BaseModel):
     claimed_published_at: str | None = Field(default=None, max_length=100)
     notes: str | None = Field(default=None, max_length=10_000)
     review_state: ReviewState | None = None
+
+    @model_validator(mode="after")
+    def _no_null_for_required_fields(self) -> "ExternalLeadUpdate":
+        # image_url and claimed_published_at may be cleared with an explicit null; the rest may not.
+        nulled = sorted(
+            name
+            for name in ("provider", "result_url", "notes", "review_state")
+            if name in self.model_fields_set and getattr(self, name) is None
+        )
+        if nulled:
+            raise ValueError(f"{', '.join(nulled)} cannot be null; omit the field to leave it unchanged.")
+        return self
 
 
 class ExternalLeadInfo(BaseModel):

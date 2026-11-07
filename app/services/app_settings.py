@@ -5,7 +5,7 @@ Values are never logged.
 """
 
 import logging
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import TypeAdapter, ValidationError
 from sqlalchemy import select
@@ -31,8 +31,11 @@ def editable_settings(session: Session) -> tuple[EditableSettings, Any]:
         row = stored.get(name)
         if row is None:
             continue
+        # Keep the field's Annotated validators (e.g. the search-provider key check): bare
+        # field.annotation would drop them and let a stale stored value crash instead of being ignored.
+        annotation = Annotated[field.annotation, *field.metadata] if field.metadata else field.annotation
         try:
-            values[name] = TypeAdapter(field.annotation).validate_python(row.value)
+            values[name] = TypeAdapter(annotation).validate_python(row.value)
         except ValidationError:
             log_event(logger, logging.WARNING, "settings.invalid_stored_value", status="ignored")
     updated_at = max((row.updated_at for row in stored.values()), default=None)

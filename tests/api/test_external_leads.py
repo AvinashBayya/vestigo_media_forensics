@@ -211,3 +211,46 @@ def test_download_parameter_serves_an_attachment(client: TestClient, fixtures: F
     original = client.get(f"/api/v1/artifacts/{artifact_id}/content", params={"download": "true"})
     assert original.headers["content-disposition"].startswith("attachment")
     assert fixtures.video_static.name in original.headers["content-disposition"]
+
+
+def test_explicit_null_on_required_lead_fields_is_rejected_not_500(
+    client: TestClient, fixtures: FixtureSet
+) -> None:
+    artifact_id = upload_ok(client, fixtures.jpeg)["artifact_id"]
+    lead = record_lead(client, artifact_id, notes="keep me")
+    url = f"/api/v1/artifacts/{artifact_id}/external-leads/{lead['lead_id']}"
+
+    for field in ("provider", "result_url", "notes", "review_state"):
+        assert_error(client.patch(url, json={field: None}), 422, "VALIDATION_ERROR")
+
+    # The lead is untouched, and the optional fields may still be cleared with an explicit null.
+    unchanged = client.get(f"/api/v1/artifacts/{artifact_id}/external-leads").json()["leads"][0]
+    assert unchanged["notes"] == "keep me"
+    assert unchanged["updated_at"] is None
+    cleared = client.patch(url, json={"image_url": None, "claimed_published_at": None})
+    assert cleared.status_code == 200, cleared.text
+
+
+def test_another_artifacts_keyframe_is_rejected_as_subject(client: TestClient, fixtures: FixtureSet) -> None:
+    other_id, _ = analyse_video(client, fixtures.video_scenes)
+    foreign = client.get(f"/api/v1/artifacts/{other_id}/evidence").json()["keyframes"]["frames"][0][
+        "derived_file_id"
+    ]
+    artifact_id, _ = analyse_video(client, fixtures.video_static)
+    assert_error(
+        client.post(
+            f"/api/v1/artifacts/{artifact_id}/external-leads",
+            json={"provider": "TinEye", "result_url": RESULT_URL, "derived_file_id": foreign},
+        ),
+        404,
+        "NOT_FOUND",
+    )
+
+
+def test_custody_notice_states_provider_pages_are_unobservable(
+    client: TestClient, fixtures: FixtureSet
+) -> None:
+    artifact_id = upload_ok(client, fixtures.jpeg)["artifact_id"]
+    notice = client.get(f"/api/v1/artifacts/{artifact_id}/custody").json()["notice"]
+    assert "cannot be observed by Vestigo and is never recorded" in notice
+    assert "only leads the analyst records appear" in notice

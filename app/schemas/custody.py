@@ -10,7 +10,9 @@ CUSTODY_NOTICE = (
     "uploaded. It is not a legal chain of custody, it says nothing about the file's history "
     "before upload, and no event is ever inferred: evidence-package exports and duplicate-library "
     "changes made before schema revision 0005 were not recorded anywhere and therefore do not "
-    "appear. Derived files written before that revision have no recorded source."
+    "appear. Derived files written before that revision have no recorded source. Opening an "
+    "external search provider's page, and anything that happens on the provider's site, cannot be "
+    "observed by Vestigo and is never recorded - only leads the analyst records appear here."
 )
 
 

@@ -54,3 +54,24 @@ def test_enabling_providers_via_settings(client: TestClient) -> None:
         "VALIDATION_ERROR",
     )
     assert get_providers(client)["providers"][2]["enabled"] is True
+
+
+def test_stale_stored_provider_keys_are_ignored_not_crashing(client: TestClient, services, settings) -> None:
+    """A stored value that is no longer valid is ignored and the default applies (M2-8 rule)."""
+    from app.core.clock import utcnow
+    from app.models import AppSetting
+
+    with services.db.writer() as session, session.begin():
+        session.merge(
+            AppSetting(
+                key="enabled_search_providers",
+                value=["askjeeves", "tineye"],  # as if a provider was removed in an upgrade
+                updated_at=utcnow(),
+            )
+        )
+
+    body = client.get("/api/v1/settings")
+    assert body.status_code == 200, body.text
+    assert body.json()["editable"]["enabled_search_providers"] == []  # ignored, default used
+    for provider in get_providers(client)["providers"]:
+        assert provider["enabled"] is False
