@@ -33,6 +33,9 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 Upload
               </NavLink>
+              <NavLink to="/search" className={NAV_LINK}>
+                Search
+              </NavLink>
               <NavLink to="/settings" className={NAV_LINK}>
                 Settings
               </NavLink>

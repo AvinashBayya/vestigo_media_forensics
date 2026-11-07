@@ -21,6 +21,7 @@ import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
 import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { ChainOfCustodyPanel } from "../components/evidence/ChainOfCustodyPanel";
+import { AIAssistantPanel } from "../components/evidence/AIAssistantPanel";
 import { LocationPanel } from "../components/evidence/LocationPanel";
 import { ReverseImageSearchPanel } from "../components/evidence/ReverseImageSearchPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
@@ -67,6 +68,7 @@ export function ArtifactPage() {
   const [leadActivity, setLeadActivity] = useState(0);
   // Bumped on every location-candidate change so the custody panel refetches (M6 events).
   const [candidateActivity, setCandidateActivity] = useState(0);
+  const [aiActivity, setAiActivity] = useState(0);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -371,9 +373,14 @@ export function ArtifactPage() {
               onLeadsChanged={() => setLeadActivity((n) => n + 1)}
             />
           )}
+          <AIAssistantPanel
+            artifactId={artifact.artifact_id}
+            mediaType={artifact.media_type}
+            onChanged={() => setAiActivity((n) => n + 1)}
+          />
           <ChainOfCustodyPanel
             artifactId={artifact.artifact_id}
-            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}:${candidateActivity}`}
+            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}:${candidateActivity}:${aiActivity}`}
           />
         </div>
       </div>

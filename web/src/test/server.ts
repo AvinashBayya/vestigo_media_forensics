@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { ARTIFACT_ID, LEADS_NOTICE, LOCATION_NOTICE, artifactDetail, artifactList, custodyReport, evidenceReport, health, jobHistoryItem, searchProviders, settingsResponse } from "./data";
+import { ARTIFACT_ID, DRAFTS_NOTICE, LEADS_NOTICE, LOCATION_NOTICE, TRANSCRIPTS_NOTICE, aiStatus, artifactDetail, artifactList, custodyReport, evidenceReport, health, jobHistoryItem, searchProviders, settingsResponse } from "./data";
 
 export const API = "/api/v1";
 
@@ -21,6 +21,18 @@ export const server = setupServer(
   ),
   http.get(`${API}/artifacts/:artifactId/location-candidates`, ({ params }) =>
     HttpResponse.json({ artifact_id: params.artifactId, notice: LOCATION_NOTICE, candidates: [] }),
+  ),
+  http.get(`${API}/ai/status`, () => HttpResponse.json(aiStatus())),
+  http.get(`${API}/ai/artifacts/:artifactId/drafts`, ({ params }) =>
+    HttpResponse.json({
+      artifact_id: params.artifactId,
+      notice: DRAFTS_NOTICE,
+      label: "AI-generated, unverified - analyst must review.",
+      drafts: [],
+    }),
+  ),
+  http.get(`${API}/ai/artifacts/:artifactId/transcripts`, ({ params }) =>
+    HttpResponse.json({ artifact_id: params.artifactId, notice: TRANSCRIPTS_NOTICE, transcripts: [] }),
   ),
   http.get(`${API}/health`, () => HttpResponse.json(health())),
   http.get(`${API}/settings`, () => HttpResponse.json(settingsResponse())),

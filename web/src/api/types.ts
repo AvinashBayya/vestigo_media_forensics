@@ -134,6 +134,9 @@ export interface DeletionSummary {
   custody_events?: number;
   external_leads?: number;
   location_candidates?: number;
+  ai_drafts?: number;
+  transcripts?: number;
+  embedding_chunks?: number;
 }
 
 export type ReviewOrigin = "artifact" | "record" | "bulk";
@@ -515,6 +518,12 @@ export interface EditableSettings {
   enabled_search_providers: string[];
   /** Off by default (M6): when on, the artifact page offers an external OpenStreetMap link. */
   enable_external_map_links: boolean;
+  /** Local AI (Pass 1). All off by default; nothing is downloaded or sent anywhere. */
+  ai_enabled: boolean;
+  transcription_enabled: boolean;
+  semantic_search_enabled: boolean;
+  ai_model_path: string;
+  transcription_model_path: string;
 }
 
 /** Read-only: set with VESTIGO_* environment variables or .env. */
@@ -855,4 +864,134 @@ export interface LocationCandidateUpdate {
   notes?: string;
   supports?: SupportRef[];
   review_state?: ReviewState;
+}
+
+// --- Local AI (Pass 1) ---------------------------------------------------------------------------
+
+export interface AIModelInfo {
+  name: string;
+  version: string | null;
+  quantization: string | null;
+  source_url: string | null;
+  license: string | null;
+  runtime: string;
+  local_path: string | null;
+  installed: boolean;
+}
+
+export interface AIStatus {
+  runtime_package: string;
+  runtime_installed: boolean;
+  telemetry_disabled: boolean;
+  telemetry_environment: Record<string, string>;
+  ai_enabled: boolean;
+  transcription_enabled: boolean;
+  semantic_search_enabled: boolean;
+  drafts_available: boolean;
+  drafts_unavailable_reason: string | null;
+  transcription_available: boolean;
+  transcription_unavailable_reason: string | null;
+  semantic_search_available: boolean;
+  semantic_search_unavailable_reason: string | null;
+  label: string;
+  limitations: string[];
+  known_models: AIModelInfo[];
+}
+
+export type DraftSource = "ocr_text" | "analyst_notes" | "metadata" | "transcript";
+export type FieldAction = "accepted" | "edited" | "rejected";
+
+export interface DraftField {
+  name: string;
+  /** The model's own value, kept even after an edit or rejection. */
+  value: string;
+  /** Only ever the model's own figure; Vestigo never calculates one. */
+  confidence: number | null;
+  status: "proposed" | FieldAction;
+  edited_value: string | null;
+}
+
+export interface AIDraft {
+  draft_id: string;
+  artifact_id: string;
+  kind: string;
+  source_kind: string;
+  source_evidence_id: string | null;
+  fields: DraftField[];
+  status: string;
+  model: Record<string, unknown>;
+  reasoning: string | null;
+  warnings: string[];
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface AIDraftsResponse {
+  artifact_id: string;
+  notice: string;
+  label: string;
+  drafts: AIDraft[];
+}
+
+export interface TranscriptSegmentInfo {
+  start: number;
+  end: number;
+  text: string;
+  words: Record<string, unknown>[];
+}
+
+export interface Transcript {
+  transcript_id: string;
+  artifact_id: string;
+  derived_file_id: string | null;
+  language: string | null;
+  duration_seconds: number | null;
+  /** The model's text, kept verbatim. */
+  text: string;
+  edited_text: string | null;
+  segments: TranscriptSegmentInfo[];
+  model: Record<string, unknown>;
+  warnings: string[];
+  review_state: ReviewState;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface TranscriptsResponse {
+  artifact_id: string;
+  notice: string;
+  transcripts: Transcript[];
+}
+
+export interface IndexResult {
+  artifact_id: string;
+  chunks: number;
+  model: string | null;
+  sources: string[];
+}
+
+export interface SearchHit {
+  artifact_id: string;
+  filename: string | null;
+  media_type: string | null;
+  source_kind: string;
+  source_ref: string | null;
+  score: number;
+  text: string;
+}
+
+export interface SemanticSearchResponse {
+  query: string;
+  hits: SearchHit[];
+  model: string | null;
+}
+
+export interface AnswerResponse {
+  question: string;
+  /** Always present: the analyst's own material the answer was drawn from. */
+  sources: SearchHit[];
+  /** Absent when no local generator is available. */
+  answer: string | null;
+  notice: string;
+  label: string;
 }

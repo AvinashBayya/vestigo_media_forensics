@@ -15,6 +15,16 @@ import type {
   LocationCandidateCreate,
   LocationCandidatesResponse,
   LocationCandidateUpdate,
+  AIDraft,
+  AIDraftsResponse,
+  AIStatus,
+  AnswerResponse,
+  DraftSource,
+  FieldAction,
+  IndexResult,
+  SemanticSearchResponse,
+  Transcript,
+  TranscriptsResponse,
   SearchProvidersResponse,
   ArtifactUploadResponse,
   BulkReviewResult,
@@ -395,4 +405,98 @@ export function openStreetMapUrl(latitude: number, longitude: number): string {
     mlon: String(longitude),
   });
   return `https://www.openstreetmap.org/?${params.toString()}#map=15/${latitude}/${longitude}`;
+}
+
+// --- Local AI (Pass 1) ---------------------------------------------------------------------------
+
+export function getAIStatus(): Promise<AIStatus> {
+  return call(http.get<AIStatus>("/ai/status"));
+}
+
+export function listAIDrafts(artifactId: string): Promise<AIDraftsResponse> {
+  return call(http.get<AIDraftsResponse>(`/ai/artifacts/${encodeURIComponent(artifactId)}/drafts`));
+}
+
+export function createAIDraft(
+  artifactId: string,
+  request: { source_kind: DraftSource; fields: string[] },
+): Promise<AIDraft> {
+  return call(http.post<AIDraft>(`/ai/artifacts/${encodeURIComponent(artifactId)}/drafts`, request));
+}
+
+export function decideDraftField(
+  artifactId: string,
+  draftId: string,
+  decision: { field: string; action: FieldAction; value?: string },
+): Promise<AIDraft> {
+  return call(
+    http.patch<AIDraft>(
+      `/ai/artifacts/${encodeURIComponent(artifactId)}/drafts/${encodeURIComponent(draftId)}`,
+      decision,
+    ),
+  );
+}
+
+export function deleteAIDraft(artifactId: string, draftId: string): Promise<void> {
+  return call(
+    http.delete<void>(
+      `/ai/artifacts/${encodeURIComponent(artifactId)}/drafts/${encodeURIComponent(draftId)}`,
+    ),
+  );
+}
+
+export function listTranscripts(artifactId: string): Promise<TranscriptsResponse> {
+  return call(
+    http.get<TranscriptsResponse>(`/ai/artifacts/${encodeURIComponent(artifactId)}/transcripts`),
+  );
+}
+
+export function createTranscript(artifactId: string, language?: string): Promise<Transcript> {
+  return call(
+    http.post<Transcript>(`/ai/artifacts/${encodeURIComponent(artifactId)}/transcripts`, {
+      ...(language ? { language } : {}),
+    }),
+  );
+}
+
+export function updateTranscript(
+  artifactId: string,
+  transcriptId: string,
+  update: { edited_text?: string; review_state?: ReviewState },
+): Promise<Transcript> {
+  return call(
+    http.patch<Transcript>(
+      `/ai/artifacts/${encodeURIComponent(artifactId)}/transcripts/${encodeURIComponent(transcriptId)}`,
+      update,
+    ),
+  );
+}
+
+export function deleteTranscript(artifactId: string, transcriptId: string): Promise<void> {
+  return call(
+    http.delete<void>(
+      `/ai/artifacts/${encodeURIComponent(artifactId)}/transcripts/${encodeURIComponent(transcriptId)}`,
+    ),
+  );
+}
+
+export function indexArtifact(artifactId: string): Promise<IndexResult> {
+  return call(http.post<IndexResult>(`/ai/artifacts/${encodeURIComponent(artifactId)}/index`));
+}
+
+export function clearArtifactIndex(artifactId: string): Promise<IndexResult> {
+  return call(http.delete<IndexResult>(`/ai/artifacts/${encodeURIComponent(artifactId)}/index`));
+}
+
+export function semanticSearch(query: string, limit = 20): Promise<SemanticSearchResponse> {
+  return call(http.get<SemanticSearchResponse>("/ai/search", { params: { q: query, limit } }));
+}
+
+export function askQuestion(question: string, artifactIds?: string[]): Promise<AnswerResponse> {
+  return call(
+    http.post<AnswerResponse>("/ai/answer", {
+      question,
+      ...(artifactIds && artifactIds.length > 0 ? { artifact_ids: artifactIds } : {}),
+    }),
+  );
 }

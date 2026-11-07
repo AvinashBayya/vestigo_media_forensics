@@ -3,6 +3,7 @@ import { Link, Outlet, type RouteObject } from "react-router";
 import { Layout } from "./components/Layout";
 import { ArtifactPage } from "./pages/ArtifactPage";
 import { LibraryPage } from "./pages/LibraryPage";
+import { SemanticSearchPage } from "./pages/SemanticSearchPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { UploadPage } from "./pages/UploadPage";
 
@@ -18,6 +19,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <LibraryPage /> },
       { path: "upload", element: <UploadPage /> },
       { path: "artifacts/:artifactId", element: <ArtifactPage /> },
+      { path: "search", element: <SemanticSearchPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <NotFound /> },
     ],

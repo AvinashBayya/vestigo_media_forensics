@@ -80,6 +80,11 @@ describe("SettingsPage", () => {
       auto_analyze_after_upload: false,
       enabled_search_providers: [],
       enable_external_map_links: false,
+      ai_enabled: false,
+      transcription_enabled: false,
+      semantic_search_enabled: false,
+      ai_model_path: "",
+      transcription_model_path: "",
     });
 
     await user.click(screen.getByRole("link", { name: "Library" }));
