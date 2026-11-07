@@ -167,6 +167,9 @@ class DeletionSummary(BaseModel):
     custody_events: int = 0
     external_leads: int = 0
     location_candidates: int = 0
+    ai_drafts: int = 0
+    transcripts: int = 0
+    embedding_chunks: int = 0
 
 
 class PreviewInfo(BaseModel):

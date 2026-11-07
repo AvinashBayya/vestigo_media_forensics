@@ -34,10 +34,28 @@ from app.core.logging import get_logger, log_event
 from app.models import DerivedFile, EvidenceRecord
 from app.schemas.common import ErrorCode
 from app.schemas.evidence import REPORT_NOTICE
-from app.services import custody, reports, review
+from app.services import ai_drafts, custody, reports, review, transcripts
+from app.services.ai.runtime import AI_LABEL
 from app.services.artifacts import get_artifact, to_review_info
 
 logger = get_logger("exports")
+
+AI_EXPORT_NOTICE = """AI-generated material - not evidence
+=====================================
+
+Everything in this folder was produced by a local language model from material Vestigo already
+held. It is AI-generated, unverified, and kept apart from the evidence on purpose:
+
+- drafts.json      Fields a model proposed, with each field's accept / edit / reject decision by
+                   the analyst. The model's own value is always kept beside any analyst edit.
+- transcripts.json Machine transcripts of audio: timestamped, potentially inaccurate, unverified,
+                   and never a replacement for the original audio, which is unchanged.
+
+Each item records the model that produced it (name, version, quantization, source, licence,
+runtime). A confidence value appears only where the model itself supplied one; Vestigo never
+calculates one. Nothing here is an evidence record, carries an evidence classification, or should
+be cited as a finding.
+"""
 
 PACKAGE_FORMAT = "vestigo-evidence-package"
 PACKAGE_FORMAT_VERSION = "1"
@@ -80,6 +98,9 @@ report.json     The evidence report: every check with its method, tool, version,
                 source, limitations, errors, and review state.
 review.json     The analyst's artifact review, the review of each evidence record, and the full
                 review history (append-only, with complete note text).
+ai/             AI-generated material, if any: proposed fields and machine transcripts. Clearly
+                separated because it is NOT evidence - it is unverified model output the analyst
+                reviews. See ai/README.txt.
 custody.json    The chain of custody Vestigo recorded on this machine since upload: upload,
                 analyses, review changes, exports, library changes, previews, and each derived
                 file's recorded lineage. Not a legal chain of custody; nothing before upload, and
@@ -172,6 +193,34 @@ def build_export(
                 _json_bytes(custody_report.model_dump(mode="json")),
                 "Chain of custody recorded by Vestigo on this machine (M4B)",
             )
+            # AI material (Pass 1) travels in its own area, never inside the evidence sections:
+            # it is a labelled draft or derived aid, not evidence, and the README says so.
+            with services.db.reader() as ai_session:
+                drafts = [
+                    draft.model_dump(mode="json") for draft in ai_drafts.list_drafts(ai_session, artifact_id)
+                ]
+                held_transcripts = [
+                    transcript.model_dump(mode="json")
+                    for transcript in transcripts.list_transcripts(ai_session, artifact_id)
+                ]
+            if drafts or held_transcripts:
+                add_bytes(
+                    "ai/README.txt",
+                    AI_EXPORT_NOTICE.encode("utf-8"),
+                    "What the ai/ folder is, and why it is not evidence",
+                )
+            if drafts:
+                add_bytes(
+                    "ai/drafts.json",
+                    _json_bytes({"notice": AI_LABEL, "drafts": drafts}),
+                    "AI-proposed fields and the analyst's decisions (not evidence)",
+                )
+            if held_transcripts:
+                add_bytes(
+                    "ai/transcripts.json",
+                    _json_bytes({"notice": AI_LABEL, "transcripts": held_transcripts}),
+                    "Machine transcripts, unverified (not evidence)",
+                )
 
             for item in derived:
                 name = f"derived/{Path(item.stored_path).name}"

@@ -2,7 +2,14 @@ from fastapi import APIRouter
 
 from app.api.deps import Services
 from app.schemas.ai import AIModelInfo, AIStatus
-from app.services import ai, app_settings
+from app.schemas.ai_drafts import AIDraftInfo, AIDraftsResponse, DraftGenerateRequest, FieldDecision
+from app.schemas.transcripts import (
+    TranscriptCreateRequest,
+    TranscriptInfo,
+    TranscriptsResponse,
+    TranscriptUpdate,
+)
+from app.services import ai, ai_drafts, app_settings, transcripts
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -48,3 +55,65 @@ def get_ai_status(services: Services) -> AIStatus:
             for model in ai.KNOWN_MODELS
         ],
     )
+
+
+@router.get("/artifacts/{artifact_id}/drafts", response_model=AIDraftsResponse)
+def list_ai_drafts(services: Services, artifact_id: str) -> AIDraftsResponse:
+    """The AI drafts held for this artifact, newest first (Pass 1). Drafts are never evidence."""
+    return AIDraftsResponse(artifact_id=artifact_id, drafts=ai_drafts.get_drafts(services, artifact_id))
+
+
+@router.post("/artifacts/{artifact_id}/drafts", response_model=AIDraftInfo, status_code=201)
+def create_ai_draft(services: Services, artifact_id: str, request: DraftGenerateRequest) -> AIDraftInfo:
+    """Ask the local model to propose the named fields from held material (OCR text, analyst notes,
+    metadata, or a transcript). Nothing is written back over metadata or evidence. 409 with a clear
+    reason when local AI is off or the runtime is not installed."""
+    return ai_drafts.generate_draft(services, artifact_id, request)
+
+
+@router.patch("/artifacts/{artifact_id}/drafts/{draft_id}", response_model=AIDraftInfo)
+def decide_ai_draft_field(
+    services: Services, artifact_id: str, draft_id: str, decision: FieldDecision
+) -> AIDraftInfo:
+    """Accept, edit, or reject one proposed field. The model's own value is always kept beside the
+    analyst's, and the decision is recorded as a custody event."""
+    return ai_drafts.decide_field(services, artifact_id, draft_id, decision)
+
+
+@router.delete("/artifacts/{artifact_id}/drafts/{draft_id}", status_code=204)
+def delete_ai_draft(services: Services, artifact_id: str, draft_id: str) -> None:
+    """Delete a draft. The deletion stays in the custody trail."""
+    ai_drafts.delete_draft(services, artifact_id, draft_id)
+
+
+@router.get("/artifacts/{artifact_id}/transcripts", response_model=TranscriptsResponse)
+def list_transcripts(services: Services, artifact_id: str) -> TranscriptsResponse:
+    """Machine transcripts held for this artifact, newest first (Pass 1). Never evidence."""
+    return TranscriptsResponse(
+        artifact_id=artifact_id, transcripts=transcripts.get_transcripts(services, artifact_id)
+    )
+
+
+@router.post("/artifacts/{artifact_id}/transcripts", response_model=TranscriptInfo, status_code=201)
+def create_transcript(
+    services: Services, artifact_id: str, request: TranscriptCreateRequest
+) -> TranscriptInfo:
+    """Transcribe the artifact's audio locally (Pass 1). For a video, the audio track is extracted
+    with ffmpeg and kept as a derived file so the lineage is explicit; the original is only read.
+    409 with a clear reason when transcription is off or the runtime is not installed."""
+    return transcripts.create_transcript(services, artifact_id, request.language)
+
+
+@router.patch("/artifacts/{artifact_id}/transcripts/{transcript_id}", response_model=TranscriptInfo)
+def update_transcript(
+    services: Services, artifact_id: str, transcript_id: str, update: TranscriptUpdate
+) -> TranscriptInfo:
+    """Store the analyst's correction beside the model's text, or set the review state. Recorded as
+    a custody event naming the changed fields, never the text."""
+    return transcripts.update_transcript(services, artifact_id, transcript_id, update)
+
+
+@router.delete("/artifacts/{artifact_id}/transcripts/{transcript_id}", status_code=204)
+def delete_transcript(services: Services, artifact_id: str, transcript_id: str) -> None:
+    """Delete a transcript. The extracted audio remains a derived file of its analysis."""
+    transcripts.delete_transcript(services, artifact_id, transcript_id)

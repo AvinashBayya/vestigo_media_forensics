@@ -17,15 +17,18 @@ from app.core.errors import AppError
 from app.core.logging import get_logger, log_event
 from app.core.storage import Storage
 from app.models import (
+    AIDraft,
     AnalysisJob,
     Artifact,
     CustodyEvent,
     DerivedFile,
+    EmbeddingChunk,
     EvidenceRecord,
     ExternalLead,
     LocationCandidate,
     PlayablePreview,
     ReviewEvent,
+    Transcript,
 )
 from app.schemas.artifact import ArtifactDetail, ArtifactSummary, DeletionSummary, ReviewInfo
 from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
@@ -429,6 +432,9 @@ def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
                 custody_events=_count(session, CustodyEvent, artifact_id),
                 external_leads=_count(session, ExternalLead, artifact_id),
                 location_candidates=_count(session, LocationCandidate, artifact_id),
+                ai_drafts=_count(session, AIDraft, artifact_id),
+                transcripts=_count(session, Transcript, artifact_id),
+                embedding_chunks=_count(session, EmbeddingChunk, artifact_id),
             )
             trashed = storage.move_to_trash(artifact_id)
             _delete_rows(session, artifact_id)
