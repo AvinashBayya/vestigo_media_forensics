@@ -3,13 +3,14 @@ from fastapi import APIRouter
 from app.api.deps import Services
 from app.schemas.ai import AIModelInfo, AIStatus
 from app.schemas.ai_drafts import AIDraftInfo, AIDraftsResponse, DraftGenerateRequest, FieldDecision
+from app.schemas.semantic import AnswerRequest, AnswerResponse, IndexResult, SearchResponse
 from app.schemas.transcripts import (
     TranscriptCreateRequest,
     TranscriptInfo,
     TranscriptsResponse,
     TranscriptUpdate,
 )
-from app.services import ai, ai_drafts, app_settings, transcripts
+from app.services import ai, ai_drafts, app_settings, semantic, transcripts
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -117,3 +118,31 @@ def update_transcript(
 def delete_transcript(services: Services, artifact_id: str, transcript_id: str) -> None:
     """Delete a transcript. The extracted audio remains a derived file of its analysis."""
     transcripts.delete_transcript(services, artifact_id, transcript_id)
+
+
+@router.post("/artifacts/{artifact_id}/index", response_model=IndexResult)
+def index_artifact(services: Services, artifact_id: str) -> IndexResult:
+    """Build this artifact's local semantic index from the analyst's own held text (Pass 1): notes,
+    OCR output, transcripts, selected metadata, leads, and location candidates. Replaces any
+    earlier index; nothing leaves this machine."""
+    return semantic.index_artifact(services, artifact_id)
+
+
+@router.delete("/artifacts/{artifact_id}/index", response_model=IndexResult)
+def clear_artifact_index(services: Services, artifact_id: str) -> IndexResult:
+    """Drop this artifact's index. It is derived data and can be rebuilt at any time."""
+    return semantic.clear_index(services, artifact_id)
+
+
+@router.get("/search", response_model=SearchResponse)
+def semantic_search(services: Services, q: str, limit: int = 20) -> SearchResponse:
+    """Search the analyst's indexed material locally. Results are their own records, not findings."""
+    return semantic.search(services, q, limit=min(max(limit, 1), 100))
+
+
+@router.post("/answer", response_model=AnswerResponse)
+def answer_question(services: Services, request: AnswerRequest) -> AnswerResponse:
+    """Answer a question over the analyst's own material (Pass 1). The sources are always returned;
+    a drafted answer is included only when a local generator is available, is labelled
+    AI-generated and unverified, is never stored, and never becomes an evidence record."""
+    return semantic.answer(services, request.question, request.artifact_ids)
