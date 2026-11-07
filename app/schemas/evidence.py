@@ -144,6 +144,42 @@ class LocationCluesSection(BaseModel):
     provenance: Provenance
 
 
+class StructuralFinding(BaseModel):
+    """One structural observation: what, where, and how big. Never a conclusion."""
+
+    kind: str
+    offset: int
+    size: int | None = None
+    detail: str | None = None
+
+
+class StructuralMeasurement(BaseModel):
+    """One number with the method that produced it, and what it does not mean."""
+
+    name: str
+    value: float
+    method: str
+    note: str | None = None
+
+
+class StructuralSection(BaseModel):
+    """Structure and byte statistics (Pass 2, D25). Facts and measurements, never verdicts."""
+
+    container: str | None = None
+    file_size: int = 0
+    # Where the format's own data ends, when the format states it.
+    logical_end: int | None = None
+    trailing_bytes: int = 0
+    findings: list[StructuralFinding] = []
+    inventory: list[dict[str, Any]] = []
+    measurements: list[StructuralMeasurement] = []
+    # How far structural parsing reached; not problems.
+    notes: list[str] = []
+    warnings: list[str] = []
+    binwalk_ran: bool = False
+    provenance: Provenance
+
+
 class PerceptualHashSection(BaseModel):
     algorithm: Literal["pHash"] = "pHash"
     bits: int
@@ -373,6 +409,7 @@ class EvidenceReport(BaseModel):
     metadata: MetadataSection | None
     c2pa: C2PASection | None
     location_clues: LocationCluesSection | None
+    structural: StructuralSection | None
     perceptual_hash: PerceptualHashSection | None
     ocr: OCRSection | None
     duplicates: DuplicatesSection | None

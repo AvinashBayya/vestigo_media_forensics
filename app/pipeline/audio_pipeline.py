@@ -16,6 +16,7 @@ from app.pipeline.video_pipeline import (
     VideoHashesStage,
     VideoLocationCluesStage,
     VideoMetadataStage,
+    VideoStructuralStage,
 )
 from app.schemas.common import EvidenceClassification, MediaType
 from app.services.duplicates import find_matches
@@ -92,11 +93,18 @@ class AudioLocationCluesStage(VideoLocationCluesStage):
     media_type = MediaType.AUDIO
 
 
+class AudioStructuralStage(VideoStructuralStage):
+    """RIFF/container structure and byte statistics for audio (Pass 2). No audio is decoded."""
+
+    media_type = MediaType.AUDIO
+
+
 AUDIO_STAGES: tuple[AnalysisStage, ...] = (
     AudioHashesStage(),
     AudioMediaInfoStage(),
     AudioMetadataStage(),
     AudioC2PAStage(),
     AudioLocationCluesStage(),
+    AudioStructuralStage(),
     AudioDuplicatesStage(),
 )

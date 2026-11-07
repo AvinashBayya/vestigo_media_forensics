@@ -51,9 +51,9 @@ def test_delete_removes_files_evidence_and_rows(
         "original_files": 1,
         # ExifTool metadata JSON, ExifTool C2PA JSON, ExifTool location JSON, and for each OCR
         # pass its input image and TSV.
-        "derived_files": 7,
+        "derived_files": 8,
         "jobs": 1,
-        "evidence_records": 7,
+        "evidence_records": 8,
         "review_events": 2,
         "preview_files": 0,
         "custody_events": 0,

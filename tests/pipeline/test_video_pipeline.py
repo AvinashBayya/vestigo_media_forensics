@@ -189,6 +189,7 @@ def test_video_jobs_appear_in_history_with_their_options(client: TestClient, fix
         "metadata": True,
         "c2pa": True,
         "location_clues": True,
+        "structural": True,
         "scene_detection": True,
         "keyframe_ocr": True,
         "duplicate_search": True,

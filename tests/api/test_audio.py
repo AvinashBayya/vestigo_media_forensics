@@ -59,6 +59,7 @@ def test_audio_pipeline_runs_header_level_stages_only(
         "metadata",
         "c2pa",
         "location_clues",
+        "structural",
         "duplicates",
     ]
 
@@ -153,6 +154,7 @@ def test_audio_metadata_can_be_disabled_via_saved_defaults(
                     "metadata": False,
                     "c2pa": True,
                     "location_clues": True,
+                    "structural": True,
                     "duplicate_search": True,
                 }
             },

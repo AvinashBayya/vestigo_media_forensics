@@ -47,6 +47,9 @@ class FixtureSet:
     webp: Path
     tiff: Path
     with_metadata: Path
+    appended_jpeg: Path
+    png_with_zip: Path
+    jpeg_big_comment: Path
     with_southern_location: Path
     with_invalid_location: Path
     video_with_location: Path
@@ -243,6 +246,36 @@ def write_invalid_location(path: Path) -> None:
         ["exiftool", "-q", "-overwrite_original", "-EXIF:GPSLatitudeRef=N", str(path)],
         check=True,
     )
+
+
+def build_structural_fixtures(path) -> dict[str, Path]:
+    """Files with known structural oddities (Pass 2): nothing hidden, just measurable facts."""
+    import io
+    import zipfile
+
+    base = path("base.jpg").read_bytes()
+    # A JPEG with bytes after its EOI marker: the classic "appended data" case.
+    appended = path("appended_jpeg.jpg")
+    appended.write_bytes(base + b"VESTIGO-TRAILING-MARKER" * 8)
+
+    # A PNG with a ZIP archive appended after IEND.
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr("note.txt", "fixture payload, nothing secret")
+    stapled = path("png_with_zip.png")
+    stapled.write_bytes(path("base.png").read_bytes() + archive.getvalue())
+
+    # A JPEG carrying an oversized comment segment.
+    marker = base.index(b"\xff\xd8") + 2
+    comment_body = b"X" * 5000
+    segment = b"\xff\xfe" + len(comment_body).to_bytes(2, "big") + comment_body
+    commented = path("jpeg_big_comment.jpg")
+    commented.write_bytes(base[:marker] + segment + base[marker:])
+    return {
+        "appended_jpeg": appended,
+        "png_with_zip": stapled,
+        "jpeg_big_comment": commented,
+    }
 
 
 def font(name: str, size: int) -> ImageFont.FreeTypeFont:
@@ -663,9 +696,11 @@ def build_fixtures(target: Path) -> FixtureSet:
     path("bomb.png").write_bytes(png_with_dimensions(20_000, 20_000))
 
     videos = build_video_fixtures(path)
+    structural_files = build_structural_fixtures(path)
     c2pa_files = build_c2pa_fixtures(path)
 
     return FixtureSet(
+        **structural_files,
         **c2pa_files,
         **videos,
         jpeg=path("base.jpg"),

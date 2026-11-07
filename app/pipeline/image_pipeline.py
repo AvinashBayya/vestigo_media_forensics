@@ -1,10 +1,12 @@
 """Milestone 1 image pipeline (`image.v1`). Stages run in the order of IMAGE_STAGES."""
 
+import json
 from dataclasses import asdict
 
 from sqlalchemy.orm import Session
 
 from app import __version__
+from app.core.tools import ToolError, run_tool
 from app.models import EvidenceRecord, ImageFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
 from app.schemas.common import EvidenceClassification, MediaType
@@ -38,6 +40,7 @@ from app.services.phash import (
     compute_phash,
     imagehash_version,
 )
+from app.services.structural import STRUCTURAL_LIMITATIONS, inspect
 
 IMAGE_PIPELINE = "image.v1"
 
@@ -145,6 +148,66 @@ class LocationCluesStage(AnalysisStage):
         ctx.derived.write(self.name, "exiftool_location_json", "exiftool.json", raw)
         warnings = [StageError(type="LOCATION_VALUE_UNUSABLE", message=message) for message in clues.warnings]
         return StageOutput(data=location_payload(clues), warnings=warnings)
+
+
+class StructuralStage(AnalysisStage):
+    name = "structural"
+    media_type = MediaType.IMAGE
+    method = (
+        "The file's structure is read in place: where the format's own data ends and how many bytes "
+        "follow it, the segments, chunks, or boxes the container declares (with PNG chunk CRCs "
+        "verified), declared sizes against the bytes on disk, trailing padding runs, and known file "
+        "signatures appearing at non-zero offsets. Byte entropy over the whole file and over the "
+        "highest 4 KiB window are measured, and for images the least-significant-bit balance and a "
+        "chi-square statistic are reported as numbers. When binwalk is installed its signature scan "
+        "is included as well, with extraction disabled. Nothing is extracted, carved, or decoded, "
+        "and the original is only ever read."
+    )
+    classification = EvidenceClassification.OBSERVED
+    source = "artifact:original"
+    tool_name = "vestigo-structural"
+    option = "structural"
+    limitations = STRUCTURAL_LIMITATIONS
+
+    def tool_version(self, ctx: StageContext) -> str:
+        binwalk = ctx.tools.status("binwalk")
+        suffix = (
+            f"; binwalk {binwalk.version}"
+            if binwalk.status == "ok" and binwalk.version
+            else "; binwalk absent"
+        )
+        return f"Vestigo {__version__}{suffix}"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        report = inspect(artifact.path)
+        payload = report.as_dict()
+        warnings = [StageError(type="STRUCTURAL_PARTIAL", message=message) for message in report.warnings]
+
+        binwalk = ctx.tools.status("binwalk")
+        if binwalk.status == "ok":
+            try:
+                # Signature scan only: -e / --extract is never passed, because extraction writes
+                # attacker-controlled paths out of untrusted input.
+                completed = run_tool(
+                    binwalk,
+                    ["--signature", "--term", artifact.path],
+                    timeout=ctx.settings.tool_timeout_seconds,
+                )
+                ctx.derived.write(self.name, "binwalk_output", "binwalk.txt", completed.stdout)
+                payload["binwalk_ran"] = True
+            except ToolError as exc:
+                payload["binwalk_ran"] = False
+                warnings.append(StageError(type="BINWALK_FAILED", message=str(exc)))
+        else:
+            payload["binwalk_ran"] = False
+
+        ctx.derived.write(
+            self.name,
+            "structural_report",
+            "structural.json",
+            json.dumps(payload, indent=1, sort_keys=True).encode("utf-8"),
+        )
+        return StageOutput(data=payload, warnings=warnings)
 
 
 class C2PAStage(AnalysisStage):
@@ -369,6 +432,7 @@ IMAGE_STAGES: tuple[AnalysisStage, ...] = (
     HashesStage(),
     MetadataStage(),
     LocationCluesStage(),
+    StructuralStage(),
     C2PAStage(),
     PerceptualHashStage(),
     OCRStage(),

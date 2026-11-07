@@ -32,6 +32,7 @@ from app.schemas.evidence import (
     Provenance,
     SceneChangesSection,
     StageError,
+    StructuralSection,
 )
 from app.services import leads, location_candidates, review
 from app.services.analysis import active_job, latest_job, to_job_summary
@@ -109,6 +110,22 @@ def _location_clues(payload: dict[str, Any], provenance: Provenance) -> Location
         device=payload.get("device", []),
         iso6709=payload.get("iso6709", []),
         ocr_available=payload.get("ocr_available", False),
+        provenance=provenance,
+    )
+
+
+def _structural(payload: dict[str, Any], provenance: Provenance) -> StructuralSection:
+    return StructuralSection(
+        container=payload.get("container"),
+        file_size=payload.get("file_size", 0),
+        logical_end=payload.get("logical_end"),
+        trailing_bytes=payload.get("trailing_bytes", 0),
+        findings=payload.get("findings", []),
+        inventory=payload.get("inventory", []),
+        measurements=payload.get("measurements", []),
+        notes=payload.get("notes", []),
+        warnings=payload.get("warnings", []),
+        binwalk_ran=payload.get("binwalk_ran", False),
         provenance=provenance,
     )
 
@@ -280,6 +297,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "metadata": _metadata,
         "c2pa": _c2pa,
         "location_clues": _location_clues,
+        "structural": _structural,
         "perceptual_hash": _perceptual_hash,
         "ocr": _ocr,
         "duplicates": _duplicates(matched),

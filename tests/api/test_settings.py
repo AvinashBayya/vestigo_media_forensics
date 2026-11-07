@@ -18,6 +18,7 @@ DEFAULT_OPTIONS = {
     "metadata": True,
     "c2pa": True,
     "location_clues": True,
+    "structural": True,
     "ocr": True,
     "duplicate_search": True,
 }
@@ -26,6 +27,7 @@ DEFAULT_VIDEO_OPTIONS = {
     "metadata": True,
     "c2pa": True,
     "location_clues": True,
+    "structural": True,
     "scene_detection": True,
     "keyframe_ocr": False,
     "duplicate_search": True,
@@ -34,6 +36,7 @@ DEFAULT_AUDIO_OPTIONS = {
     "metadata": True,
     "c2pa": True,
     "location_clues": True,
+    "structural": True,
     "duplicate_search": True,
 }
 

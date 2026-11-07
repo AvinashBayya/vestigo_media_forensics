@@ -31,6 +31,8 @@ TOOL_SPECS: dict[str, ToolSpec] = {
     spec.name: spec
     for spec in (
         ToolSpec("exiftool", ("-ver",), r"^\s*(\S+)", "M1: metadata, C2PA detection", True),
+        # Optional (Pass 2): signature scanning only, never extraction. Absent is fine.
+        ToolSpec("binwalk", ("--version",), r"v?(\d[\d.]*)", "Pass 2: signature scan", False),
         ToolSpec("tesseract", ("--version",), r"tesseract\s+v?(\S+)", "M1: OCR", True, ("eng",)),
         ToolSpec("ffmpeg", ("-version",), r"ffmpeg version (\S+)", "M3: keyframes, scene detection", True),
         ToolSpec(
