@@ -14,16 +14,28 @@ from app.models import AppSetting
 from tests.fixtures.make_fixtures import FixtureSet
 from tests.helpers import assert_error, upload_ok
 
-DEFAULT_OPTIONS = {"metadata": True, "c2pa": True, "ocr": True, "duplicate_search": True}
+DEFAULT_OPTIONS = {
+    "metadata": True,
+    "c2pa": True,
+    "location_clues": True,
+    "ocr": True,
+    "duplicate_search": True,
+}
 # Keyframe OCR is off by default (decision M3-3).
 DEFAULT_VIDEO_OPTIONS = {
     "metadata": True,
     "c2pa": True,
+    "location_clues": True,
     "scene_detection": True,
     "keyframe_ocr": False,
     "duplicate_search": True,
 }
-DEFAULT_AUDIO_OPTIONS = {"metadata": True, "c2pa": True, "duplicate_search": True}
+DEFAULT_AUDIO_OPTIONS = {
+    "metadata": True,
+    "c2pa": True,
+    "location_clues": True,
+    "duplicate_search": True,
+}
 
 
 def test_defaults_and_environment(client: TestClient, settings: Settings) -> None:

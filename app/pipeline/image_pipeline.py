@@ -18,6 +18,7 @@ from app.services.c2pa import (
 )
 from app.services.duplicates import FrameHash, find_matches
 from app.services.hashing import hash_file, hashlib_version
+from app.services.location import LOCATION_LIMITATIONS, location_payload, read_location_clues
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
 from app.services.ocr import (
     LANGUAGES,
@@ -114,6 +115,36 @@ class MetadataStage(AnalysisStage):
         warnings = [StageError(type="EXIFTOOL_ERROR", message=text) for text in result.parsed.errors]
         warnings += [StageError(type="EXIFTOOL_WARNING", message=text) for text in result.parsed.warnings]
         return StageOutput(data=result.parsed.sections, warnings=warnings)
+
+
+class LocationCluesStage(AnalysisStage):
+    name = "location_clues"
+    media_type = MediaType.IMAGE
+    method = (
+        "ExifTool is read twice: once with -n for numeric values and once with print conversion for "
+        "the strings as written. Vestigo collects the GPS coordinate pair (converted to decimal "
+        "degrees and kept alongside the original strings and hemisphere refs), altitude, ISO 6709 "
+        "container location strings where present, location-named IPTC/XMP text fields, "
+        "location-relevant timestamps, and device/orientation fields - each labelled with the tag it "
+        "came from. Coordinate ranges are checked; values outside them are flagged and kept as "
+        "written. No value is corrected, reconciled, or inferred, and no text in the media is "
+        "interpreted."
+    )
+    classification = EvidenceClassification.OBSERVED
+    source = "artifact:original"
+    tool_name = "ExifTool"
+    option = "location_clues"
+    limitations = LOCATION_LIMITATIONS
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return ctx.tools.require("exiftool").version or "unknown"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("exiftool")
+        clues, raw = read_location_clues(tool, artifact.path, ctx.settings.tool_timeout_seconds)
+        ctx.derived.write(self.name, "exiftool_location_json", "exiftool.json", raw)
+        warnings = [StageError(type="LOCATION_VALUE_UNUSABLE", message=message) for message in clues.warnings]
+        return StageOutput(data=location_payload(clues), warnings=warnings)
 
 
 class C2PAStage(AnalysisStage):
@@ -337,6 +368,7 @@ class DuplicatesStage(AnalysisStage):
 IMAGE_STAGES: tuple[AnalysisStage, ...] = (
     HashesStage(),
     MetadataStage(),
+    LocationCluesStage(),
     C2PAStage(),
     PerceptualHashStage(),
     OCRStage(),

@@ -15,7 +15,7 @@ from app import __version__
 from app.core.tools import ToolError
 from app.models import EvidenceRecord, KeyframeFingerprint
 from app.pipeline.base import AnalysisStage, ArtifactView, StageContext, StageFailure, StageOutput
-from app.pipeline.image_pipeline import HashesStage, MetadataStage
+from app.pipeline.image_pipeline import HashesStage, LocationCluesStage, MetadataStage
 from app.schemas.common import EvidenceClassification, MediaType
 from app.schemas.evidence import StageError
 from app.services import media_info
@@ -128,6 +128,12 @@ class VideoC2PAStage(AnalysisStage):
                 **manifest_payload(read),
             }
         )
+
+
+class VideoLocationCluesStage(LocationCluesStage):
+    """Same reader as images (M6): container location tags (ISO 6709) land here as written."""
+
+    media_type = MediaType.VIDEO
 
 
 class SceneChangesStage(AnalysisStage):
@@ -494,6 +500,7 @@ VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     MediaInfoStage(),
     VideoMetadataStage(),
     VideoC2PAStage(),
+    VideoLocationCluesStage(),
     SceneChangesStage(),
     KeyframesStage(),
     KeyframePHashStage(),

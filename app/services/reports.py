@@ -23,6 +23,7 @@ from app.schemas.evidence import (
     KeyframeOCRSection,
     KeyframePHashSection,
     KeyframesSection,
+    LocationCluesSection,
     MediaInfoSection,
     MetadataSection,
     OCRPreprocessingStep,
@@ -32,7 +33,7 @@ from app.schemas.evidence import (
     SceneChangesSection,
     StageError,
 )
-from app.services import leads, review
+from app.services import leads, location_candidates, review
 from app.services.analysis import active_job, latest_job, to_job_summary
 from app.services.artifacts import get_artifact, to_review_info, to_summary
 from app.services.errors import analysis_in_progress, job_not_found
@@ -93,6 +94,21 @@ def _c2pa(payload: dict[str, Any], provenance: Provenance) -> C2PASection:
         validation_codes=payload.get("validation_codes"),
         validator=payload.get("validator"),
         validator_error=payload.get("validator_error"),
+        provenance=provenance,
+    )
+
+
+def _location_clues(payload: dict[str, Any], provenance: Provenance) -> LocationCluesSection:
+    return LocationCluesSection(
+        coordinates=payload.get("coordinates", []),
+        altitude_meters=payload.get("altitude_meters"),
+        altitude_as_written=payload.get("altitude_as_written"),
+        altitude_reference=payload.get("altitude_reference"),
+        text_clues=payload.get("text_clues", []),
+        timestamps=payload.get("timestamps", []),
+        device=payload.get("device", []),
+        iso6709=payload.get("iso6709", []),
+        ocr_available=payload.get("ocr_available", False),
         provenance=provenance,
     )
 
@@ -246,6 +262,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         latest = latest_job(session, artifact_id)
         review_history = review.history(session, artifact_id)
         external_leads = leads.list_leads(session, artifact_id)
+        candidates = location_candidates.list_candidates(session, artifact_id)
         duplicates = records.get("duplicates")
         matches = duplicates.payload.get("matches", []) if duplicates else []
         matched_ids = {match["artifact_id"] for match in matches}
@@ -262,6 +279,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "hashes": _hashes,
         "metadata": _metadata,
         "c2pa": _c2pa,
+        "location_clues": _location_clues,
         "perceptual_hash": _perceptual_hash,
         "ocr": _ocr,
         "duplicates": _duplicates(matched),
@@ -277,6 +295,14 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         else None
         for stage, build in builders.items()
     }
+    clues = sections.get("location_clues")
+    if isinstance(clues, LocationCluesSection):
+        # Point the analyst at this job's OCR text, if any, instead of interpreting it (M6-4).
+        clues.ocr_available = any(
+            stage in records
+            and bool(records[stage].payload.get("text") or records[stage].payload.get("frames"))
+            for stage in ("ocr", "keyframe_ocr")
+        )
     return EvidenceReport(
         artifact_id=artifact.id,
         job_id=job.id,
@@ -286,5 +312,6 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         review=to_review_info(artifact),
         review_history=review_history,
         external_leads=external_leads,
+        location_candidates=candidates,
         **sections,
     )

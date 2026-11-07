@@ -13,6 +13,7 @@ from app.schemas.analysis import JobSummary
 from app.schemas.artifact import ArtifactSummary, ReviewInfo
 from app.schemas.common import EvidenceClassification, MediaType, ReviewState, StageStatus
 from app.schemas.leads import ExternalLeadInfo
+from app.schemas.location_candidates import LocationCandidateInfo
 from app.schemas.review import ReviewEventOut
 
 REPORT_NOTICE = (
@@ -103,6 +104,43 @@ class C2PASection(BaseModel):
     validation_codes: dict[str, list[dict[str, str | None]]] | None = None
     validator: str | None = None
     validator_error: str | None = None
+    provenance: Provenance
+
+
+class LocationCoordinate(BaseModel):
+    """One coordinate pair as read (M6). `valid` is False when a value is out of range or unreadable;
+    the value is still shown exactly as written."""
+
+    source: str
+    latitude: float | None
+    longitude: float | None
+    latitude_as_written: str | None
+    longitude_as_written: str | None
+    valid: bool
+    problem: str | None = None
+
+
+class LocationTag(BaseModel):
+    """One clue exactly as written, with the tag it came from."""
+
+    tag: str
+    value: str
+
+
+class LocationCluesSection(BaseModel):
+    """Machine-read location clues (M6, D23): facts as written, never a location claim."""
+
+    coordinates: list[LocationCoordinate] = []
+    altitude_meters: float | None = None
+    altitude_as_written: str | None = None
+    altitude_reference: str | None = None
+    text_clues: list[LocationTag] = []
+    timestamps: list[LocationTag] = []
+    device: list[LocationTag] = []
+    iso6709: list[LocationTag] = []
+    # True when this analysis produced OCR text the analyst can read for visible location clues.
+    # Vestigo never interprets that text.
+    ocr_available: bool = False
     provenance: Provenance
 
 
@@ -334,6 +372,7 @@ class EvidenceReport(BaseModel):
     hashes: HashesSection | None
     metadata: MetadataSection | None
     c2pa: C2PASection | None
+    location_clues: LocationCluesSection | None
     perceptual_hash: PerceptualHashSection | None
     ocr: OCRSection | None
     duplicates: DuplicatesSection | None
@@ -346,5 +385,7 @@ class EvidenceReport(BaseModel):
     review: ReviewInfo
     # Analyst-recorded external search leads (M5), newest first; artifact-level like the history.
     external_leads: list[ExternalLeadInfo] = []
+    # Analyst-stated possible locations (M6), newest first.
+    location_candidates: list[LocationCandidateInfo] = []
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

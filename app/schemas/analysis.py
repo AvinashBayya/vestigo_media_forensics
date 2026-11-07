@@ -12,6 +12,7 @@ class AnalysisOptions(BaseModel):
 
     metadata: bool = True
     c2pa: bool = True
+    location_clues: bool = True
     ocr: bool = True
     duplicate_search: bool = True
 
@@ -31,6 +32,7 @@ class VideoAnalysisOptions(BaseModel):
 
     metadata: bool = True
     c2pa: bool = True
+    location_clues: bool = True
     scene_detection: bool = True
     keyframe_ocr: bool = False
     duplicate_search: bool = True
@@ -44,6 +46,7 @@ class AudioAnalysisOptions(BaseModel):
 
     metadata: bool = True
     c2pa: bool = True
+    location_clues: bool = True
     duplicate_search: bool = True
 
 

@@ -49,14 +49,16 @@ def test_delete_removes_files_evidence_and_rows(
     assert response.json() == {
         "artifact_id": artifact_id,
         "original_files": 1,
-        # ExifTool metadata JSON, ExifTool C2PA JSON, and for each OCR pass its input image and TSV.
-        "derived_files": 6,
+        # ExifTool metadata JSON, ExifTool C2PA JSON, ExifTool location JSON, and for each OCR
+        # pass its input image and TSV.
+        "derived_files": 7,
         "jobs": 1,
-        "evidence_records": 6,
+        "evidence_records": 7,
         "review_events": 2,
         "preview_files": 0,
         "custody_events": 0,
         "external_leads": 0,
+        "location_candidates": 0,
     }
     assert not artifact_dir.exists()
     assert list((settings.data_dir / "trash").iterdir()) == []

@@ -58,6 +58,7 @@ def test_audio_pipeline_runs_header_level_stages_only(
         "media_info",
         "metadata",
         "c2pa",
+        "location_clues",
         "duplicates",
     ]
 
@@ -148,7 +149,12 @@ def test_audio_metadata_can_be_disabled_via_saved_defaults(
         client.patch(
             "/api/v1/settings",
             json={
-                "default_audio_analysis_options": {"metadata": False, "c2pa": True, "duplicate_search": True}
+                "default_audio_analysis_options": {
+                    "metadata": False,
+                    "c2pa": True,
+                    "location_clues": True,
+                    "duplicate_search": True,
+                }
             },
         ).status_code
         == 200

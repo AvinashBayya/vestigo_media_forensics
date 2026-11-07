@@ -155,7 +155,7 @@ def test_custody_timeline_merges_all_sources_chronologically(
         "app_version": finished["detail"]["app_version"],
     }
     assert finished["detail"]["status"] == "completed"
-    assert finished["detail"]["evidence_records"] == 6
+    assert finished["detail"]["evidence_records"] == 7  # one per image.v1 stage
     assert finished["detail"]["derived_files"] > 0
     assert review["source_table"] == "review_events"
     assert review["detail"]["to_state"] == "IN_REVIEW"

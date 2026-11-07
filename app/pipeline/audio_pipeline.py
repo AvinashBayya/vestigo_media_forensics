@@ -14,6 +14,7 @@ from app.pipeline.video_pipeline import (
     MediaInfoStage,
     VideoC2PAStage,
     VideoHashesStage,
+    VideoLocationCluesStage,
     VideoMetadataStage,
 )
 from app.schemas.common import EvidenceClassification, MediaType
@@ -85,10 +86,17 @@ class AudioDuplicatesStage(AnalysisStage):
         )
 
 
+class AudioLocationCluesStage(VideoLocationCluesStage):
+    """Metadata-derived clues only (M6): no audio is decoded and nothing is inferred from content."""
+
+    media_type = MediaType.AUDIO
+
+
 AUDIO_STAGES: tuple[AnalysisStage, ...] = (
     AudioHashesStage(),
     AudioMediaInfoStage(),
     AudioMetadataStage(),
     AudioC2PAStage(),
+    AudioLocationCluesStage(),
     AudioDuplicatesStage(),
 )

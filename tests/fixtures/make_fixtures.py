@@ -47,6 +47,9 @@ class FixtureSet:
     webp: Path
     tiff: Path
     with_metadata: Path
+    with_southern_location: Path
+    with_invalid_location: Path
+    video_with_location: Path
     corrupt_exif: Path
     near_duplicate: Path
     edited: Path
@@ -206,6 +209,42 @@ def write_metadata(path: Path) -> None:
     )
 
 
+def write_southern_location(path: Path) -> None:
+    """Southern/eastern hemisphere GPS plus altitude and XMP location text (M6)."""
+    subprocess.run(
+        [
+            "exiftool",
+            "-q",
+            "-overwrite_original",
+            "-EXIF:GPSLatitude=33.8688",
+            "-EXIF:GPSLatitudeRef=S",
+            "-EXIF:GPSLongitude=151.2093",
+            "-EXIF:GPSLongitudeRef=E",
+            "-EXIF:GPSAltitude=58.4",
+            "-EXIF:GPSAltitudeRef=0",
+            "-EXIF:GPSDateStamp=2026:02:03",
+            "-EXIF:GPSTimeStamp=11:22:33",
+            "-XMP-photoshop:City=Harbourtown",
+            "-XMP-photoshop:Country=Fixtureland",
+            "-XMP-iptcExt:LocationShownCity=Harbourtown",
+            str(path),
+        ],
+        check=True,
+    )
+
+
+def write_invalid_location(path: Path) -> None:
+    """Out-of-range latitude, written with ExifTool's numeric input so it survives as stored (M6)."""
+    subprocess.run(
+        ["exiftool", "-q", "-overwrite_original", "-n", "-EXIF:GPSLatitude=191.5", str(path)],
+        check=True,
+    )
+    subprocess.run(
+        ["exiftool", "-q", "-overwrite_original", "-EXIF:GPSLatitudeRef=N", str(path)],
+        check=True,
+    )
+
+
 def font(name: str, size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(FONT_DIR / name), size)
 
@@ -329,6 +368,31 @@ def build_video_fixtures(path) -> dict[str, Path]:
         path("mirrored.mp4"),
     )
     ffmpeg("-f", "lavfi", "-i", "color=c=green:s=320x240:d=4", "-c:v", "libx264", path("static.mp4"))
+    # A video carrying an ISO 6709 container location tag (M6): +51.5000-000.1200/
+    ffmpeg(
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=320x240:d=2",
+        "-c:v",
+        "libx264",
+        "-metadata",
+        "location=+51.5000-000.1200/",
+        "-metadata",
+        "location-eng=+51.5000-000.1200/",
+        path("video_location.mp4"),
+    )
+    # Also write the Apple-style ISO 6709 key, so the container-location path has a real fixture.
+    subprocess.run(
+        [
+            "exiftool",
+            "-q",
+            "-overwrite_original",
+            "-Keys:GPSCoordinates=+51.5000-000.1200+010.000/",
+            str(path("video_location.mp4")),
+        ],
+        check=True,
+    )
     # The additional containers (D19), remuxed or re-encoded from the same sources.
     ffmpeg("-i", scenes, "-c:v", "mpeg4", "-c:a", "mp2", path("scenes.avi"))
     ffmpeg("-i", scenes, "-c", "copy", path("scenes.ts"))
@@ -369,6 +433,7 @@ def build_video_fixtures(path) -> dict[str, Path]:
         "video_frame_jpg": path("frame_from_video.jpg"),
         "video_scenes": scenes,
         "video_static": path("static.mp4"),
+        "video_with_location": path("video_location.mp4"),
         "video_webm": path("recoded.webm"),
         "video_mkv": path("scenes.mkv"),
         "video_mov": path("scenes.mov"),
@@ -558,6 +623,10 @@ def build_fixtures(target: Path) -> FixtureSet:
 
     base.save(path("with_metadata.jpg"), quality=92)
     write_metadata(path("with_metadata.jpg"))
+    base.save(path("southern_location.jpg"), quality=92)
+    write_southern_location(path("southern_location.jpg"))
+    base.save(path("invalid_location.jpg"), quality=92)
+    write_invalid_location(path("invalid_location.jpg"))
 
     jpeg_bytes = path("base.jpg").read_bytes()
     path("corrupt_exif.jpg").write_bytes(insert_jpeg_segment(jpeg_bytes, 0xE1, corrupt_exif_payload()))
@@ -604,6 +673,8 @@ def build_fixtures(target: Path) -> FixtureSet:
         webp=path("base.webp"),
         tiff=path("base.tiff"),
         with_metadata=path("with_metadata.jpg"),
+        with_southern_location=path("southern_location.jpg"),
+        with_invalid_location=path("invalid_location.jpg"),
         corrupt_exif=path("corrupt_exif.jpg"),
         near_duplicate=path("near_duplicate.jpg"),
         edited=path("edited.jpg"),
