@@ -150,6 +150,30 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
         </p>
       </fieldset>
       <SearchProviderToggles form={form} onChange={change} />
+      <fieldset className="space-y-1">
+        <legend className="mb-1 font-medium">External map links</legend>
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={form.enable_external_map_links}
+            onChange={(event) => change({ ...form, enable_external_map_links: event.target.checked })}
+          />
+          Offer an OpenStreetMap link for coordinates found in metadata
+          <a
+            href="https://www.openstreetmap.org/copyright"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-slate-600 underline dark:text-slate-400"
+          >
+            terms
+          </a>
+        </label>
+        <p className="text-xs text-slate-600 dark:text-slate-400">
+          Off by default. The link is built in your browser and opens only when you click it —
+          clicking sends those coordinates to openstreetmap.org in the URL. Vestigo never loads map
+          tiles, sends coordinates on its own, or looks up place names.
+        </p>
+      </fieldset>
       <label className="flex items-center gap-2">
         <input
           type="checkbox"

@@ -5,6 +5,8 @@ import type {
   C2PASection,
   CustodyReport,
   ExternalLead,
+  LocationCandidate,
+  LocationCluesSection,
   HealthResponse,
   JobHistoryItem,
   SearchProvidersResponse,
@@ -247,6 +249,8 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
     review: { state: "UNREVIEWED", analyst_notes: "", updated_at: NOW },
     review_history: [],
     external_leads: [],
+    location_clues: locationClues(),
+    location_candidates: [],
     ...overrides,
   };
 }
@@ -260,7 +264,7 @@ export function jobHistoryItem(overrides: Partial<JobHistoryItem> = {}): JobHist
     completed_at: NOW,
     pipeline: "image.v1",
     app_version: "0.1.0",
-    options: { metadata: true, c2pa: true, ocr: true, duplicate_search: true },
+    options: { metadata: true, c2pa: true, location_clues: true, ocr: true, duplicate_search: true },
     error: null,
     problem_count: 0,
     ...overrides,
@@ -283,18 +287,31 @@ export function health(overrides: Partial<HealthResponse> = {}): HealthResponse 
 export function settingsResponse(editable: Partial<SettingsResponse["editable"]> = {}): SettingsResponse {
   return {
     editable: {
-      default_analysis_options: { metadata: true, c2pa: true, ocr: true, duplicate_search: true },
+      default_analysis_options: {
+        metadata: true,
+        c2pa: true,
+        location_clues: true,
+        ocr: true,
+        duplicate_search: true,
+      },
       default_video_analysis_options: {
         metadata: true,
         c2pa: true,
+        location_clues: true,
         scene_detection: true,
         keyframe_ocr: false,
         duplicate_search: true,
       },
-      default_audio_analysis_options: { metadata: true, c2pa: true, duplicate_search: true },
+      default_audio_analysis_options: {
+        metadata: true,
+        c2pa: true,
+        location_clues: true,
+        duplicate_search: true,
+      },
       library_page_size: 25,
       auto_analyze_after_upload: true,
       enabled_search_providers: [],
+      enable_external_map_links: false,
       ...editable,
     },
     environment: {
@@ -596,6 +613,58 @@ export function externalLead(overrides: Partial<ExternalLead> = {}): ExternalLea
     claimed_published_at: null,
     notes: "",
     classification: "EXTERNAL",
+    review_state: "UNREVIEWED",
+    recorded_at: NOW,
+    updated_at: null,
+    ...overrides,
+  };
+}
+
+export const LOCATION_NOTICE =
+  "Location candidates are analyst statements, classified UNVERIFIED: the place, any coordinates, " +
+  "the basis, and the assessment are recorded as the analyst entered them and are not verified by " +
+  "Vestigo. The assessment label is the analyst's own judgment, never a machine-calculated " +
+  "confidence. A candidate is never a finding that the media was captured at that place.";
+
+/** Machine-read location clues as the report serves them (M6). */
+export function locationClues(overrides: Partial<LocationCluesSection> = {}): LocationCluesSection {
+  return {
+    coordinates: [
+      {
+        source: "EXIF/container GPS",
+        latitude: 51.5,
+        longitude: -0.12,
+        latitude_as_written: "51 deg 30' 0.00\" (North)",
+        longitude_as_written: "0 deg 7' 12.00\" (West)",
+        valid: true,
+        problem: null,
+      },
+    ],
+    altitude_meters: 58.4,
+    altitude_as_written: "58.4 m",
+    altitude_reference: "Above Sea Level",
+    text_clues: [{ tag: "IPTC:City", value: "Testville" }],
+    timestamps: [{ tag: "EXIF:DateTimeOriginal", value: "2026:01:15 10:30:00" }],
+    device: [{ tag: "EXIF:Make", value: "VestigoTestCam" }],
+    iso6709: [],
+    ocr_available: true,
+    provenance: provenance("location_clues", { classification: "OBSERVED", tool: "ExifTool" }),
+    ...overrides,
+  };
+}
+
+export function locationCandidate(overrides: Partial<LocationCandidate> = {}): LocationCandidate {
+  return {
+    candidate_id: "loc_" + "1".repeat(32),
+    artifact_id: ARTIFACT_ID,
+    description: "Near the harbour, Testville",
+    latitude: null,
+    longitude: null,
+    basis: "IPTC city tag says Testville and a street sign is legible in the OCR text.",
+    notes: "",
+    analyst_assessment: "speculative",
+    supports: [],
+    classification: "UNVERIFIED",
     review_state: "UNREVIEWED",
     recorded_at: NOW,
     updated_at: null,

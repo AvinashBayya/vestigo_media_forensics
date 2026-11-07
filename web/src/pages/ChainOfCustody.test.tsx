@@ -76,6 +76,23 @@ describe("Chain of custody panel", () => {
                 source_table: "custody_events",
                 detail: { lead_id: "lead_x", provider: "TinEye" },
               },
+              {
+                type: "location_candidate_recorded",
+                at: "2026-11-02T09:08:00.000000Z",
+                source_table: "custody_events",
+                detail: {
+                  candidate_id: "loc_x",
+                  analyst_assessment: "possible",
+                  has_coordinates: true,
+                  support_count: 2,
+                },
+              },
+              {
+                type: "location_candidate_updated",
+                at: "2026-11-02T09:09:00.000000Z",
+                source_table: "custody_events",
+                detail: { candidate_id: "loc_x", fields: ["analyst_assessment"] },
+              },
             ],
           }),
         ),
@@ -90,7 +107,7 @@ describe("Chain of custody panel", () => {
 
     const timeline = within(panel).getByRole("list", { name: "Custody timeline" });
     const rows = within(timeline).getAllByRole("listitem");
-    expect(rows).toHaveLength(10);
+    expect(rows).toHaveLength(12);
     expect(rows[0]).toHaveTextContent("Uploaded");
     expect(rows[0]).toHaveTextContent("harbour.jpg");
     expect(rows[1]).toHaveTextContent("Analysis started");
@@ -111,6 +128,10 @@ describe("Chain of custody panel", () => {
     expect(rows[8]).toHaveTextContent("fields changed: notes, review_state");
     expect(rows[9]).toHaveTextContent("External lead deleted");
     expect(rows[9]).toHaveTextContent("earlier events for this lead remain above");
+    expect(rows[10]).toHaveTextContent("Location candidate recorded");
+    expect(rows[10]).toHaveTextContent("analyst assessment: possible · with coordinates · 2 supporting item(s)");
+    expect(rows[11]).toHaveTextContent("Location candidate edited");
+    expect(rows[11]).toHaveTextContent("fields changed: analyst_assessment");
   });
 
   it("indents the lineage tree under the original and each source file", async () => {

@@ -43,6 +43,7 @@ function kindOf(file: File): MediaKind | null {
 export const OPTION_LABELS: Record<keyof AnalysisOptions, string> = {
   metadata: "Embedded metadata (EXIF, XMP, IPTC)",
   c2pa: "Content Credentials (C2PA) validation",
+  location_clues: "Location clues in metadata (GPS, place tags, timestamps)",
   ocr: "Text in image (OCR, English)",
   duplicate_search: "Duplicate search in the local library",
 };
@@ -50,12 +51,14 @@ export const OPTION_LABELS: Record<keyof AnalysisOptions, string> = {
 export const AUDIO_OPTION_LABELS: Record<keyof AudioAnalysisOptions, string> = {
   metadata: "Embedded metadata (ID3 and container tags)",
   c2pa: "Content Credentials (C2PA) validation",
+  location_clues: "Location clues in metadata (GPS, place tags, timestamps)",
   duplicate_search: "Duplicate search (byte-identical files only)",
 };
 
 export const VIDEO_OPTION_LABELS: Record<keyof VideoAnalysisOptions, string> = {
   metadata: "Embedded metadata (QuickTime, Matroska, XMP)",
   c2pa: "Content Credentials (C2PA) validation",
+  location_clues: "Location clues in metadata (GPS, place tags, timestamps)",
   scene_detection: "Scene-change detection",
   keyframe_ocr: "Text in keyframes (OCR, English, up to 10 frames)",
   duplicate_search: "Duplicate search in the local library",

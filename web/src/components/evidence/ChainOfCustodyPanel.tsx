@@ -17,6 +17,9 @@ const EVENT_LABELS: Record<string, string> = {
   lead_recorded: "External lead recorded",
   lead_updated: "External lead edited",
   lead_deleted: "External lead deleted",
+  location_candidate_recorded: "Location candidate recorded",
+  location_candidate_updated: "Location candidate edited",
+  location_candidate_deleted: "Location candidate deleted",
 };
 
 function shortHash(value: unknown): string {
@@ -58,6 +61,16 @@ function eventSummary(event: CustodyTimelineEvent): string {
       return `fields changed: ${Array.isArray(d.fields) ? d.fields.join(", ") : String(d.fields)}`;
     case "lead_deleted":
       return `${String(d.provider)} · earlier events for this lead remain above`;
+    case "location_candidate_recorded":
+      return (
+        `analyst assessment: ${String(d.analyst_assessment)}` +
+        (d.has_coordinates ? " · with coordinates" : " · no coordinates") +
+        (Number(d.support_count) > 0 ? ` · ${String(d.support_count)} supporting item(s)` : "")
+      );
+    case "location_candidate_updated":
+      return `fields changed: ${Array.isArray(d.fields) ? d.fields.join(", ") : String(d.fields)}`;
+    case "location_candidate_deleted":
+      return `analyst assessment was ${String(d.analyst_assessment)} · earlier events remain above`;
     default:
       return JSON.stringify(d);
   }

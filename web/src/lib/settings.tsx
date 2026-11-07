@@ -6,12 +6,18 @@ import type { EditableSettings } from "../api/types";
 export const DEFAULT_VIDEO_OPTIONS = {
   metadata: true,
   c2pa: true,
+  location_clues: true,
   scene_detection: true,
   keyframe_ocr: false, // off by default (M3-3)
   duplicate_search: true,
 } as const;
 
-export const DEFAULT_AUDIO_OPTIONS = { metadata: true, c2pa: true, duplicate_search: true } as const;
+export const DEFAULT_AUDIO_OPTIONS = {
+  metadata: true,
+  c2pa: true,
+  location_clues: true,
+  duplicate_search: true,
+} as const;
 
 export const DEFAULT_SETTINGS: EditableSettings = {
   default_analysis_options: DEFAULT_OPTIONS,
@@ -20,6 +26,7 @@ export const DEFAULT_SETTINGS: EditableSettings = {
   library_page_size: 25,
   auto_analyze_after_upload: true,
   enabled_search_providers: [],
+  enable_external_map_links: false,
 };
 
 interface SettingsContextValue {

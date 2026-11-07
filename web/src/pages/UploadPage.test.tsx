@@ -58,6 +58,7 @@ describe("UploadPage", () => {
     expect(posted).toEqual({
       metadata: true,
       c2pa: true,
+      location_clues: true,
       scene_detection: true,
       keyframe_ocr: true,
       duplicate_search: true,
@@ -97,7 +98,7 @@ describe("UploadPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
     await screen.findByRole("heading", { name: "harbour.jpg" });
-    expect(posted).toEqual({ metadata: true, c2pa: true, duplicate_search: true });
+    expect(posted).toEqual({ metadata: true, c2pa: true, location_clues: true, duplicate_search: true });
   });
 
   it("rejects a video over the 500 MB limit without uploading", async () => {
@@ -167,7 +168,13 @@ describe("UploadPage", () => {
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
 
     expect(await screen.findByRole("heading", { name: "harbour.jpg" })).toBeInTheDocument();
-    expect(sentOptions).toEqual({ metadata: true, c2pa: true, ocr: false, duplicate_search: true });
+    expect(sentOptions).toEqual({
+      metadata: true,
+      c2pa: true,
+      location_clues: true,
+      ocr: false,
+      duplicate_search: true,
+    });
   });
 
   it("shows the backend's error message when the upload is rejected", async () => {

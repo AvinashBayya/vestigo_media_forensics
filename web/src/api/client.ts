@@ -11,6 +11,10 @@ import type {
   ExternalLeadCreate,
   ExternalLeadsResponse,
   ExternalLeadUpdate,
+  LocationCandidate,
+  LocationCandidateCreate,
+  LocationCandidatesResponse,
+  LocationCandidateUpdate,
   SearchProvidersResponse,
   ArtifactUploadResponse,
   BulkReviewResult,
@@ -82,6 +86,7 @@ async function call<T>(request: Promise<{ data: T }>): Promise<T> {
 export const DEFAULT_OPTIONS: AnalysisOptions = {
   metadata: true,
   c2pa: true,
+  location_clues: true,
   ocr: true,
   duplicate_search: true,
 };
@@ -336,4 +341,58 @@ export function deleteExternalLead(artifactId: string, leadId: string): Promise<
 export function downloadUrl(artifactId: string, derivedFileId?: string | null): string {
   const base = derivedFileId ? derivedContentUrl(artifactId, derivedFileId) : contentUrl(artifactId);
   return `${base}?download=true`;
+}
+
+export function listLocationCandidates(artifactId: string): Promise<LocationCandidatesResponse> {
+  return call(
+    http.get<LocationCandidatesResponse>(
+      `/artifacts/${encodeURIComponent(artifactId)}/location-candidates`,
+    ),
+  );
+}
+
+export function createLocationCandidate(
+  artifactId: string,
+  candidate: LocationCandidateCreate,
+): Promise<LocationCandidate> {
+  return call(
+    http.post<LocationCandidate>(
+      `/artifacts/${encodeURIComponent(artifactId)}/location-candidates`,
+      candidate,
+    ),
+  );
+}
+
+export function updateLocationCandidate(
+  artifactId: string,
+  candidateId: string,
+  update: LocationCandidateUpdate,
+): Promise<LocationCandidate> {
+  return call(
+    http.patch<LocationCandidate>(
+      `/artifacts/${encodeURIComponent(artifactId)}/location-candidates/${encodeURIComponent(candidateId)}`,
+      update,
+    ),
+  );
+}
+
+export function deleteLocationCandidate(artifactId: string, candidateId: string): Promise<void> {
+  return call(
+    http.delete<void>(
+      `/artifacts/${encodeURIComponent(artifactId)}/location-candidates/${encodeURIComponent(candidateId)}`,
+    ),
+  );
+}
+
+/**
+ * An OpenStreetMap link for coordinates, built entirely in the browser (M6): the backend never
+ * constructs, stores, or logs a coordinate-bearing URL. Opening it sends the coordinates to
+ * openstreetmap.org, which is why the UI warns before the analyst clicks.
+ */
+export function openStreetMapUrl(latitude: number, longitude: number): string {
+  const params = new URLSearchParams({
+    mlat: String(latitude),
+    mlon: String(longitude),
+  });
+  return `https://www.openstreetmap.org/?${params.toString()}#map=15/${latitude}/${longitude}`;
 }

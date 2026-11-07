@@ -55,18 +55,31 @@ describe("SettingsPage", () => {
 
     expect(await within(form).findByRole("status")).toHaveTextContent("Saved");
     expect(sent).toEqual({
-      default_analysis_options: { metadata: true, c2pa: true, ocr: false, duplicate_search: true },
+      default_analysis_options: {
+        metadata: true,
+        c2pa: true,
+        location_clues: true,
+        ocr: false,
+        duplicate_search: true,
+      },
       default_video_analysis_options: {
         metadata: true,
         c2pa: true,
+        location_clues: true,
         scene_detection: true,
         keyframe_ocr: false,
         duplicate_search: true,
       },
-      default_audio_analysis_options: { metadata: true, c2pa: true, duplicate_search: true },
+      default_audio_analysis_options: {
+        metadata: true,
+        c2pa: true,
+        location_clues: true,
+        duplicate_search: true,
+      },
       library_page_size: 50,
       auto_analyze_after_upload: false,
       enabled_search_providers: [],
+      enable_external_map_links: false,
     });
 
     await user.click(screen.getByRole("link", { name: "Library" }));
@@ -99,6 +112,35 @@ describe("SettingsPage", () => {
     await user.click(within(form).getByRole("button", { name: "Save defaults" }));
     expect(await within(form).findByRole("status")).toHaveTextContent("Saved");
     expect((sent as { enabled_search_providers: string[] }).enabled_search_providers).toEqual(["tineye"]);
+  });
+
+  it("keeps external map links off by default and saves the toggle", async () => {
+    let sent: unknown = null;
+    server.use(
+      http.patch(`${API}/settings`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({
+          ...settingsResponse({ enable_external_map_links: true }),
+          updated_at: "2026-11-07T09:00:00Z",
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp("/settings");
+
+    const form = await screen.findByRole("form", { name: "Defaults" });
+    const group = within(form).getByRole("group", { name: "External map links" });
+    const toggle = within(group).getByRole("checkbox", {
+      name: /Offer an OpenStreetMap link for coordinates found in metadata/,
+    });
+    expect(toggle).not.toBeChecked();
+    expect(group).toHaveTextContent("clicking sends those coordinates to openstreetmap.org");
+    expect(group).toHaveTextContent("Vestigo never loads map tiles");
+
+    await user.click(toggle);
+    await user.click(within(form).getByRole("button", { name: "Save defaults" }));
+    expect(await within(form).findByRole("status")).toHaveTextContent("Saved");
+    expect((sent as { enable_external_map_links: boolean }).enable_external_map_links).toBe(true);
   });
 
   it("shows validation errors from the backend", async () => {
@@ -240,7 +282,7 @@ describe("Settings applied elsewhere", () => {
     server.use(
       http.get(`${API}/settings`, () =>
         HttpResponse.json(
-          settingsResponse({ default_analysis_options: { metadata: true, c2pa: false, ocr: false, duplicate_search: true } }),
+          settingsResponse({ default_analysis_options: { metadata: true, c2pa: false, location_clues: true, ocr: false, duplicate_search: true } }),
         ),
       ),
       http.post(`${API}/artifacts/upload`, uploadResponse),
@@ -257,7 +299,7 @@ describe("Settings applied elsewhere", () => {
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile());
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
 
-    await waitFor(() => expect(options).toEqual({ metadata: true, c2pa: false, ocr: false, duplicate_search: true }));
+    await waitFor(() => expect(options).toEqual({ metadata: true, c2pa: false, location_clues: true, ocr: false, duplicate_search: true }));
   });
 
   it("uses the saved page size in the Library", async () => {

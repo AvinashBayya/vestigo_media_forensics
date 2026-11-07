@@ -21,6 +21,7 @@ import { DuplicateLibraryControl } from "../components/DuplicateLibraryControl";
 import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { ChainOfCustodyPanel } from "../components/evidence/ChainOfCustodyPanel";
+import { LocationPanel } from "../components/evidence/LocationPanel";
 import { ReverseImageSearchPanel } from "../components/evidence/ReverseImageSearchPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
 import { KeyframeOCRPanel } from "../components/evidence/KeyframeOCRPanel";
@@ -64,6 +65,8 @@ export function ArtifactPage() {
   const [creatingPreview, setCreatingPreview] = useState(false);
   // Bumped on every lead create/edit/delete so the Chain of custody panel refetches (M5 events).
   const [leadActivity, setLeadActivity] = useState(0);
+  // Bumped on every location-candidate change so the custody panel refetches (M6 events).
+  const [candidateActivity, setCandidateActivity] = useState(0);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -353,6 +356,11 @@ export function ArtifactPage() {
                 </>
               )}
               <MetadataPanel section={report.metadata} />
+              <LocationPanel
+                artifactId={artifact.artifact_id}
+                section={report.location_clues}
+                onCandidatesChanged={() => setCandidateActivity((n) => n + 1)}
+              />
             </div>
           )}
           {artifact.media_type !== "audio" && (
@@ -365,7 +373,7 @@ export function ArtifactPage() {
           )}
           <ChainOfCustodyPanel
             artifactId={artifact.artifact_id}
-            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}`}
+            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}:${candidateActivity}`}
           />
         </div>
       </div>

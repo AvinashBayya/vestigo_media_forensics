@@ -133,6 +133,7 @@ export interface DeletionSummary {
   review_events: number;
   custody_events?: number;
   external_leads?: number;
+  location_candidates?: number;
 }
 
 export type ReviewOrigin = "artifact" | "record" | "bulk";
@@ -177,6 +178,7 @@ export interface BulkReviewResult {
 export interface VideoAnalysisOptions {
   metadata: boolean;
   c2pa: boolean;
+  location_clues: boolean;
   scene_detection: boolean;
   keyframe_ocr: boolean;
   duplicate_search: boolean;
@@ -186,12 +188,14 @@ export interface VideoAnalysisOptions {
 export interface AudioAnalysisOptions {
   metadata: boolean;
   c2pa: boolean;
+  location_clues: boolean;
   duplicate_search: boolean;
 }
 
 export interface AnalysisOptions {
   metadata: boolean;
   c2pa: boolean;
+  location_clues: boolean;
   ocr: boolean;
   duplicate_search: boolean;
 }
@@ -430,6 +434,7 @@ export interface EvidenceReport {
   hashes: HashesSection | null;
   metadata: MetadataSection | null;
   c2pa: C2PASection | null;
+  location_clues: LocationCluesSection | null;
   perceptual_hash: PerceptualHashSection | null;
   ocr: OCRSection | null;
   duplicates: DuplicatesSection | null;
@@ -443,6 +448,8 @@ export interface EvidenceReport {
   review_history: ReviewEvent[];
   /** Analyst-recorded external search leads (M5), newest first. */
   external_leads: ExternalLead[];
+  /** Analyst-stated possible locations (M6), newest first. */
+  location_candidates: LocationCandidate[];
 }
 
 export interface JobHistoryItem extends JobSummary {
@@ -506,6 +513,8 @@ export interface EditableSettings {
   auto_analyze_after_upload: boolean;
   /** Reverse-image search providers the analyst enabled (M5). All disabled by default. */
   enabled_search_providers: string[];
+  /** Off by default (M6): when on, the artifact page offers an external OpenStreetMap link. */
+  enable_external_map_links: boolean;
 }
 
 /** Read-only: set with VESTIGO_* environment variables or .env. */
@@ -751,5 +760,99 @@ export interface ExternalLeadUpdate {
   image_url?: string;
   claimed_published_at?: string;
   notes?: string;
+  review_state?: ReviewState;
+}
+
+// --- Location clues and candidates (Milestone 6) --------------------------------------------------
+
+/**
+ * One coordinate pair as read (M6). `valid` is false when a value is out of range or only half
+ * present; the value is still shown exactly as written.
+ */
+export interface LocationCoordinate {
+  source: string;
+  latitude: number | null;
+  longitude: number | null;
+  latitude_as_written: string | null;
+  longitude_as_written: string | null;
+  valid: boolean;
+  problem: string | null;
+}
+
+/** One clue exactly as written, with the tag it came from. */
+export interface LocationTag {
+  tag: string;
+  value: string;
+}
+
+/** Machine-read location clues: facts as written, never a location claim. */
+export interface LocationCluesSection {
+  coordinates: LocationCoordinate[];
+  altitude_meters: number | null;
+  altitude_as_written: string | null;
+  altitude_reference: string | null;
+  text_clues: LocationTag[];
+  timestamps: LocationTag[];
+  device: LocationTag[];
+  iso6709: LocationTag[];
+  /** True when this analysis produced OCR text the analyst can read. Vestigo never interprets it. */
+  ocr_available: boolean;
+  provenance: Provenance;
+}
+
+/** The analyst's own judgment, never a machine score. */
+export type AnalystAssessment = "speculative" | "possible" | "likely";
+
+export type SupportType = "evidence_record" | "derived_file" | "external_lead";
+
+export interface SupportRef {
+  type: SupportType;
+  id: string;
+}
+
+/**
+ * One possible location stated by the analyst (M6), classified UNVERIFIED. Everything here is the
+ * analyst's statement; `recorded_at` is when Vestigo saved it.
+ */
+export interface LocationCandidate {
+  candidate_id: string;
+  artifact_id: string;
+  description: string;
+  latitude: number | null;
+  longitude: number | null;
+  basis: string;
+  notes: string;
+  analyst_assessment: AnalystAssessment;
+  supports: SupportRef[];
+  classification: "UNVERIFIED";
+  review_state: ReviewState;
+  recorded_at: string;
+  updated_at: string | null;
+}
+
+export interface LocationCandidatesResponse {
+  artifact_id: string;
+  notice: string;
+  candidates: LocationCandidate[];
+}
+
+export interface LocationCandidateCreate {
+  description: string;
+  basis: string;
+  analyst_assessment: AnalystAssessment;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string;
+  supports?: SupportRef[];
+}
+
+export interface LocationCandidateUpdate {
+  description?: string;
+  basis?: string;
+  analyst_assessment?: AnalystAssessment;
+  latitude?: number | null;
+  longitude?: number | null;
+  notes?: string;
+  supports?: SupportRef[];
   review_state?: ReviewState;
 }
