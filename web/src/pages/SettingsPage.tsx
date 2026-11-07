@@ -5,6 +5,7 @@ import {
   errorMessage,
   getHealth,
   getLibrarySummary,
+  getSearchProviders,
   getSettings,
   setDuplicateLibrary,
   startImageAnalysis,
@@ -148,6 +149,7 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
           File hashes and media information always run. No audio is decoded or transcribed.
         </p>
       </fieldset>
+      <SearchProviderToggles form={form} onChange={change} />
       <label className="flex items-center gap-2">
         <input
           type="checkbox"
@@ -186,6 +188,57 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
         )}
       </div>
     </form>
+  );
+}
+
+/** Per-provider toggles (M5). External services are opt-in per the security policy; none is on by default. */
+function SearchProviderToggles({
+  form,
+  onChange,
+}: {
+  form: EditableSettings;
+  onChange: (next: EditableSettings) => void;
+}) {
+  const providersResource = useApiResource(getSearchProviders, "search-providers");
+  const registry = providersResource.data?.providers ?? [];
+
+  function toggle(key: string, enabled: boolean) {
+    const current = new Set(form.enabled_search_providers);
+    if (enabled) current.add(key);
+    else current.delete(key);
+    onChange({ ...form, enabled_search_providers: [...current].sort() });
+  }
+
+  return (
+    <fieldset className="space-y-1">
+      <legend className="mb-1 font-medium">Reverse-image search providers</legend>
+      {registry.length === 0 ? (
+        <p className="text-xs text-slate-600 dark:text-slate-400">Loading providers…</p>
+      ) : (
+        registry.map((provider) => (
+          <label key={provider.key} className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.enabled_search_providers.includes(provider.key)}
+              onChange={(event) => toggle(provider.key, event.target.checked)}
+            />
+            {provider.name}
+            <a
+              href={provider.terms_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-slate-600 underline dark:text-slate-400"
+            >
+              terms
+            </a>
+          </label>
+        ))
+      )}
+      <p className="text-xs text-slate-600 dark:text-slate-400">
+        All providers start disabled. Enabling one only shows its link on artifact pages — media is
+        shared with a provider only when you upload it there yourself, under that provider's terms.
+      </p>
+    </fieldset>
   );
 }
 

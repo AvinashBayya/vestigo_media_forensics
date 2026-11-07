@@ -74,6 +74,33 @@ describe("SettingsPage", () => {
     expect(listLimits.at(-1)).toBe("50");
   });
 
+  it("toggles reverse-image search providers, all off by default", async () => {
+    let sent: unknown = null;
+    server.use(
+      http.patch(`${API}/settings`, async ({ request }) => {
+        sent = await request.json();
+        const saved = settingsResponse({ enabled_search_providers: ["tineye"] });
+        return HttpResponse.json({ ...saved, updated_at: "2026-11-06T09:00:00Z" });
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp("/settings");
+
+    const form = await screen.findByRole("form", { name: "Defaults" });
+    const group = within(form).getByRole("group", { name: "Reverse-image search providers" });
+    expect(group).toHaveTextContent("All providers start disabled.");
+    expect(group).toHaveTextContent("only when you upload it there yourself");
+    const tineye = await within(group).findByRole("checkbox", { name: /TinEye/ });
+    for (const checkbox of within(group).getAllByRole("checkbox")) {
+      expect(checkbox).not.toBeChecked();
+    }
+
+    await user.click(tineye);
+    await user.click(within(form).getByRole("button", { name: "Save defaults" }));
+    expect(await within(form).findByRole("status")).toHaveTextContent("Saved");
+    expect((sent as { enabled_search_providers: string[] }).enabled_search_providers).toEqual(["tineye"]);
+  });
+
   it("shows validation errors from the backend", async () => {
     server.use(
       http.patch(`${API}/settings`, () => apiError(422, "VALIDATION_ERROR", "Request validation failed.")),
