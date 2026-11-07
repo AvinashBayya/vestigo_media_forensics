@@ -40,6 +40,14 @@ class EditableSettings(BaseModel):
     # Off by default (M6): when on, the artifact page offers an OpenStreetMap link for coordinates
     # found in metadata. The link is built in the browser; the backend never constructs or logs one.
     enable_external_map_links: bool = False
+    # Local AI (Pass 1, D24). All off by default: nothing is installed, loaded, or downloaded until
+    # the analyst turns a capability on. AI output is never evidence.
+    ai_enabled: bool = False
+    transcription_enabled: bool = False
+    semantic_search_enabled: bool = False
+    # Paths to locally held model files (.cact). Empty means "let the runtime resolve its default".
+    ai_model_path: str = ""
+    transcription_model_path: str = ""
 
 
 class EnvironmentSettings(BaseModel):
@@ -82,6 +90,11 @@ class SettingsUpdate(BaseModel):
     auto_analyze_after_upload: bool | None = None
     enabled_search_providers: EnabledSearchProviders | None = None
     enable_external_map_links: bool | None = None
+    ai_enabled: bool | None = None
+    transcription_enabled: bool | None = None
+    semantic_search_enabled: bool | None = None
+    ai_model_path: str | None = Field(default=None, max_length=1000)
+    transcription_model_path: str | None = Field(default=None, max_length=1000)
 
     @model_validator(mode="before")
     @classmethod

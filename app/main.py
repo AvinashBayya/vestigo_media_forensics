@@ -9,6 +9,7 @@ from PIL import Image
 
 from app import __version__
 from app.api import (
+    routes_ai,
     routes_analysis,
     routes_artifacts,
     routes_health,
@@ -90,6 +91,7 @@ def create_app(
     api.include_router(routes_library.router)
     api.include_router(routes_settings.router)
     api.include_router(routes_search.router)
+    api.include_router(routes_ai.router)
     app.include_router(api)
     return app
 

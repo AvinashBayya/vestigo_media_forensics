@@ -49,6 +49,11 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
         "auto_analyze_after_upload": True,
         "enabled_search_providers": [],
         "enable_external_map_links": False,
+        "ai_enabled": False,
+        "transcription_enabled": False,
+        "semantic_search_enabled": False,
+        "ai_model_path": "",
+        "transcription_model_path": "",
     }
     assert body["updated_at"] is None
     env = body["environment"]
@@ -83,6 +88,11 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
         "auto_analyze_after_upload": False,
         "enabled_search_providers": [],
         "enable_external_map_links": False,
+        "ai_enabled": False,
+        "transcription_enabled": False,
+        "semantic_search_enabled": False,
+        "ai_model_path": "",
+        "transcription_model_path": "",
     }
 
 
