@@ -244,7 +244,34 @@ Backend:
 Frontend: the panel shows the honesty notice, one factual line per event type, the indented
 lineage tree, "source not recorded" for pre-0005 rows, and a load error with retry.
 
-## 10. Container tests
+## 10. Milestone 5 tests (reverse-image search, D22)
+
+Backend:
+
+- Registry listing: all four providers, disabled by default, plain https landing URLs with no query
+  parameters; enabling via settings round-trips; unknown provider keys are rejected with nothing
+  changed (for API updates and stored values alike).
+- Leads: recorded exactly as entered (claimed date never parsed), EXTERNAL and UNREVIEWED by
+  default; subject rules (image leads omit the derived file, video leads require a real keyframe of
+  that artifact, non-keyframe files and foreign files rejected, audio refused); URL and field
+  validation; 404s.
+- Custody: lead_recorded / lead_updated (changed field names only) / lead_deleted; no-op saves
+  record nothing; the trail survives the lead's deletion.
+- Integration: leads in the evidence report and the export package's report.json, their events in
+  custody.json, deletion cascading and counting them.
+- Downloads: `download=true` answers as an attachment with the honest filename and the protective
+  headers kept, byte-identical to the inline response.
+- Migrations: v1/v2 databases upgrade in place to schema_version 6 with every row unchanged; the
+  external_leads table shape, FK validation, and cascade.
+
+Frontend: the sharing warning and the cannot-observe note; provider links only when enabled (new
+tab, noopener, plain URL) and "enable in Settings" otherwise; the keyframe-only subject picker with
+the preview never offered and recording blocked until a keyframe is chosen; the recorded payload;
+lead rows with EXTERNAL, "Recorded" vs "Publication date (analyst-reported, unverified)", and the
+never-proof-of-origin notice; review select and two-step delete; the panel absent on audio pages;
+Settings toggles off by default with the policy note.
+
+## 11. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

@@ -73,6 +73,14 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 - Derived-file lineage: every new derived file records what it was read from (a keyframe-OCR TSV points at its exact keyframe thumbnail); older rows read "source not recorded", never guessed
 - `GET /artifacts/{id}/custody`, custody.json in the evidence export package (hashed in the manifest), an append-only custody_events table (Alembic 0005), and custody events counted in deletion
 
+### Milestone 5 — Reverse-image search (D22)
+
+- Manual-first external search: Vestigo opens a provider's plain landing page (no query parameters, nothing evidence-derived) and never uploads media — the analyst downloads the exact subject file and uploads it themselves, under the provider's terms, after a clear sharing warning
+- Providers (Google Lens, Bing Visual Search, TinEye, Yandex Images) are all disabled until enabled individually in Settings
+- Search subjects: the original image, or a selected video keyframe (its real derived file) — audio is refused and the playable preview is never offered
+- Findings come back as analyst-recorded **EXTERNAL leads**: provider, result URL, optional image URL, notes, and the publication date exactly as entered, always labelled analyst-reported and unverified, separate from when the lead was recorded; an earlier result is never called the original source
+- Lead creates, edits, and deletes are append-only custody events; leads travel in the evidence report and export package and are deleted and counted with the artifact (Alembic 0006, schema v6)
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
@@ -97,7 +105,7 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 
 ## Later phases
 
-- Reverse-image search integrations
+- Paid or official reverse-image search provider APIs (each needs separate approval)
 - GEOINT / geo-lite analysis
 - Optional Vestigo integration through a versioned evidence API
 
@@ -209,6 +217,16 @@ With both servers running, open http://localhost:5180.
 4. **Audio.** Upload a WAV/MP3/FLAC/OGG/M4A: it plays in the built-in audio player, with media information (codec, channels, sample rate, container-reported duration) and ID3/container metadata as evidence. Upload the identical file again: duplicate search reports "Same file (identical bytes)". Re-encode it (e.g. WAV → MP3) and upload: no match, and the evidence's limitations explain that only byte-identical audio matches.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
+
+## Manual test of reverse-image search (M5)
+
+1. **Gating.** On a fresh database, open an image artifact: the Reverse-image search panel lists every provider as "enable in Settings". In Settings, tick TinEye (note the terms link and the policy note), save, and reload the artifact: "Open TinEye" appears with upload instructions.
+2. **Nothing transmitted.** Click "Open TinEye": a new tab opens on tineye.com with a bare URL — no parameters, nothing about your evidence. The sharing warning sits above the provider links.
+3. **Subject download.** Click "Download original image" (or, on an analysed video, pick a keyframe thumbnail first — the playable preview is never offered — then "Download selected keyframe"): the exact file saves as an attachment. Upload it manually on the provider page.
+4. **Record a lead.** Fill the form with the result URL and the page's publication date as written. The lead shows EXTERNAL / Unreviewed, "Recorded <now>", and "Publication date (analyst-reported, unverified): <your text>" as separate lines, plus the never-proof-of-origin notice.
+5. **Custody trail.** The Chain of custody panel gains lead_recorded; change the lead's review state or notes → lead_updated naming the fields; delete it (two-step confirm) → lead_deleted, with the earlier events still present.
+6. **Export and deletion.** An exported package's report.json carries the leads and custody.json their events; deleting the artifact counts external_leads in the summary and removes everything.
+7. **Audio.** An audio artifact page has no search panel, and the API refuses audio leads.
 
 ## Manual test of the chain of custody (M4B)
 

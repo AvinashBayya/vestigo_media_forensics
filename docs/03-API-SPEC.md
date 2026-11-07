@@ -377,6 +377,44 @@ The evidence export package gains `custody.json` (the same report), hashed in `m
 the next package's custody.json. `DeletionSummary` adds `custody_events`; the table is append-only
 (database triggers) and cascade-deletes with the artifact.
 
+## Milestone 5 — Reverse-image search (D22)
+
+### `GET /search/providers`
+
+The static provider registry (Google Lens, Bing Visual Search, TinEye, Yandex Images) with each
+provider's name, plain landing URL (https, no query parameters, nothing evidence-derived), terms
+URL, manual-upload instructions, and `enabled` flag. The response `notice` is the sharing warning.
+Providers are enabled through the editable setting `enabled_search_providers` (registry keys only,
+validated and deduplicated; all off by default). The backend never contacts a provider.
+
+### External leads
+
+- `GET /artifacts/{id}/external-leads` — the analyst-recorded leads, newest first, with a notice
+  stating that leads are unverified analyst statements and an earlier result is never proof of the
+  original source.
+- `POST /artifacts/{id}/external-leads` (201) — body: `provider`, `result_url` (http/https, stored
+  exactly as entered), optional `image_url`, `claimed_published_at` (free text, as entered),
+  `notes`, and `derived_file_id`. Subject rules: an image lead omits `derived_file_id`; a video
+  lead must name a real keyframe (`keyframe_jpeg`) of that artifact; audio is refused with
+  `WRONG_MEDIA_TYPE`.
+- `PATCH /artifacts/{id}/external-leads/{lead_id}` — any subset of the fields plus `review_state`
+  (lightweight lead review). Each actual change is a `lead_updated` custody event naming the
+  changed fields; a no-op save records nothing.
+- `DELETE /artifacts/{id}/external-leads/{lead_id}` (204) — the deletion itself stays in the
+  custody trail (`lead_deleted`).
+
+A lead answers with `lead_id`, the stored fields, fixed `classification: "EXTERNAL"`,
+`review_state` (starting UNREVIEWED), `recorded_at` (when Vestigo saved it — not a publication
+date), and `updated_at`. The evidence report gains an artifact-level `external_leads` list, which
+also places leads in the export package's `report.json`; their custody events appear in
+`custody.json`. `DeletionSummary` adds `external_leads`.
+
+### Content downloads
+
+Both `GET /artifacts/{id}/content` and `GET /artifacts/{id}/derived/{derived_file_id}/content`
+take `download=true` to answer as an attachment (honest filename, protective headers unchanged),
+so the analyst can save the exact subject file for a manual provider upload.
+
 ## Review state values
 
 - `UNREVIEWED`

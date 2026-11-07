@@ -47,6 +47,13 @@ External services are optional and must be:
 - Recorded as `EXTERNAL` evidence
 - Disabled by default if legal or terms review is pending
 
+Milestone 5 (D22) implements this policy manual-first: every search provider is disabled until the
+analyst enables it in Settings; Vestigo only opens the provider's plain landing page (no query
+parameters, nothing evidence-derived) and never uploads media — the analyst does, knowingly, on the
+provider's own site under its terms. The backend makes no outbound HTTP requests. Automated
+scraping, CAPTCHA bypass, browser automation, rate-limit evasion, and automatic uploads are
+prohibited; paid or official provider APIs each require separate approval.
+
 ## 5. Prohibited capabilities
 
 The system must not include:
@@ -75,6 +82,7 @@ Users must be able to delete:
 - Fingerprint index rows (image and keyframe)
 - Its playable preview, when one was created
 - Custody events (append-only until the artifact itself is deleted)
+- External leads (M5)
 - Database rows
 
 Playable previews are kept only as long as their artifact and are removed with it; nothing is

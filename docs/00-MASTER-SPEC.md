@@ -107,8 +107,12 @@ Implemented (see `06-ROADMAP.md` and `09-DECISIONS.md` for the approved details)
   plus the chain of custody (D21) — an append-only custody_events table, derived-file lineage,
   `GET /artifacts/{id}/custody`, custody.json in the export package, and the Chain of custody panel.
 
-Remaining: permission-gated reverse-image search (M5), GEOINT / geo-lite (M6), Vestigo
-integration (M7).
+- **Milestone 5 — Reverse-image search** (D22): manual-first external search — a provider registry
+  gated by per-provider settings (all off by default), plain landing-page links that transmit
+  nothing, subject downloads (original image or a selected keyframe, never the preview), and
+  analyst-recorded EXTERNAL leads with custody-trailed edits.
+
+Remaining: GEOINT / geo-lite (M6), Vestigo integration (M7).
 
 ## 10. API Contract
 

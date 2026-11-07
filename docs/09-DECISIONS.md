@@ -277,3 +277,37 @@ lineage tree lives inside the Chain of custody panel).
   appears in the next package's custody.json (stated in the README inside the package).
 - **UI.** One Chain of custody panel on the artifact page (no separate page): notice, timeline,
   and the indented lineage tree. `DeletionSummary` counts `custody_events`; deletion removes them.
+
+## D22 — Milestone 5: reverse-image search, manual-first
+
+Implemented 2026-11-07 (approved plan `15-MILESTONE-5-PLAN.md`, decisions M5-1…9 confirmed by the
+user with the proposed defaults: the four initial providers, editable custody-trailed leads, and
+lightweight lead review).
+
+- **Manual-first, nothing transmitted.** Vestigo opens a provider's plain landing page in a new tab
+  (https, no query parameters, nothing evidence-derived, `noopener noreferrer`), shows manual-upload
+  instructions and the provider's terms link, and serves the exact subject file as a download
+  (`?download=true` on the content endpoints, protective headers unchanged). The backend makes no
+  outbound HTTP requests. No prefilled search links: no listed provider officially accepts a URL the
+  tool can supply (a localhost path is not public). A sharing warning precedes every provider link,
+  and the UI states that Vestigo cannot observe or record anything after the page opens.
+- **Providers, disabled by default** (05 §4): Google Lens, Bing Visual Search, TinEye, Yandex
+  Images, in a static code registry; enabled individually via the `enabled_search_providers`
+  setting, validated against registry keys for API updates and stored values alike. Paid or
+  official provider APIs each need their own approval.
+- **Search subjects** (M5-2): the original image, or one selected video keyframe (its real derived
+  file, kind `keyframe_jpeg`). Audio is refused; the playable preview is never offered or
+  substituted.
+- **Leads are analyst statements** stored in `external_leads` (Alembic 0006, schema_version 6,
+  additive): provider, result URL, optional image URL, notes, and the claimed publication date
+  exactly as entered — always labelled analyst-reported and unverified, distinct from
+  `recorded_at`. Classification is fixed EXTERNAL; review is the lightweight `review_state`
+  starting UNREVIEWED. Nothing ever calls the earliest result "the original source".
+- **Custody-trailed edits.** Leads are editable; every create, update (changed field names only),
+  and delete writes an append-only custody event (`lead_recorded` / `lead_updated` /
+  `lead_deleted`); no-op saves record nothing, and a deleted lead's history stays in the trail.
+  Leads flow into the evidence report (artifact-level `external_leads`), the export package
+  (report.json; events in custody.json), and the deletion summary, and cascade-delete with the
+  artifact.
+- **Refused capabilities**: automated scraping, CAPTCHA bypass, browser automation, rate-limit
+  evasion, automatic media uploads.

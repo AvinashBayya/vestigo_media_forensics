@@ -66,12 +66,13 @@ playable previews all use the existing ffmpeg/ffprobe, ExifTool, Pillow, and ima
 - The chain of custody (M4B, D21) added no dependencies: Alembic 0005, SQLite triggers, and the
   existing FastAPI/SQLAlchemy/React toolchain.
 
+## Backend — Milestone 5 (D22)
+
+No new dependencies: the manual-first reverse-image search uses the existing FastAPI/SQLAlchemy/
+React toolchain and makes no outbound HTTP requests. Provider-specific SDKs or HTTP clients were
+not needed and remain out of scope until a paid/official API integration is separately approved.
+
 ## Future dependencies
-
-### Reverse-image search
-
-- Provider-specific SDKs or HTTP clients
-- Permission and licence registry
 
 ### GEOINT
 

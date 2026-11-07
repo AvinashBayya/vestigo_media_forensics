@@ -197,3 +197,18 @@ never silently left out.
 - Custody events carry no note text (review notes stay in the review history) and no user identity
   (single-analyst tool). Deletion removes them with the artifact and counts them.
 
+## 13. External leads (Milestone 5, D22)
+
+- A lead is an **analyst statement**, classified EXTERNAL: the provider, result URL, optional image
+  URL, notes, and any publication date are recorded exactly as entered and never verified by
+  Vestigo. `recorded_at` (set by Vestigo) and the analyst-reported publication date are separate
+  facts, always labelled apart; an earlier-dated result is a lead about prior appearance, never
+  "the original source".
+- The lead names its subject: the original image, or the exact keyframe derived file that was
+  searched. Audio has no searchable image; the playable preview is never a subject.
+- Leads are editable (unlike machine evidence); every create, update, and delete is an append-only
+  custody event, so the full history survives edits and deletions. Lead review is a lightweight
+  per-lead state starting UNREVIEWED.
+- Leads appear in the evidence report (artifact-level, newest first), travel in the export package,
+  and are deleted and counted with the artifact.
+

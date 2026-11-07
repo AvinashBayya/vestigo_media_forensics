@@ -1,6 +1,8 @@
-# Milestone 5 Build Plan — Reverse-Image Search (DRAFT)
+# Milestone 5 Build Plan — Reverse-Image Search (approved)
 
-**Status: draft — awaiting approval. Nothing below is implemented.**
+Approved: 2026-11-06 with the proposed defaults (the four initial providers; editable,
+custody-trailed leads; lightweight lead review). Implemented: 2026-11-07 (decision record in
+`09-DECISIONS.md` D22).
 
 Analyst-assisted external image search on the evidence-first architecture of Milestones 1–4.
 Manual provider workflows only: Vestigo never transmits media anywhere; the analyst does, knowingly,

@@ -76,16 +76,23 @@ Scope:
 
 ## Milestone 5 — Reverse-image search
 
+**Status: complete** (2026-11-07, decision D22, approved plan `15-MILESTONE-5-PLAN.md`), as a
+manual-first workflow: Vestigo never transmits media — it opens plain provider landing pages,
+serves the subject file for a manual upload, and records what the analyst found as custody-trailed
+EXTERNAL leads.
+
 Goal: add permission-gated external lookups.
 
 Scope:
 
-- Provider registry
-- Permission gates
-- Licence and terms tracking
-- Result normalization
-- Evidence recording
-- Analyst review workflow
+- Provider registry — **done** (static registry: Google Lens, Bing Visual Search, TinEye, Yandex Images)
+- Permission gates — **done** (per-provider Settings toggles, all disabled by default)
+- Licence and terms tracking — **done** (each provider's terms linked in Settings and the panel)
+- Result normalization — **done** as analyst-recorded leads with fixed fields, stored as entered
+- Evidence recording — **done** (EXTERNAL leads in the report, export, custody, and deletion)
+- Analyst review workflow — **done** (lightweight per-lead review state)
+
+Paid or official provider API integrations were explicitly deferred: each needs its own approval.
 
 ## Milestone 6 — GEOINT / geo-lite
 
