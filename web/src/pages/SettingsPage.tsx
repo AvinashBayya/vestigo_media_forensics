@@ -212,7 +212,20 @@ function SearchProviderToggles({
   return (
     <fieldset className="space-y-1">
       <legend className="mb-1 font-medium">Reverse-image search providers</legend>
-      {registry.length === 0 ? (
+      {providersResource.error ? (
+        <div role="alert" className="space-y-1 text-xs">
+          <p className="text-rose-800 dark:text-rose-300">
+            The provider list could not be loaded: {providersResource.error.message}
+          </p>
+          <button
+            type="button"
+            onClick={providersResource.reload}
+            className="rounded-md border border-slate-300 px-2 py-0.5 font-medium dark:border-slate-600"
+          >
+            Retry
+          </button>
+        </div>
+      ) : registry.length === 0 ? (
         <p className="text-xs text-slate-600 dark:text-slate-400">Loading providers…</p>
       ) : (
         registry.map((provider) => (

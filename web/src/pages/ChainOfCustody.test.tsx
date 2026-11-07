@@ -58,6 +58,24 @@ describe("Chain of custody panel", () => {
                 source_table: "custody_events",
                 detail: { sha256: "9".repeat(64), size_bytes: 1024, width: 640, height: 360 },
               },
+              {
+                type: "lead_recorded",
+                at: "2026-11-02T09:05:00.000000Z",
+                source_table: "custody_events",
+                detail: { lead_id: "lead_x", provider: "TinEye", derived_file_id: "df_x" },
+              },
+              {
+                type: "lead_updated",
+                at: "2026-11-02T09:06:00.000000Z",
+                source_table: "custody_events",
+                detail: { lead_id: "lead_x", fields: ["notes", "review_state"] },
+              },
+              {
+                type: "lead_deleted",
+                at: "2026-11-02T09:07:00.000000Z",
+                source_table: "custody_events",
+                detail: { lead_id: "lead_x", provider: "TinEye" },
+              },
             ],
           }),
         ),
@@ -72,7 +90,7 @@ describe("Chain of custody panel", () => {
 
     const timeline = within(panel).getByRole("list", { name: "Custody timeline" });
     const rows = within(timeline).getAllByRole("listitem");
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(10);
     expect(rows[0]).toHaveTextContent("Uploaded");
     expect(rows[0]).toHaveTextContent("harbour.jpg");
     expect(rows[1]).toHaveTextContent("Analysis started");
@@ -87,6 +105,12 @@ describe("Chain of custody panel", () => {
     expect(rows[5]).toHaveTextContent("Evidence package exported");
     expect(rows[5]).toHaveTextContent("original not included");
     expect(rows[6]).toHaveTextContent("Playable preview created");
+    expect(rows[7]).toHaveTextContent("External lead recorded");
+    expect(rows[7]).toHaveTextContent("TinEye · from a keyframe");
+    expect(rows[8]).toHaveTextContent("External lead edited");
+    expect(rows[8]).toHaveTextContent("fields changed: notes, review_state");
+    expect(rows[9]).toHaveTextContent("External lead deleted");
+    expect(rows[9]).toHaveTextContent("earlier events for this lead remain above");
   });
 
   it("indents the lineage tree under the original and each source file", async () => {

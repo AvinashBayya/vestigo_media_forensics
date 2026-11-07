@@ -62,6 +62,8 @@ export function ArtifactPage() {
   // True once a re-encoded viewing copy (D19) should be played instead of the original.
   const [usePlayablePreview, setUsePlayablePreview] = useState(false);
   const [creatingPreview, setCreatingPreview] = useState(false);
+  // Bumped on every lead create/edit/delete so the Chain of custody panel refetches (M5 events).
+  const [leadActivity, setLeadActivity] = useState(0);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -358,11 +360,12 @@ export function ArtifactPage() {
               artifactId={artifact.artifact_id}
               mediaType={artifact.media_type}
               keyframes={report?.keyframes ?? null}
+              onLeadsChanged={() => setLeadActivity((n) => n + 1)}
             />
           )}
           <ChainOfCustodyPanel
             artifactId={artifact.artifact_id}
-            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}`}
+            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}`}
           />
         </div>
       </div>

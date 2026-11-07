@@ -14,6 +14,9 @@ const EVENT_LABELS: Record<string, string> = {
   exported: "Evidence package exported",
   library_changed: "Duplicate library changed",
   preview_created: "Playable preview created",
+  lead_recorded: "External lead recorded",
+  lead_updated: "External lead edited",
+  lead_deleted: "External lead deleted",
 };
 
 function shortHash(value: unknown): string {
@@ -49,6 +52,12 @@ function eventSummary(event: CustodyTimelineEvent): string {
       return d.included_after ? "included in future duplicate searches" : "excluded from future duplicate searches";
     case "preview_created":
       return `viewing copy · ${formatBytes(Number(d.size_bytes))} · SHA-256 ${shortHash(d.sha256)}`;
+    case "lead_recorded":
+      return `${String(d.provider)}${d.derived_file_id ? " · from a keyframe" : ""}`;
+    case "lead_updated":
+      return `fields changed: ${Array.isArray(d.fields) ? d.fields.join(", ") : String(d.fields)}`;
+    case "lead_deleted":
+      return `${String(d.provider)} · earlier events for this lead remain above`;
     default:
       return JSON.stringify(d);
   }

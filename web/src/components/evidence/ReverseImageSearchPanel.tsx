@@ -31,9 +31,16 @@ interface ReverseImageSearchPanelProps {
   mediaType: MediaType;
   /** The viewed analysis's keyframes: the only video search subjects. Previews are never offered. */
   keyframes: KeyframesSection | null;
+  /** Called after a lead is recorded, edited, or deleted, so siblings (custody) can refresh. */
+  onLeadsChanged?: () => void;
 }
 
-export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: ReverseImageSearchPanelProps) {
+export function ReverseImageSearchPanel({
+  artifactId,
+  mediaType,
+  keyframes,
+  onLeadsChanged,
+}: ReverseImageSearchPanelProps) {
   const headingId = useId();
   const [providers, setProviders] = useState<SearchProvidersResponse | null>(null);
   const [leads, setLeads] = useState<ExternalLeadsResponse | null>(null);
@@ -57,7 +64,16 @@ export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: Re
   }, [load]);
 
   const frames = keyframes?.frames.filter((frame) => frame.derived_file_id) ?? [];
-  const subjectReady = mediaType === "image" || subject !== null;
+  // Only a keyframe of THIS artifact's viewed analysis counts: a selection left over from another
+  // artifact or an earlier analysis self-heals to "nothing selected" instead of leaking.
+  const validSubject =
+    mediaType === "video" && frames.some((frame) => frame.derived_file_id === subject) ? subject : null;
+  const subjectReady = mediaType === "image" || validSubject !== null;
+
+  function changed() {
+    void load();
+    onLeadsChanged?.();
+  }
 
   return (
     <section
@@ -91,7 +107,8 @@ export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: Re
                 {frames.length === 0 ? (
                   <p className={MUTED}>
                     No keyframes are available. Run an analysis to extract keyframes; the search subject
-                    is always original evidence — never the re-encoded playable preview.
+                    is always a keyframe extracted from the original video — never the re-encoded
+                    playable preview.
                   </p>
                 ) : (
                   <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
@@ -102,7 +119,7 @@ export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: Re
                             type="radio"
                             name="search-subject"
                             className="sr-only"
-                            checked={subject === frame.derived_file_id}
+                            checked={validSubject === frame.derived_file_id}
                             onChange={() => setSubject(frame.derived_file_id)}
                           />
                           <img
@@ -110,7 +127,7 @@ export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: Re
                             alt={`Keyframe ${frame.seq} at ${formatSeconds(frame.timestamp)}`}
                             loading="lazy"
                             className={`aspect-video w-full rounded object-contain ring-2 ${
-                              subject === frame.derived_file_id
+                              validSubject === frame.derived_file_id
                                 ? "bg-sky-100 ring-sky-600 dark:bg-sky-950"
                                 : "bg-slate-100 ring-transparent dark:bg-slate-800"
                             }`}
@@ -128,7 +145,11 @@ export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: Re
 
             <div className="flex flex-wrap items-center gap-2">
               <a
-                href={subjectReady ? downloadUrl(artifactId, subject) : undefined}
+                href={
+                  subjectReady
+                    ? downloadUrl(artifactId, mediaType === "video" ? validSubject : null)
+                    : undefined
+                }
                 aria-disabled={!subjectReady}
                 className={`${BUTTON} ${subjectReady ? "" : "pointer-events-none opacity-40"}`}
                 download
@@ -176,17 +197,12 @@ export function ReverseImageSearchPanel({ artifactId, mediaType, keyframes }: Re
 
             <LeadForm
               artifactId={artifactId}
-              subject={mediaType === "video" ? subject : null}
+              subject={mediaType === "video" ? validSubject : null}
               subjectReady={subjectReady}
-              onRecorded={() => void load()}
+              onRecorded={changed}
             />
 
-            <LeadsList
-              artifactId={artifactId}
-              response={leads}
-              keyframes={keyframes}
-              onChanged={() => void load()}
-            />
+            <LeadsList artifactId={artifactId} response={leads} keyframes={keyframes} onChanged={changed} />
           </>
         )}
       </div>

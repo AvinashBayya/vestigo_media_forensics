@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,8 @@ import {
   ARTIFACT_ID,
   DERIVED_KF_1,
   DERIVED_KF_2,
+  JOB_ID,
+  jobHistoryItem,
   LEADS_NOTICE,
   artifactDetail,
   externalLead,
@@ -174,5 +176,94 @@ describe("Reverse-image search panel", () => {
     expect(
       screen.queryByRole("region", { name: "Reverse-image search (external)" }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("Reverse-image search panel integration", () => {
+  it("refreshes the chain of custody after a lead is recorded", async () => {
+    let custodyCalls = 0;
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/custody`, () => {
+        custodyCalls += 1;
+        return HttpResponse.json({ artifact_id: ARTIFACT_ID, notice: "n", events: [], derived_files: [] });
+      }),
+      http.post(`${API}/artifacts/${ARTIFACT_ID}/external-leads`, () =>
+        HttpResponse.json(externalLead(), { status: 201 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const panel = await findPanel();
+    const before = custodyCalls;
+    const form = within(panel).getByRole("form", { name: "Record an external lead" });
+    await user.type(within(form).getByLabelText("Provider"), "TinEye");
+    await user.type(within(form).getByLabelText("Result page URL"), "https://example.org/results/42");
+    await user.click(within(form).getByRole("button", { name: "Record lead" }));
+
+    // The custody panel refetches, so the new lead_recorded event can appear.
+    await waitFor(() => expect(custodyCalls).toBeGreaterThan(before));
+  });
+
+  it("drops a selected keyframe that is not in the viewed analysis", async () => {
+    const OLD_JOB = "job_55555555555555555555555555555555";
+    const base = videoReport();
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}`, () => HttpResponse.json(videoDetail())),
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/jobs`, () =>
+        HttpResponse.json({
+          artifact_id: ARTIFACT_ID,
+          jobs: [
+            jobHistoryItem({ pipeline: "video.v1" }),
+            jobHistoryItem({ job_id: OLD_JOB, created_at: "2026-11-03T09:00:00Z", pipeline: "video.v1" }),
+          ],
+        }),
+      ),
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, ({ request }) => {
+        const jobId = new URL(request.url).searchParams.get("job_id") ?? JOB_ID;
+        if (jobId !== OLD_JOB) return HttpResponse.json(videoReport());
+        // The earlier analysis has a different keyframe set.
+        const report = videoReport({
+          job_id: OLD_JOB,
+          keyframes: {
+            ...base.keyframes!,
+            frames: [
+              {
+                seq: 1,
+                timestamp: 0,
+                reason: "first_frame",
+                scene_score: null,
+                derived_file_id: "df_" + "f".repeat(32),
+                width: 640,
+                height: 360,
+              },
+            ],
+            extracted: 1,
+            requested: 1,
+          },
+        });
+        report.job = { ...report.job, job_id: OLD_JOB };
+        return HttpResponse.json(report);
+      }),
+    );
+    const user = userEvent.setup();
+    renderApp(PAGE);
+
+    const panel = await findPanel();
+    const subjects = within(panel).getByRole("group", { name: /Search subject/ });
+    await user.click(within(subjects).getByRole("radio", { name: /Keyframe 2/ }));
+    expect(within(panel).getByRole("button", { name: "Record lead" })).toBeEnabled();
+
+    // View the earlier analysis: its keyframes don't include the selection, so it self-heals.
+    const history = screen.getByRole("region", { name: "Analysis history" });
+    await user.click(within(history).getByRole("button", { name: "View this analysis" }));
+
+    const switched = await screen.findByRole("region", { name: "Reverse-image search (external)" });
+    const record = await within(switched).findByRole("button", { name: "Record lead" });
+    expect(record).toBeDisabled();
+    expect(switched).toHaveTextContent("Select the searched keyframe first.");
+    for (const radio of within(switched).getAllByRole("radio")) {
+      expect(radio).not.toBeChecked();
+    }
   });
 });
