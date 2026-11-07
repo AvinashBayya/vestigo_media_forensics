@@ -106,7 +106,9 @@ def test_answers_always_carry_sources_and_are_never_stored(client: TestClient, f
     # Nothing about the answer is persisted anywhere, and it is not in the evidence report.
     report = client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json()
     assert "answer" not in json.dumps(report)
-    assert client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json() == report
+    again = client.get(f"/api/v1/artifacts/{artifact_id}/evidence").json()
+    report.pop("created_at"), again.pop("created_at")  # the report's own build time
+    assert again == report  # asking a question changed no stored evidence
 
 
 def test_answer_can_be_scoped_to_chosen_artifacts(client: TestClient, fixtures: FixtureSet) -> None:
