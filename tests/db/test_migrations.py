@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "7")]
+    assert after.pop("schema_meta") == [("schema_version", "8")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -378,7 +378,7 @@ def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m2_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "7")]
+    assert after.pop("schema_meta") == [("schema_version", "8")]
     before.pop("schema_meta")
     assert after == before
     with sqlite3.connect(path) as connection:
@@ -548,3 +548,51 @@ def test_location_candidates_table_shape_and_cascade(tmp_path: Path) -> None:
         connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
         connection.commit()
         assert connection.execute("SELECT count(*) FROM location_candidates").fetchone() == (0,)
+
+
+# --- Local AI artifacts (0008) -------------------------------------------------------------------------
+
+
+def test_local_ai_tables_shape_and_cascade(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+    model = json.dumps({"name": "needle3", "license": "Apache-2.0", "runtime": "needle"})
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute(
+            "INSERT INTO ai_drafts VALUES (?, ?, 'field_extraction', 'ocr_text', ?, ?, 'proposed', "
+            "?, NULL, '[]', ?, NULL)",
+            (
+                "draft_" + "1" * 32,
+                ART_A,
+                EV_HASH,
+                json.dumps([{"name": "city", "value": "Testville", "status": "proposed"}]),
+                model,
+                T1,
+            ),
+        )
+        connection.execute(
+            "INSERT INTO transcripts VALUES (?, ?, NULL, 'en', 12.5, 'hello', '[]', NULL, ?, '[]', "
+            "'UNREVIEWED', ?, NULL)",
+            ("tsc_" + "1" * 32, ART_A, model, T1),
+        )
+        connection.execute(
+            "INSERT INTO embedding_chunks VALUES (?, ?, 'analyst_notes', NULL, 0, 'hello', ?, "
+            "'vestigo-local-hash', 4, ?)",
+            ("emb_" + "1" * 32, ART_A, json.dumps([0.5, 0.5, 0.5, 0.5]), T1),
+        )
+        connection.commit()
+
+        # A draft may cite an evidence record; losing that record must not lose the draft.
+        connection.execute("DELETE FROM evidence_records WHERE id = ?", (EV_HASH,))
+        connection.commit()
+        assert connection.execute(
+            "SELECT source_evidence_id FROM ai_drafts WHERE id = ?", ("draft_" + "1" * 32,)
+        ).fetchone() == (None,)
+
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        for table in ("ai_drafts", "transcripts", "embedding_chunks"):
+            assert connection.execute(f"SELECT count(*) FROM {table}").fetchone() == (0,), table
