@@ -11,6 +11,7 @@ from app.models.evidence_record import EvidenceRecord
 from app.models.external_lead import ExternalLead
 from app.models.fingerprint import ImageFingerprint
 from app.models.keyframe_fingerprint import KeyframeFingerprint
+from app.models.location_candidate import LocationCandidate
 from app.models.playable_preview import PlayablePreview
 from app.models.review_event import ReviewEvent
 
@@ -33,6 +34,7 @@ __all__ = [
     "ExternalLead",
     "ImageFingerprint",
     "KeyframeFingerprint",
+    "LocationCandidate",
     "PlayablePreview",
     "ReviewEvent",
     "SchemaMeta",

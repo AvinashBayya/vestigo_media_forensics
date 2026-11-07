@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "6")]
+    assert after.pop("schema_meta") == [("schema_version", "7")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -378,7 +378,7 @@ def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m2_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "6")]
+    assert after.pop("schema_meta") == [("schema_version", "7")]
     before.pop("schema_meta")
     assert after == before
     with sqlite3.connect(path) as connection:
@@ -515,3 +515,36 @@ def test_external_leads_table_shape_and_cascade(tmp_path: Path) -> None:
         connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
         connection.commit()
         assert connection.execute("SELECT count(*) FROM external_leads").fetchone() == (0,)
+
+
+# --- Location candidates (0007) ------------------------------------------------------------------------
+
+
+def test_location_candidates_table_shape_and_cascade(tmp_path: Path) -> None:
+    path = tmp_path / "app.db"
+    build_m1_database(path)
+    Database(path).initialize()
+
+    with sqlite3.connect(path) as connection:
+        connection.execute("PRAGMA foreign_keys=ON")
+        connection.execute(
+            "INSERT INTO location_candidates VALUES (?, ?, 'Near Trafalgar Square', 51.5, -0.12, "
+            "'IPTC city plus visible signage', '', 'speculative', '[]', 'UNREVIEWED', ?, NULL)",
+            ("loc_" + "1" * 32, ART_A, T1),
+        )
+        # Coordinates are optional: a candidate can be a stated place with no coordinates.
+        connection.execute(
+            "INSERT INTO location_candidates VALUES (?, ?, 'Somewhere coastal', NULL, NULL, "
+            "'Gulls audible in the recording metadata notes', '', 'possible', '[]', 'UNREVIEWED', ?, ?)",
+            ("loc_" + "2" * 32, ART_A, T1, T1),
+        )
+        # Rejected: candidates always belong to a real artifact.
+        with pytest.raises(sqlite3.IntegrityError):
+            connection.execute(
+                "INSERT INTO location_candidates VALUES (?, ?, 'x', NULL, NULL, 'b', '', "
+                "'speculative', '[]', 'UNREVIEWED', ?, NULL)",
+                ("loc_" + "3" * 32, "art_" + "9" * 32, T1),
+            )
+        connection.execute("DELETE FROM artifacts WHERE id = ?", (ART_A,))
+        connection.commit()
+        assert connection.execute("SELECT count(*) FROM location_candidates").fetchone() == (0,)
