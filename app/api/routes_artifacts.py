@@ -22,6 +22,12 @@ from app.schemas.custody import CustodyReport
 from app.schemas.evidence import EvidenceReport
 from app.schemas.leads import ExternalLeadCreate, ExternalLeadInfo, ExternalLeadsResponse, ExternalLeadUpdate
 from app.schemas.library import DuplicateLibraryUpdate
+from app.schemas.location_candidates import (
+    LocationCandidateCreate,
+    LocationCandidateInfo,
+    LocationCandidatesResponse,
+    LocationCandidateUpdate,
+)
 from app.schemas.review import (
     BulkReviewRequest,
     BulkReviewResult,
@@ -29,7 +35,18 @@ from app.schemas.review import (
     RecordReviewUpdate,
     ReviewHistory,
 )
-from app.services import analysis, artifacts, custody, exports, leads, library, previews, reports, review
+from app.services import (
+    analysis,
+    artifacts,
+    custody,
+    exports,
+    leads,
+    library,
+    location_candidates,
+    previews,
+    reports,
+    review,
+)
 
 router = APIRouter(prefix="/artifacts", tags=["artifacts"])
 
@@ -252,6 +269,41 @@ def update_external_lead(
 def delete_external_lead(services: Services, artifact_id: str, lead_id: str) -> None:
     """Delete a lead. The deletion itself stays in the custody trail (lead_deleted)."""
     leads.delete_lead(services, artifact_id, lead_id)
+
+
+@router.get("/{artifact_id}/location-candidates", response_model=LocationCandidatesResponse)
+def list_location_candidates(services: Services, artifact_id: str) -> LocationCandidatesResponse:
+    """The analyst's possible locations for this artifact, newest first (M6). Candidates are analyst
+    statements classified UNVERIFIED: Vestigo verifies nothing and claims no location of its own."""
+    return LocationCandidatesResponse(
+        artifact_id=artifact_id, candidates=location_candidates.get_candidates(services, artifact_id)
+    )
+
+
+@router.post("/{artifact_id}/location-candidates", response_model=LocationCandidateInfo, status_code=201)
+def create_location_candidate(
+    services: Services, artifact_id: str, payload: LocationCandidateCreate
+) -> LocationCandidateInfo:
+    """Record one possible location (M6): the stated place, the analyst's basis and assessment, any
+    coordinates, and supporting evidence of this artifact. Recorded as a
+    location_candidate_recorded custody event."""
+    return location_candidates.create_candidate(services, artifact_id, payload)
+
+
+@router.patch("/{artifact_id}/location-candidates/{candidate_id}", response_model=LocationCandidateInfo)
+def update_location_candidate(
+    services: Services, artifact_id: str, candidate_id: str, update: LocationCandidateUpdate
+) -> LocationCandidateInfo:
+    """Edit a candidate's fields, assessment, or review state. Every actual change is a
+    location_candidate_updated custody event naming the changed fields; a no-op save records
+    nothing."""
+    return location_candidates.update_candidate(services, artifact_id, candidate_id, update)
+
+
+@router.delete("/{artifact_id}/location-candidates/{candidate_id}", status_code=204)
+def delete_location_candidate(services: Services, artifact_id: str, candidate_id: str) -> None:
+    """Delete a candidate. The deletion itself stays in the custody trail."""
+    location_candidates.delete_candidate(services, artifact_id, candidate_id)
 
 
 @router.get("/{artifact_id}/custody", response_model=CustodyReport)
