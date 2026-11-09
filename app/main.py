@@ -12,6 +12,7 @@ from app.api import (
     routes_ai,
     routes_analysis,
     routes_artifacts,
+    routes_geo,
     routes_health,
     routes_library,
     routes_search,
@@ -92,6 +93,7 @@ def create_app(
     api.include_router(routes_settings.router)
     api.include_router(routes_search.router)
     api.include_router(routes_ai.router)
+    api.include_router(routes_geo.router)
     app.include_router(api)
     return app
 
