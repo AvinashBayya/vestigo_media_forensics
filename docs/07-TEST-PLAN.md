@@ -317,7 +317,10 @@ Backend:
   `NEEDLE_API_KEY` is never present; every capability is off by default with an actionable reason;
   the label and limitations are served; the known models carry Apache-2.0 and their Hugging Face
   sources with `installed: false`; enabling a capability without the runtime names
-  `pip install cactus-needle`; model paths validate; the disabled provider refuses every capability.
+  `pip install -e ".[dev,ai]"`; a configured path that does not resolve reports the capability
+  unavailable and echoes the bad path; the disabled provider refuses every capability. The Needle
+  adapters run against a stand-in module in `tests/unit/test_ai_providers.py` on every machine, and
+  against real weights under `pytest -m live_model` (excluded by default, beside `container`).
 - Drafts: refused with 409 `AI_UNAVAILABLE` while AI is off; model provenance and the model's own
   confidence recorded (and `null` left alone when the model gives none); the model actually reads the
   held material; per-field accept / edit / reject with the model's value kept beside an edit; an edit

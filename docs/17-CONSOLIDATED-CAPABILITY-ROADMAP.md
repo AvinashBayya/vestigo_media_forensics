@@ -16,7 +16,7 @@ CPU-only — far lighter than a typical local-AI stack.
 | Name | What it actually is | Licence | Source | Install | Size |
 |---|---|---|---|---|---|
 | **Cactus** | On-device inference engine (Cactus Kernels / Graph / Engine) | Apache-2.0 (per repo README; the vendor docs site also describes paid tiers for hybrid cloud inference, custom models, and extra hardware acceleration — we use none of those) | [github.com/cactus-compute/cactus](https://github.com/cactus-compute/cactus) | `pip install cactus-compute` (4.0.1) | engine binary |
-| **Needle** | Automation model + C++ engine: tool calling, structured extraction, embeddings, ASR host. Needle 3 is 2-bit, 8–29 MB | Apache-2.0 | [github.com/cactus-compute/needle](https://github.com/cactus-compute/needle), weights [Cactus-Compute/needle3](https://huggingface.co/Cactus-Compute/needle3) | `pip install cactus-needle` (3.2.10), `import needle` | 8–29 MB |
+| **Needle** | Automation model + C++ engine: tool calling and structured extraction. Embeddings and ASR need the generation 3 engine, which the vendor does not publish - see D27 | Apache-2.0 | [github.com/cactus-compute/needle](https://github.com/cactus-compute/needle), weights [Cactus-Compute/needle3](https://huggingface.co/Cactus-Compute/needle3) | `pip install cactus-needle` (3.2.10), `import needle` | 8–29 MB |
 | **Whistle** | Speech-to-text model running on the Needle engine; word-level timestamps with probabilities, keyword biasing, 7 languages claimed (sources disagree; EN/DE/FR confirmed) | Apache-2.0 | weights [Cactus-Compute/whistle](https://huggingface.co/Cactus-Compute/whistle) | same package | 16.9 MB |
 
 Verified API surface (from the published package documentation):
@@ -52,7 +52,7 @@ Installing and executing third-party packages is blocked by this environment's e
 Everything in Pass 1 is therefore built so that **the architecture, storage, custody, export,
 deletion, review, UI, and the entire test suite work without the dependency installed**: the real
 `needle`-backed provider is implemented but inactive until `cactus-needle` is installed and the
-feature is enabled in Settings. Live-model tests are marked `local_ai` and excluded by default, the
+feature is enabled in Settings. Live-model tests are marked `live_model` and excluded by default, the
 same way `container` tests already are. Nothing downloads at import time, ever.
 
 ## 1. Architecture decisions (made once, applied across all three passes)
@@ -88,7 +88,7 @@ same way `container` tests already are. Nothing downloads at import time, ever.
 | 3 | **Whistle transcription.** `transcripts` table: timestamped segments with word-level timing where available, language, duration, model provenance, warnings/errors, `source` (the artifact's audio, or a video's audio track extracted with the existing ffmpeg to a derived file so lineage is explicit), status and analyst edits. Opt-in per analysis and per artifact; originals never touched. Exported under `ai/transcripts/`. |
 | 4 | **Embeddings, semantic search, RAG.** `embedding_chunks` table over notes, OCR text, transcripts, and selected metadata; `GET /search/semantic`; question answering that **always** returns the source artifacts and evidence records it drew on, with the generated answer visibly separated and never storable as evidence. Indexes are derived data, deleted with the artifact and rebuildable. |
 | 5 | **UI integration.** An "Assistant (AI drafts)" panel per artifact (drafts with per-field accept/edit/reject), a transcript panel with editing and the machine-generated label, a semantic-search page with answer-plus-sources, and Settings for enablement, model import, cache, and the telemetry indicator. |
-| 6 | **Tests and docs.** Hermetic fakes throughout; marked `local_ai` tests for the real runtime; export/deletion/custody/migration coverage; D24 decision record; README and test-plan updates. |
+| 6 | **Tests and docs.** Hermetic fakes throughout; marked `live_model` tests for the real runtime; export/deletion/custody/migration coverage; D24 decision record; README and test-plan updates. |
 
 ## 3. Pass 2 — Deep media forensics — **complete** (2026-11-09, D25; no migration needed)
 

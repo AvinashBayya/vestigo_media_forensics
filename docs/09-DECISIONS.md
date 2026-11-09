@@ -503,3 +503,69 @@ programme. No new runtime dependency; Alembic 0009 (schema_version 9) is additiv
   put data in, and adding one would mean accepting evidence Vestigo did not observe - which the
   evidence model cannot honestly represent. Evidence leaves through the export package and the
   read-only integration view; it never arrives from outside.
+
+## D27 - Local AI made live, and the three things that turned out not to exist (2026-11-09)
+
+Pass 1 built the whole local AI surface and never ran it: `cactus-needle` was optional and absent, so
+`NeedleExtractor.extract` and `NeedleTranscriber.transcribe` had never once been executed and their
+call shapes were guesses from vendor prose. This pass installed the runtime, checked it, and wired
+what is real. Three of those guesses were wrong in ways worth recording, because each had been
+written up as if it worked.
+
+**The call shapes were wrong.** `needle.extract(text, schema, weights=, generation=, strict=)` takes
+an OpenAI-style tool schema and returns the plain arguments mapping; it does not take a list of field
+names. `needle.transcribe` returns flat text plus a `words` list of `{start, end, probability}` and
+has no `segments` key, so the old adapter would have produced a single segment stamped 0.0 and
+silently discarded every word timing. Both adapters now match the installed package, and the model
+path is finally passed through as `weights=` - before, it was computed for provenance and dropped, so
+configuring a model changed what Vestigo *recorded* and not what it *loaded*.
+
+**Generation 3 cannot run at all.** The engine binary and the weights are published separately, and
+`Cactus-Compute/needle3` holds only weights, a checkpoint and a tokenizer: there is no engine wheel
+or platform folder for any platform, and the version the package pins (3.3.3) 404s. Whistle loads
+through that same generation 3 engine, so transcription is blocked by the same gap. Generation 2 has
+a published engine and runs: 0.96 s for the first call, 0.67 s warm, 47 MB RSS on an i7 laptop CPU
+with no GPU. So `DEFAULT_GENERATION = 2`, generation 3 stays wired and reports itself unavailable
+with the real reason, and it will start working when the vendor publishes an engine. **A model being
+installed and a model being runnable are reported separately** (`installed` and `runnable` on
+`/ai/status`), because the common case here is weights present and engine absent, and calling that
+either "installed" or "missing" would be a lie in one direction or the other.
+
+**There is no text generation and no text embedding.** `Needle.complete()` with no tools returns an
+empty call, so Vestigo drafts no prose answers: `semantic.answer` now returns the analyst's own
+material and says that is what it did, and the unreachable drafting branch and its `ANSWER_LABEL`
+are deleted rather than left as code that cannot run. `Needle.embed(text)` exists but raises
+"embeddings require a Needle 3 model", so `LocalHashEmbedder` stays - now for a verified reason
+rather than an assumption, with the reason in the resolver's docstring.
+
+**Downloads are blocked rather than avoided.** `needle/__init__.py` fetches a missing engine or
+missing weights from Hugging Face at load time, and pings the Hub even on a warm cache ("a warm cache
+still counts as a use of the model"). D24's claim that the backend makes no outbound request was
+therefore a hope about cache state. `HF_HUB_OFFLINE=1` is now forced at import beside the telemetry
+switches, `/ai/status` reports `offline_enforced`, and the behaviour is measured: a cold lookup fails
+locally in 0.14 s with no network call while a staged model still runs. The telemetry set was also
+corrected - `CACTUS_TELEMETRY` is read by no version of this package, so setting it was theatre;
+`NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1` are the switches that exist.
+
+**Model files are managed, not typed from memory.** `data/models/` is created by `Storage` and
+deliberately excluded from the tmp/trash wipe, so a restart cannot eat the weights. `GET /ai/models`
+scans it, `POST /ai/models/import` copies a file the analyst already has, and `DELETE` removes one -
+refused while a setting still points at it. A directory scan is the contract, so dropping a `.cact`
+file in by hand works identically; the endpoint is a convenience, not a gate. Names are validated
+rather than normalised: a filename with a directory part is refused instead of quietly renamed, which
+follows the same rule as coordinates in D26. Settings keeps both fields and gains a picker, and a
+configured path that does not resolve now reports the feature **unavailable with the bad path
+echoed**, where before a typo read as "available" and failed on first use.
+
+**Two fixed defects found on the way.** Transcription resolved its provider early but refused late,
+after `_prepare_audio` had already run ffmpeg, written a WAV and committed a `DerivedFile` row - so a
+turned-off feature left derived evidence and a custody event behind for work that never happened. It
+now refuses first. And `/ai/status` and `semantic.py` were reading a private `_reason` attribute off
+providers; `unavailable_reason` is now part of the provider protocol.
+
+**Tests now cover the adapters twice over.** `tests/unit/test_ai_providers.py` injects a stand-in
+module under the runtime's import name, so the mapping and error handling run on every machine
+whether or not the package is installed - code that previously had no coverage at all. A `live_model`
+marker (`pytest -m live_model`, excluded from the default run beside `container`) exercises the real
+library against real weights, which is where an upstream change in those call shapes will surface.
+The claim in the old docs that such tests existed was untrue when written; it is true now.

@@ -92,12 +92,15 @@ See `docs/13-MILESTONE-3-PLAN.md`.
 
 ### Pass 1 — Local AI foundation (D24)
 
-Local, optional, and off by default. All three tools are Cactus Compute's, Apache-2.0, CPU-only and tens of megabytes; install them yourself with `pip install cactus-needle` and point Vestigo at the model files. A stock build installs nothing, downloads nothing, and sends nothing.
+Local, optional, and off by default. The runtime is Cactus Compute's, Apache-2.0, CPU-only and tens of megabytes; it is an optional extra (`pip install -e ".[dev,ai]"`) and you stage the engine yourself with `needle fetch --generation 2`. A stock build installs nothing, downloads nothing, and sends nothing — and the backend *cannot* download anything, because `HF_HUB_OFFLINE=1` is forced in-process (D27).
+
+Measured on an i7-1165G7 laptop CPU with no GPU: 0.96 s for the first extraction including engine load, 0.67 s warm, 47 MB RSS. What runs is generation 2. Generation 3 weights (`needle3.cact`) and Whistle are published **without an engine for any platform**, so transcription and model text embeddings report themselves unavailable with that reason and will start working when the vendor publishes one. Nothing is faked in the meantime.
 
 - **AI output is never evidence.** Drafts, transcripts, and indexes live in their own tables, are absent from the evidence report, travel in the export package's separate `ai/` folder with its own "not evidence" README, and are labelled **"AI-generated, unverified — analyst must review"** everywhere
 - **Needle structured extraction**: ask a local model for named fields from material you already hold (metadata, OCR text, your notes, a transcript), then accept, edit, or reject **each field** — an edit is stored beside the model's value, never over it, and nothing is ever written back onto metadata or evidence
-- **Whistle transcription** (16.9 MB): timestamped local speech-to-text for audio and video, with word-level timing where the model gives it; the model's text is kept verbatim beside your corrections and the original audio is only ever read
-- **Local semantic search and question answering** over your own notes, OCR text, transcripts, metadata, leads, and location candidates; answers always come with the sources they drew on, and are never stored or citable as findings
+- **Whistle transcription** (16.9 MB): timestamped local speech-to-text for audio and video, with word-level timing where the model gives it; the model's text is kept verbatim beside your corrections and the original audio is only ever read. *Currently unavailable: it needs the generation 3 engine, which the vendor does not publish — `/ai/status` says so rather than failing on use*
+- **Local semantic search and retrieval** over your own notes, OCR text, transcripts, metadata, leads, and location candidates. Questions return the sources themselves: this runtime has no text generation, so Vestigo drafts no prose and says so
+- **Staged model files** live in `data/models/`, listed with their size and SHA-256 so a draft names the exact bytes behind it. Drop a `.cact` file in by hand or import it in Settings — both are the same thing, and neither fetches anything
 - **Confidence only where the model supplies it** — Vestigo never calculates one
 - **Vendor telemetry is forced off** in-process (`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`) before the runtime can load, asserted by a test; `NEEDLE_API_KEY` is never read, so the vendor's upload-to-their-GPUs fine-tuning is unreachable
 
@@ -150,7 +153,7 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 - Database: SQLite
 - Frontend: React + Vite + TypeScript
 - Media tooling: ExifTool, Tesseract OCR, FFmpeg, ffprobe
-- Local AI (optional, analyst-installed): Cactus / Needle / Whistle (Apache-2.0, CPU-only)
+- Local AI (optional extra `.[ai]`): Cactus Needle (Apache-2.0, CPU-only; engine staged by you, downloads blocked in-process)
 - C2PA validation: c2pa-python 0.38.1 (c2pa-rs SDK 0.91.3), entirely local
 - Container: Docker Dev Container
 
@@ -170,9 +173,17 @@ All commands run inside the Dev Container, from the repository root.
 Rebuilding the container runs `scripts/post-create.sh`, which installs ExifTool, Tesseract, and FFmpeg, then the Python and web dependencies. To install the project dependencies by hand:
 
 ```bash
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,ai]"   # drop ,ai to build without the local AI runtime
 (cd web && npm ci)
 bash scripts/verify-env.sh
+```
+
+`verify-env.sh` reports the AI runtime and each engine generation as present or absent without
+failing: a container with no local AI is a supported setup. To run a model, stage the engine once —
+this is the only step that touches the network, and it is never part of a container build:
+
+```bash
+needle fetch --generation 2    # ~14 MB into ~/.cache/cactus-needle/v2/2.0.4/
 ```
 
 ### Backend (port 8400)
@@ -275,11 +286,13 @@ With both servers running, open http://localhost:5180.
 
 Everything below works with local AI **off** except where it says otherwise — that is the point.
 
-1. **Off by default.** Open any artifact: the "AI assistant (drafts, not evidence)" panel shows the AI-generated-unverified label, says nothing here is a finding, reports that vendor telemetry is disabled, and the "Ask the local model" button is disabled with the reason given. `curl localhost:8400/api/v1/ai/status` shows every capability false, `telemetry_disabled: true`, and both models listed with Apache-2.0 and their Hugging Face URLs, `installed: false`.
-2. **Semantic search with no model at all.** Enable "Semantic search" in Settings. Add a note to an artifact, then press "Index" from the AI panel (or `POST /api/v1/ai/artifacts/<id>/index`). Go to **Search**, search a word from your note: your own record comes back with its source kind and score. Ask a question: the answer section says no local generator is available and returns your material exactly as recorded — no invented prose.
-3. **Drafts and transcription (needs the runtime).** `pip install cactus-needle`, download `needle3.cact` and `whistle.cact`, set their paths in Settings, and enable "AI drafts" and "Transcription". Ask for fields from metadata: each proposed field shows the model's value, its own confidence where given, and Accept / Edit / Reject. Edit one — the model's value stays visible beside yours, and the evidence report is unchanged. Transcribe an audio or video file: timestamped segments appear with the machine-generated caveat and the model's provenance.
-4. **Nothing leaks.** Grep the backend log: no prompts, draft values, transcript text, or vectors — only artifact ids and event names.
-5. **Custody, export, deletion.** The Chain of custody panel gains the AI events (names only). Export the package: `ai/README.txt` says it is not evidence, `ai/drafts.json` and `ai/transcripts.json` hold the material, and `report.json` has none of it. Delete the artifact: the summary counts `ai_drafts`, `transcripts`, and `embedding_chunks`, and all are gone.
+1. **Off by default.** Open any artifact: the "AI assistant (drafts, not evidence)" panel shows the AI-generated-unverified label, says nothing here is a finding, reports that vendor telemetry is disabled, and the "Ask the local model" button is disabled with the reason given. `curl localhost:8400/api/v1/ai/status` shows every capability false, `telemetry_disabled: true`, `offline_enforced: true`, and all three models listed with Apache-2.0 and their Hugging Face URLs, `installed: false` — with `runnable` separating "the file is here" from "an engine could load it".
+2. **Semantic search with no model at all.** Enable "Semantic search" in Settings. Add a note to an artifact, then press "Index" from the AI panel (or `POST /api/v1/ai/artifacts/<id>/index`). Go to **Search**, search a word from your note: your own record comes back with its source kind and score. Ask a question: the answer section says this runtime has no text-generation model and returns your material exactly as recorded — no invented prose.
+3. **Drafts, live (needs the runtime and an engine).** Install the `ai` extra and run `needle fetch --generation 2`. In Settings, leave the draft model as "Use the model the engine carries" and enable "AI drafts". Ask for fields from metadata: each proposed field shows the model's value, its own confidence where given, and Accept / Edit / Reject. Edit one — the model's value stays visible beside yours, and the evidence report is unchanged. Ask for a field the text does not state and you get nothing back for it, with a warning: the engine's own grounding check refuses values it cannot find in the source, and Vestigo reports the refusal instead of hiding it.
+4. **Staging a model file.** Settings → Local AI → *Import a model file*, or copy a `.cact` archive into `data/models/`. Either way it appears in the list with its size and digest, and can be chosen for drafts. Try to remove one while a setting points at it: refused, with the field named. Restart the backend — `tmp/` and `trash/` are cleared, your staged model is not.
+5. **Transcription says why not.** Enable "Transcription" and press "Transcribe audio locally" on an audio artifact: a 409 explains that the vendor publishes no generation 3 engine. Confirm it left nothing behind — no new derived file under `data/artifacts/<id>/derived/`, and no custody event. A turned-off feature must not write derived evidence on its way to refusing.
+6. **Nothing leaks, and nothing is fetched.** Grep the backend log: no prompts, draft values, transcript text, or vectors — only artifact ids and event names. Disconnect the network and generate a draft: it still works from the staged engine. Point the draft model at a path that does not exist: `/ai/status` reports drafts unavailable **and echoes the bad path**, rather than claiming to be ready.
+7. **Custody, export, deletion.** The Chain of custody panel gains the AI events (names only). Export the package: `ai/README.txt` says it is not evidence, `ai/drafts.json` and `ai/transcripts.json` hold the material, and `report.json` has none of it. Delete the artifact: the summary counts `ai_drafts`, `transcripts`, and `embedding_chunks`, and all are gone.
 
 ## Manual test of location clues (M6)
 

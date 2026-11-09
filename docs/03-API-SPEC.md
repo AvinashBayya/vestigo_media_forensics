@@ -456,16 +456,43 @@ offered.
 
 ## Pass 1 — Local AI (D24)
 
-All local, all off by default. Nothing downloads at import, and the backend makes no outbound
-request. Asking for AI work while a capability is off returns **409 `AI_UNAVAILABLE`** with the
-reason and the fix.
+All local, all off by default. Nothing downloads at import, and the backend **cannot** make an
+outbound request: `HF_HUB_OFFLINE=1` is forced in-process, because the runtime otherwise fetches a
+missing engine or missing weights at load time (D27). Asking for AI work while a capability is off,
+or while the engine it needs is not staged, returns **409 `AI_UNAVAILABLE`** with the reason and the
+fix.
 
 ### `GET /ai/status`
 
 Runtime availability, the three analyst switches, what is unavailable and why, the telemetry state
-(`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`, forced in-process), the standing AI
-label and limitations, and the known models with licence, source URL, quantization, and whether a
-local file is in place.
+(`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, forced in-process), `offline_enforced` with
+`offline_environment` (`HF_HUB_OFFLINE=1`), the engine Vestigo asks for
+(`engine_generation`, `engine_available`, `engine_path`, `engine_unavailable_reason`), the standing
+AI label and limitations, and the known models with licence, source URL, quantization, generation,
+and two separate booleans: `installed` (a local file is in place) and `runnable` (an engine that
+could load it is staged), with `unavailable_reason` when it is not. They are separate because the
+vendor publishes some weights without an engine for this platform, so reporting one as the other
+would be false in whichever direction the gap runs.
+
+Reading this endpoint loads no model and touches no network, so it is safe to poll.
+
+### Model files — `/ai/models`
+
+`GET` lists the model files staged on this machine, each with its size, SHA-256 measured from the
+bytes on disk, modification time, absolute path, and `configured_for` (which settings fields point at
+it), plus `models_directory` and the standing limitations. A plain scan of `data/models/` is the
+contract: copying a `.cact` file in by hand is equivalent to importing one, and nothing is ever
+fetched.
+
+`POST /ai/models/import` (201) takes a multipart `file` and copies it into the managed directory. It
+refuses a name that is not a bare `*.cact` filename (**422 `VALIDATION_ERROR`**, including a name
+with any directory part - the path is never silently stripped), a non-`.cact` suffix (**415
+`UNSUPPORTED_MEDIA_TYPE`**), an empty body (**422 `EMPTY_FILE`**), a file over
+`VESTIGO_MAX_MODEL_BYTES` (**413 `FILE_TOO_LARGE`**), and a name already staged (**409**) rather than
+overwriting it.
+
+`DELETE /ai/models/{name}` (204) removes one, and refuses with **409** while a settings field still
+points at it, naming the field. Deleting a model file removes nothing an analyst recorded.
 
 ### Drafts — `/ai/artifacts/{id}/drafts`
 

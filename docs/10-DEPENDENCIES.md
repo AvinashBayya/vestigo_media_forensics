@@ -80,23 +80,84 @@ only map affordance is a plain link built in the browser. The "GEOINT" future-de
 (reverse-geocoding service, map rendering library, coordinate validation utilities) was therefore
 not needed; a geocoding service or tile provider would each require separate approval.
 
-## Backend — Pass 1 local AI (D24), optional and analyst-installed
+## Backend — local AI (D24, made live in D27), an optional extra
 
-Not declared in `pyproject.toml` and not required to run or test Vestigo: a stock build has local AI
-disabled and every test uses fakes. The analyst installs these themselves if they want live
-inference.
+Declared as an optional extra, not a dependency: `pip install -e ".[dev,ai]"`. A stock build has
+local AI disabled, the suite passes with the extra absent, and the resolvers in
+`app/services/ai/__init__.py` return a provider that refuses with a reason rather than degrading
+silently. Installing the extra downloads no model and no engine.
 
-- `cactus-needle` (3.2.10 at time of writing), import name `needle`, **Apache-2.0** —
+- `cactus-needle` (3.2.10), import name `needle`, **Apache-2.0** —
   [github.com/cactus-compute/needle](https://github.com/cactus-compute/needle). Provides tool
-  calling, structured extraction, and speech-to-text on a CPU engine.
-- `cactus-compute` (4.0.1), **Apache-2.0** —
-  [github.com/cactus-compute/cactus](https://github.com/cactus-compute/cactus). The inference
-  engine; the vendor's documentation site also describes paid tiers for cloud hybrid inference,
-  custom models, and extra hardware acceleration, none of which Vestigo uses or can reach.
-- Model weights, **Apache-2.0**, supplied as local files by the analyst:
-  [Cactus-Compute/needle3](https://huggingface.co/Cactus-Compute/needle3) (2-bit, 8–29 MB) and
-  [Cactus-Compute/whistle](https://huggingface.co/Cactus-Compute/whistle) (16.9 MB speech-to-text).
-- No GPU, no account, and no recurring cost. Vendor telemetry is forced off in-process (D24).
+  calling, structured extraction, and (where an engine exists) speech-to-text on a CPU engine. It
+  pulls in `huggingface_hub`, which is what the offline switch below acts on.
+- Engine binaries and model weights, **Apache-2.0**, published separately from the package:
+  [Cactus-Compute/needle2](https://huggingface.co/Cactus-Compute/needle2),
+  [Cactus-Compute/needle3](https://huggingface.co/Cactus-Compute/needle3),
+  [Cactus-Compute/whistle](https://huggingface.co/Cactus-Compute/whistle).
+- No GPU, no account, no recurring cost. Vendor telemetry is forced off in-process, and so are
+  downloads.
+
+### What can actually run (verified 2026-11-09, linux-x86_64)
+
+The engine and the weights ship from different places, and they are not both published for every
+generation. This was checked against the Hub rather than taken from vendor prose:
+
+| Generation | Weights published | Engine published for linux-x86_64 | Runs here |
+|---|---|---|---|
+| needle2 | `needle2.cact`, 13.7 MB | yes, wheels through 2.0.4 | **yes** |
+| needle3 | `needle3.cact`, 35.3 MB | **no** — repo holds weights, a checkpoint and a tokenizer only | no |
+| whistle | `whistle.cact`, 16.9 MB | **no** — loads through the generation 3 engine | no |
+
+So Vestigo asks for generation 2 (`DEFAULT_GENERATION`), which gives AI drafts and structured
+extraction. Transcription, model text embeddings (`Needle.embed` raises "embeddings require a
+Needle 3 model"), and anything else gated on generation 3 report themselves unavailable with that
+reason, and start working the moment the vendor publishes a generation 3 engine. Nothing is faked
+in the meantime. There is no free-text generation in this runtime at all: `Needle.complete()` with
+no tools returns an empty call, so Vestigo drafts no prose answers.
+
+### Staging a model (the only step that touches the network)
+
+Deliberately manual, and never part of a container build:
+
+```bash
+python -m pip install -e ".[dev,ai]"   # the runtime
+needle fetch --generation 2            # the engine, ~14 MB, into ~/.cache/cactus-needle/v2/2.0.4/
+```
+
+`scripts/verify-env.sh` then reports the runtime and each generation's engine as present or absent
+without failing, because a container with no local AI is a supported setup. A `.cact` archive can
+also be staged per-install: drop it in `data/models/` or import it in Settings, and Vestigo passes
+it to the engine as explicit weights.
+
+### Why the backend cannot download anything
+
+`needle/__init__.py` resolves a missing engine or missing weights by fetching them from Hugging Face
+*at load time*, and its `_register_download` pings the Hub even when the cache is warm. Relying on a
+warm cache would make "the backend makes no outbound request" a hope. So `app/services/ai/runtime.py`
+forces `HF_HUB_OFFLINE=1` at import, alongside `NEEDLE_TELEMETRY=0` and `DO_NOT_TRACK=1`, and
+`/ai/status` reports `offline_enforced`. Measured: a cold lookup then fails locally in 0.14 s with no
+network call, while a staged model still runs. Passing explicit weights skips the Hub ping entirely.
+
+Only those three variables are set. `CACTUS_*` names appear in no version of this package and are
+not used; the real ones are `NEEDLE_TELEMETRY`, `DO_NOT_TRACK`, `NEEDLE2_LIB_PATH` /
+`NEEDLE3_LIB_PATH`, `NEEDLE_WHISTLE_WEIGHTS`, and `NEEDLE_HF_REPO`. `NEEDLE_API_KEY` and
+`OPENROUTER_API_KEY` are the vendor's cloud paths: Vestigo never reads or sets either.
+
+### Measured on the development machine
+
+Intel i7-1165G7, 8 cores, 7.7 GB RAM, no GPU, generation 2 engine, via `NeedleExtractor`:
+
+| | |
+|---|---|
+| Import of Vestigo's AI modules | 0.07 s |
+| First call (engine load + extraction) | 0.96 s |
+| Warm extraction, 56-character source | 0.67 s median (0.63–0.69 over 5 runs) |
+| Warm extraction, 2,312-character source | 3.76 s median over 3 runs |
+| Peak RSS of the process | 47 MB |
+
+Correctness is not claimed from these runs; they establish that the model is usable interactively on
+a laptop CPU. The engine is single-model and not thread-safe, so `ENGINE_LOCK` serialises every call.
 
 ## Backend — Pass 2 deep forensics (D25)
 

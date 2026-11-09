@@ -63,7 +63,7 @@ prohibited; paid or official provider APIs each require separate approval.
 
 Pass 1 (D24) adds local AI on strict terms: inference runs on this machine, every capability is off
 by default, and the third-party runtime's telemetry is forced off in-process
-(`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`) before it can load, asserted by a
+(`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, plus `HF_HUB_OFFLINE=1` so it cannot download) before it can load, asserted by a
 test. No media, prompt, embedding, question, or answer is ever transmitted; the backend makes no
 outbound request; `NEEDLE_API_KEY` is never read and no fine-tuning entry point exists, so the
 vendor's platform fine-tuning (which uploads files to its GPUs) is unreachable. Model weights are

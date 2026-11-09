@@ -33,6 +33,24 @@ else
   failures=$((failures + 1))
 fi
 
+# Local AI is optional, so nothing here counts as a failure: a stock container with no runtime and
+# no staged model is a correct, supported setup. This reports the state and moves on.
+echo "Local AI (optional):"
+if python3 -c 'import importlib.util, sys; sys.exit(0 if importlib.util.find_spec("needle") else 1)' 2>/dev/null; then
+  version="$(python3 -c 'import importlib.metadata as m; print(m.version("cactus-needle"))' 2>/dev/null || echo installed)"
+  printf '  ok       %-12s %s\n' "runtime" "$version"
+else
+  printf '  absent   %-12s %s\n' "runtime" 'install with: pip install -e ".[dev,ai]"'
+fi
+for generation in 2 3; do
+  engine="$(python3 -c "from app.services.ai import runtime; print(runtime.engine_library_path($generation) or '')" 2>/dev/null)"
+  if [ -n "$engine" ]; then
+    printf '  ok       %-12s %s\n' "engine v$generation" "$engine"
+  else
+    printf '  absent   %-12s %s\n' "engine v$generation" "stage with: needle fetch --generation $generation"
+  fi
+done
+
 if [ "${1:-}" = "--servers" ]; then
   echo "Servers:"
   check backend  curl -fsS http://localhost:8400/api/v1/health
