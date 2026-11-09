@@ -53,7 +53,7 @@ def test_delete_removes_files_evidence_and_rows(
         # pass its input image and TSV.
         "derived_files": 8,
         "jobs": 1,
-        "evidence_records": 8,
+        "evidence_records": 9,
         "review_events": 2,
         "preview_files": 0,
         "custody_events": 0,

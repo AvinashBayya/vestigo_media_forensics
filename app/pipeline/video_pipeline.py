@@ -26,6 +26,7 @@ from app.services.c2pa import (
     read_manifest_store,
 )
 from app.services.duplicates import FrameHash, find_matches
+from app.services.forensics import FORENSIC_LIMITATIONS, ForensicReport, video_statistics
 from app.services.keyframes import (
     DEDUPE_SECONDS,
     JPEG_QUALITY,
@@ -140,6 +141,38 @@ class VideoStructuralStage(StructuralStage):
     """Same structural reader as images (Pass 2): MP4/MOV box inventory and byte statistics."""
 
     media_type = MediaType.VIDEO
+
+
+class VideoForensicIndicatorsStage(AnalysisStage):
+    name = "forensic_indicators"
+    media_type = MediaType.VIDEO
+    method = (
+        "ffprobe reports the first packets of the primary video stream; Vestigo summarises keyframe "
+        "spacing and packet sizes as distributions (count, mean, standard deviation, minimum, "
+        "median, maximum). These describe how the file was encoded. No threshold is applied and no "
+        "judgement about editing is made."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "artifact:original"
+    tool_name = "ffprobe"
+    option = "forensic_indicators"
+    limitations = FORENSIC_LIMITATIONS
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return ctx.tools.require("ffprobe").version or "unknown"
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        tool = ctx.tools.require("ffprobe")
+        statistics = video_statistics(tool, artifact.path, ctx.settings.tool_timeout_seconds)
+        report = ForensicReport(container="video", video_statistics=statistics)
+        if statistics.get("error"):
+            return StageOutput(
+                data=report.as_dict(),
+                warnings=[StageError(type="FORENSIC_MEASUREMENT_FAILED", message=statistics["error"])],
+            )
+        if not statistics.get("packets_examined"):
+            report.notes.append("ffprobe reported no packets for the primary video stream.")
+        return StageOutput(data=report.as_dict())
 
 
 class SceneChangesStage(AnalysisStage):
@@ -508,6 +541,7 @@ VIDEO_STAGES: tuple[AnalysisStage, ...] = (
     VideoC2PAStage(),
     VideoLocationCluesStage(),
     VideoStructuralStage(),
+    VideoForensicIndicatorsStage(),
     SceneChangesStage(),
     KeyframesStage(),
     KeyframePHashStage(),

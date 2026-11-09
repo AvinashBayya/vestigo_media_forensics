@@ -19,6 +19,7 @@ from app.services.c2pa import (
     read_manifest_store,
 )
 from app.services.duplicates import FrameHash, find_matches
+from app.services.forensics import FORENSIC_LIMITATIONS, inspect_image
 from app.services.hashing import hash_file, hashlib_version
 from app.services.location import LOCATION_LIMITATIONS, location_payload, read_location_clues
 from app.services.metadata import EXIFTOOL_ARGS, extract_metadata
@@ -208,6 +209,50 @@ class StructuralStage(AnalysisStage):
             json.dumps(payload, indent=1, sort_keys=True).encode("utf-8"),
         )
         return StageOutput(data=payload, warnings=warnings)
+
+
+class ForensicIndicatorsStage(AnalysisStage):
+    name = "forensic_indicators"
+    media_type = MediaType.IMAGE
+    method = (
+        "Encoding and pixel measurements: every JPEG quantisation table with the IJG quality setting "
+        "whose standard table it most closely matches, per-channel mean, standard deviation, and "
+        "range of the decoded pixels, and the dimensions the metadata declares against the "
+        "dimensions the pixels actually decode to. Values are reported with their method and no "
+        "threshold is applied. Error-level analysis is deliberately not implemented."
+    )
+    classification = EvidenceClassification.DERIVED
+    source = "artifact:original"
+    tool_name = "vestigo-forensics"
+    option = "forensic_indicators"
+    limitations = FORENSIC_LIMITATIONS
+    depends_on = ()
+
+    def tool_version(self, ctx: StageContext) -> str:
+        return f"Vestigo {__version__}; Pillow {pillow_version()}"
+
+    def _declared(self, ctx: StageContext) -> tuple[int | None, int | None]:
+        """Dimensions as the metadata declares them, when the metadata stage read any."""
+        metadata = ctx.results.get("metadata")
+        if metadata is None or not metadata.has_output:
+            return (None, None)
+        for groups in metadata.output.values():
+            if not isinstance(groups, dict):
+                continue
+            for tags in groups.values():
+                if not isinstance(tags, dict):
+                    continue
+                width, height = tags.get("ImageWidth"), tags.get("ImageHeight")
+                if isinstance(width, int) and isinstance(height, int):
+                    return (width, height)
+        return (None, None)
+
+    def analyze(self, artifact: ArtifactView, ctx: StageContext) -> StageOutput:
+        report = inspect_image(artifact.path, self._declared(ctx))
+        warnings = [
+            StageError(type="FORENSIC_MEASUREMENT_FAILED", message=message) for message in report.warnings
+        ]
+        return StageOutput(data=report.as_dict(), warnings=warnings)
 
 
 class C2PAStage(AnalysisStage):
@@ -433,6 +478,7 @@ IMAGE_STAGES: tuple[AnalysisStage, ...] = (
     MetadataStage(),
     LocationCluesStage(),
     StructuralStage(),
+    ForensicIndicatorsStage(),
     C2PAStage(),
     PerceptualHashStage(),
     OCRStage(),

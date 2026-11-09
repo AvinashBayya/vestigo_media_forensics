@@ -14,6 +14,7 @@ class AnalysisOptions(BaseModel):
     c2pa: bool = True
     location_clues: bool = True
     structural: bool = True
+    forensic_indicators: bool = True
     ocr: bool = True
     duplicate_search: bool = True
 
@@ -35,6 +36,7 @@ class VideoAnalysisOptions(BaseModel):
     c2pa: bool = True
     location_clues: bool = True
     structural: bool = True
+    forensic_indicators: bool = True
     scene_detection: bool = True
     keyframe_ocr: bool = False
     duplicate_search: bool = True

@@ -19,6 +19,7 @@ from app.schemas.evidence import (
     DuplicateMatch,
     DuplicatesSection,
     EvidenceReport,
+    ForensicIndicatorsSection,
     HashesSection,
     KeyframeOCRSection,
     KeyframePHashSection,
@@ -126,6 +127,23 @@ def _structural(payload: dict[str, Any], provenance: Provenance) -> StructuralSe
         notes=payload.get("notes", []),
         warnings=payload.get("warnings", []),
         binwalk_ran=payload.get("binwalk_ran", False),
+        provenance=provenance,
+    )
+
+
+def _forensic_indicators(payload: dict[str, Any], provenance: Provenance) -> ForensicIndicatorsSection:
+    return ForensicIndicatorsSection(
+        container=payload.get("container"),
+        quantization_tables=payload.get("quantization_tables", []),
+        channel_statistics=payload.get("channel_statistics", []),
+        decoded_width=payload.get("decoded_width"),
+        decoded_height=payload.get("decoded_height"),
+        declared_width=payload.get("declared_width"),
+        declared_height=payload.get("declared_height"),
+        dimensions_match=payload.get("dimensions_match"),
+        video_statistics=payload.get("video_statistics", {}),
+        notes=payload.get("notes", []),
+        warnings=payload.get("warnings", []),
         provenance=provenance,
     )
 
@@ -298,6 +316,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "c2pa": _c2pa,
         "location_clues": _location_clues,
         "structural": _structural,
+        "forensic_indicators": _forensic_indicators,
         "perceptual_hash": _perceptual_hash,
         "ocr": _ocr,
         "duplicates": _duplicates(matched),

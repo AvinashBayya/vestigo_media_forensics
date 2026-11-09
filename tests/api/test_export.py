@@ -96,7 +96,7 @@ def test_package_contents_and_verification(
 
     review = json.loads(package.read("review.json"))
     assert review["artifact_review"]["analyst_notes"] == "Checking."
-    assert len(review["record_reviews"]) == 8  # one per image.v1 stage
+    assert len(review["record_reviews"]) == 9  # one per image.v1 stage
     assert {r["classification"] for r in review["record_reviews"]} <= {"OBSERVED", "DERIVED"}
     assert review["review_history"][0]["notes_after"] == "Checking."
 

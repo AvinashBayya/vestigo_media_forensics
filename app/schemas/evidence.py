@@ -180,6 +180,33 @@ class StructuralSection(BaseModel):
     provenance: Provenance
 
 
+class QuantizationTableInfo(BaseModel):
+    index: int
+    precision: int
+    values: list[int] = []
+    # The IJG quality whose standard table is closest. An estimate of the LAST save only.
+    implied_quality: int | None = None
+    matches_standard: bool = False
+
+
+class ForensicIndicatorsSection(BaseModel):
+    """Encoding and pixel measurements (Pass 2, D25). Numbers with methods, never verdicts."""
+
+    container: str | None = None
+    quantization_tables: list[QuantizationTableInfo] = []
+    channel_statistics: list[dict[str, Any]] = []
+    decoded_width: int | None = None
+    decoded_height: int | None = None
+    declared_width: int | None = None
+    declared_height: int | None = None
+    # Whether the metadata's dimensions match the decoded pixels. A fact, not an accusation.
+    dimensions_match: bool | None = None
+    video_statistics: dict[str, Any] = {}
+    notes: list[str] = []
+    warnings: list[str] = []
+    provenance: Provenance
+
+
 class PerceptualHashSection(BaseModel):
     algorithm: Literal["pHash"] = "pHash"
     bits: int
@@ -410,6 +437,7 @@ class EvidenceReport(BaseModel):
     c2pa: C2PASection | None
     location_clues: LocationCluesSection | None
     structural: StructuralSection | None
+    forensic_indicators: ForensicIndicatorsSection | None
     perceptual_hash: PerceptualHashSection | None
     ocr: OCRSection | None
     duplicates: DuplicatesSection | None
