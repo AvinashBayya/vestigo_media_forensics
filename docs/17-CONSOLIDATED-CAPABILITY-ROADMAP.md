@@ -112,7 +112,7 @@ same way `container` tests already are. Nothing downloads at import time, ever.
   structural indicators, plus Whistle transcription from Pass 1. Originals and derived outputs stay
   separate. No authenticity verdicts.
 
-## 4. Pass 3 — GEOINT and integrations (schema 0010)
+## 4. Pass 3 — GEOINT and integrations — **complete** (2026-11-09, D26, schema 0009)
 
 - **GEOINT tool integrations**: builds on D23 — richer local geospatial handling, optional **offline
   map data** (locally stored tiles or a vector file the analyst supplies; nothing fetched

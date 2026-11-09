@@ -120,7 +120,14 @@ Implemented (see `06-ROADMAP.md` and `09-DECISIONS.md` for the approved details)
   than corrected), analyst location candidates classified UNVERIFIED with their own assessment
   labels and supporting-evidence references, and one opt-in client-built OpenStreetMap link.
 
-Remaining: Vestigo integration (M7).
+- **Pass 1 — Local intelligence** (D24): optional local AI (Cactus/Needle/Whistle) for drafts,
+  transcripts, and local semantic search, with AI output kept out of the evidence tables entirely.
+- **Pass 2 — Deep media forensics** (D25): structural and hidden-data inspection, forensic
+  indicators, and document/PDF analysis as a new media type.
+- **Pass 3 — GEOINT and integration** (D26): local coordinate tooling, cases, and a read-only
+  versioned integration API with no write route at all.
+
+Every roadmap milestone is now implemented. Later work is whatever the analyst approves next.
 
 ## 10. API Contract
 

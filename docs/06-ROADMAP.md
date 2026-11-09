@@ -116,12 +116,20 @@ Scope:
 
 ## Milestone 7 — Vestigo integration
 
+**Status: complete** (2026-11-09, decision D26, delivered as Pass 3 of
+`17-CONSOLIDATED-CAPABILITY-ROADMAP.md`).
+
 Goal: connect to Vestigo through a versioned evidence API.
 
 Scope:
 
-- Evidence API
-- Case linking
-- Import/export
-- Permission-aware integration
-- No direct database writes
+- Evidence API — **done**: `GET /integration/version` and
+  `GET /integration/artifacts/{id}/evidence`, a versioned read-only envelope
+- Case linking — **done**: cases group artifacts, with every link and unlink in the artifact's
+  custody trail; deleting a case never deletes an artifact
+- Import/export — **export done** (the evidence package, plus the read-only integration view).
+  **Import is deliberately not implemented**: accepting evidence Vestigo did not observe cannot be
+  represented honestly in the evidence model
+- Permission-aware integration — **done**: off by default, enabled only by the analyst
+- No direct database writes — **done by construction**: the integration surface has no write route
+  at all, which a test enforces

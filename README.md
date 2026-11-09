@@ -109,6 +109,13 @@ Local, optional, and off by default. All three tools are Cactus Compute's, Apach
 - **Documents and PDFs** are a first-class media type, parsed in pure Python with no PDF library and no renderer: structure (pages, objects, repeated saves, encryption, signature *presence*, and features like JavaScript or forms as presence counts), provisional text labelled like OCR, and embedded JPEG images copied out **byte for byte**. Vestigo never validates a PDF signature, renders a page, executes anything in a document, or decrypts one
 - **Audio** keeps its header-level media info and metadata, gains the structural checks, and can be transcribed locally via Pass 1
 
+### Pass 3 — GEOINT tooling and integration (D26)
+
+- **Coordinate tools** for every coordinate Vestigo already holds (metadata clues and your own candidates): decimal, DMS, DDM, and ISO 6709 notation, plus the great-circle distance and bearing between each pair. Calculation only — no geocoding, no place names, no map tiles, no network. A coordinate flagged invalid stays in the evidence as written and is never used for geometry, and **no location is ever decided**
+- Offline map data is used only if you supply a path to your own (`VESTIGO_OFFLINE_MAP_PATH`); Vestigo downloads none
+- **Cases** group artifacts under a name you choose. A case is organisation, not evidence: it asserts nothing about its members, every link and unlink lands in the artifact's custody trail, and deleting a case removes only the case and its links — never an artifact or its evidence
+- **A read-only integration API**, off by default: `GET /integration/version` (always readable, so an integrator can see the contract and that it is disabled) and `GET /integration/artifacts/{id}/evidence`, returning the evidence report, chain of custody, and cases in one versioned envelope. The surface has **no write route of any kind**, so an external system can never change anything Vestigo holds — enforced by construction, not by a permission check. Import is deliberately absent: evidence leaves Vestigo, it never arrives from outside
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
@@ -136,7 +143,6 @@ clearly labelled, excluded from the evidence package, kept until the artifact is
 ## Later phases
 
 - Paid or official reverse-image search provider APIs, reverse geocoding, and map tile services (each needs separate approval)
-- Optional Vestigo integration through a versioned evidence API
 
 ## Tech stack
 
@@ -247,6 +253,14 @@ With both servers running, open http://localhost:5180.
 4. **Audio.** Upload a WAV/MP3/FLAC/OGG/M4A: it plays in the built-in audio player, with media information (codec, channels, sample rate, container-reported duration) and ID3/container metadata as evidence. Upload the identical file again: duplicate search reports "Same file (identical bytes)". Re-encode it (e.g. WAV → MP3) and upload: no match, and the evidence's limitations explain that only byte-identical audio matches.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
+
+## Manual test of Pass 3 (coordinates, cases, integration)
+
+1. **Coordinate tools.** Upload `samples/generated/with_metadata.jpg` and analyse it: the Coordinate tools panel shows `51.500000, -0.120000` alongside the DMS, DDM, and ISO 6709 forms. Add a location candidate with coordinates and the panel gains a second point plus the distance and bearing between them.
+2. **Nothing invented.** Upload `invalid_location.jpg`: the coordinate stays in the Location clues panel exactly as written, and the Coordinate tools panel does not appear — a flagged value is never used for geometry.
+3. **Cases.** In the artifact sidebar, type a case name and click "Create and add this artifact". The Chain of custody panel gains "Added to a case". Remove it and you get "Removed from a case", with the earlier event still there. Delete the case (`DELETE /api/v1/cases/<id>`) and confirm the artifact and its evidence are untouched.
+4. **Integration, off.** `curl localhost:8400/api/v1/integration/version` shows `enabled: false` and lists only GET endpoints; requesting evidence returns 409 with the reason.
+5. **Integration, on.** Enable "Integration API" in Settings, then `curl localhost:8400/api/v1/integration/artifacts/<id>/evidence`: one envelope with the report, the custody trail, and the artifact's cases. Try `curl -X POST` or `-X DELETE` against it — every write verb is refused by routing itself, and the Chain of custody panel shows no event for your reads.
 
 ## Manual test of Pass 2 (structure, forensics, documents)
 

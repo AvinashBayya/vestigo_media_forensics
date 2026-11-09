@@ -69,6 +69,13 @@ outbound request; `NEEDLE_API_KEY` is never read and no fine-tuning entry point 
 vendor's platform fine-tuning (which uploads files to its GPUs) is unreachable. Model weights are
 supplied by the analyst as local files; nothing downloads at import.
 
+Pass 3 (D26) adds a read-only integration surface, off by default. It exposes evidence for another
+system to read and has **no write route of any kind**, so an external system can never create,
+change, re-classify, or delete anything Vestigo holds - enforced by the absence of the endpoints
+rather than by a permission check. Reading records no custody event, and import is deliberately not
+implemented. Local coordinate tooling is arithmetic only: no geocoding, no place names, no map tiles,
+and no network; offline map data is used only when the analyst supplies a path to their own.
+
 Milestone 6 (D23) adds one deliberate carve-out to the "nothing evidence-derived" sentence above,
 which was written for M5's static provider landing pages: an **opt-in** OpenStreetMap link for
 coordinates already on screen. It is off by default, built entirely in the analyst's browser (the
@@ -106,6 +113,7 @@ Users must be able to delete:
 - Fingerprint index rows (image and keyframe)
 - Its playable preview, when one was created
 - AI drafts, machine transcripts, and embedding indexes (Pass 1)
+- Case memberships (Pass 3; the case itself survives, and other members are untouched)
 - Custody events (append-only until the artifact itself is deleted)
 - External leads (M5)
 - Location candidates (M6)

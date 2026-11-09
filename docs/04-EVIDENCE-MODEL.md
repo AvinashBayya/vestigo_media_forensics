@@ -241,6 +241,23 @@ Machine and analyst work are separate records with different classifications:
 - Candidates appear in the evidence report (artifact-level, newest first), travel in the export
   package, and are deleted and counted with the artifact.
 
+## 17. Cases, coordinate tooling, and integration (Pass 3, D26)
+
+- **A case is organisation, not evidence.** It carries no classification and asserts nothing about
+  the artifacts in it; linking changes no evidence section. Every link and unlink is an append-only
+  custody event on the artifact, and deleting a case removes only the case and its links - never an
+  artifact or its evidence.
+- **Coordinate tooling is arithmetic over held numbers.** A reformatted coordinate is the same
+  coordinate, and a distance is spherical geometry rather than travelled distance. Proximity to an
+  analyst's candidate confirms nothing, a coordinate flagged invalid is never used for geometry, and
+  no location is ever decided.
+- **Integration is read-only by construction.** The surface exposes the evidence report, the custody
+  trail, and the artifact's cases in a versioned envelope, and has no write route at all - so an
+  external system can never create, change, re-classify, or delete anything. It is off by default,
+  and reading records nothing, because Vestigo records only actions that change what it holds.
+- **Import is deliberately absent.** Evidence Vestigo did not observe cannot be represented honestly
+  under this model, so there is no endpoint through which it can arrive.
+
 ## 16. Structure, measurements, and documents (Pass 2, D25)
 
 - **Structural findings are placed facts**: what was found, at which byte offset, and how large.

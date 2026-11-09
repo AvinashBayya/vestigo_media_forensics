@@ -540,6 +540,38 @@ in both directions.
 `structural` and (image/video) `forensic_indicators`. `environment` gains
 `max_document_upload_bytes`.
 
+## Pass 3 — Coordinate tools, cases, and integration (D26)
+
+### `GET /geo/artifacts/{artifact_id}/tools`
+
+Every coordinate Vestigo holds for the artifact - machine-read clues and the analyst's own
+candidates - each in `decimal`, `degrees_minutes_seconds`, `degrees_decimal_minutes`, and `iso6709`,
+plus `pairs` giving the great-circle `distance_metres` and `bearing_degrees` between every pair.
+Calculation only: no geocoding, no place names, no tiles, no network. A coordinate flagged invalid by
+the location stage is never used for geometry. `offline_map_available` reflects
+`VESTIGO_OFFLINE_MAP_PATH`, which the analyst supplies; Vestigo downloads no map data.
+
+### Cases
+
+`GET /cases`, `POST /cases` (201), `GET|PATCH /cases/{case_id}`, `DELETE /cases/{case_id}` (204),
+and `PUT|DELETE /cases/{case_id}/artifacts/{artifact_id}` to add or remove a member. A case is
+organisation, not evidence. Linking and unlinking write `case_linked` / `case_unlinked` custody
+events on the artifact; re-linking an existing member records nothing. Deleting a case removes only
+the case and its links. The evidence report gains an artifact-level `cases` list, and
+`DeletionSummary` gains `case_links`.
+
+### Integration (read-only, off by default)
+
+- `GET /integration/version` — always readable: the integration version, report schema version, app
+  version, schema revision, whether it is enabled, and every endpoint offered (all GETs).
+- `GET /integration/artifacts/{artifact_id}/evidence` — one versioned envelope containing the
+  evidence report, the chain of custody, and the artifact's cases. Returns 409
+  `INTEGRATION_DISABLED` until the analyst sets `integration_api_enabled`.
+
+The surface has **no write route of any kind**, so an external system can never create, change,
+re-classify, or delete anything Vestigo holds. Reading records no custody event. Import is
+deliberately absent: evidence leaves Vestigo, it never arrives from outside.
+
 ## Review state values
 
 - `UNREVIEWED`

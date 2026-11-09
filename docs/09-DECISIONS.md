@@ -464,3 +464,42 @@ was added: everything is pure Python plus the ExifTool, ffprobe, and Pillow the 
 No migration was needed: `media_type` is an unconstrained column, and every new section is an
 evidence record with its raw output kept as a derived file, so export, custody, and deletion cover
 them with no new wiring.
+
+## D26 — Pass 3: GEOINT tooling and integration hardening
+
+Implemented 2026-11-09 (plan `17-CONSOLIDATED-CAPABILITY-ROADMAP.md`). Completes the three-pass
+programme. No new runtime dependency; Alembic 0009 (schema_version 9) is additive.
+
+- **Local geospatial tooling** (`GET /geo/artifacts/{id}/tools`). Gathers every coordinate Vestigo
+  already holds - machine-read location clues (D23) and the analyst's own candidates - and reports
+  each in decimal, DMS, DDM, and ISO 6709, plus the great-circle distance and initial bearing
+  between every pair. Calculation only: no geocoding, no place names, no map tiles, no network. A
+  coordinate the location stage flagged as out of range stays in the evidence exactly as written but
+  is never used for geometry, and a candidate without coordinates is skipped. Offline map data is
+  reported only when the analyst has configured a path to their own
+  (`VESTIGO_OFFLINE_MAP_PATH`); Vestigo never downloads any. The limitations state that a
+  reformatted coordinate is the same coordinate, that distances are spherical geometry rather than
+  travelled distance, that proximity confirms nothing, and that **Vestigo never decides a location**.
+- **Cases** (`cases`, `case_artifacts`). A case is a name, notes, and a set of artifacts:
+  organisation, not evidence. It carries no classification and asserts nothing about its members - a
+  test pins every evidence section byte-identical after linking. Linking and unlinking write
+  `case_linked` / `case_unlinked` custody events on the artifact, so its own trail shows which cases
+  it was put in; re-linking an existing member records nothing. **Deleting a case removes only the
+  case and its links**, never an artifact or its evidence; deleting an artifact removes only its
+  links and leaves the case and its other members intact. The evidence report gains an
+  artifact-level `cases` list and `DeletionSummary` gains `case_links`.
+- **The integration surface** (`/integration`). `GET /integration/version` is always readable, so an
+  integrator can discover the contract and that it is disabled; it reports the integration version
+  (1.0), the report schema version, the app version, the schema revision, and every endpoint
+  offered. `GET /integration/artifacts/{id}/evidence` returns one versioned envelope: the evidence
+  report exactly as Vestigo serves it, the chain of custody, and the artifact's cases.
+- **"No direct database writes by external integrations" is enforced by construction**, not by a
+  permission check that could be misconfigured: the integration surface has no write route at all,
+  which a test confirms by finding every write verb refused by routing itself. It is off by default
+  (`integration_api_enabled`), and evidence reads return 409 `INTEGRATION_DISABLED` with the reason
+  until the analyst enables it. **Reading writes nothing** - no custody event is recorded for a read,
+  because Vestigo records only actions that change what it holds.
+- **Import** is deliberately not implemented. Vestigo has no endpoint by which an external system can
+  put data in, and adding one would mean accepting evidence Vestigo did not observe - which the
+  evidence model cannot honestly represent. Evidence leaves through the export package and the
+  read-only integration view; it never arrives from outside.

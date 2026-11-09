@@ -367,7 +367,27 @@ retry; Settings switches off by default with the local-only wording.
 - Frontend: all three panels' wording and data, the document page end to end, the signature and
   repeated-save explanations, the empty-text path, and the feature list as presence counts.
 
-## 14. Container tests
+## 14. Pass 3 tests (GEOINT tooling and integration, D26)
+
+- Coordinate tooling: each notation for the same point including southern/eastern hemispheres;
+  distance and bearing against known values (London-Sydney, due north, due east, zero); held clues
+  and analyst candidates listed with their source and the geometry between them; a flagged
+  coordinate excluded from geometry while staying in the evidence as written; candidates without
+  coordinates skipped; offline map absent unless configured; unknown artifact refused.
+- Cases: grouping that leaves every evidence section byte-identical; custody events for link and
+  unlink with re-linking recording nothing; deleting a case leaving the artifact and its evidence
+  intact; deleting an artifact removing only its links and counting `case_links`; name and null
+  validation; 404s.
+- Integration: the version endpoint readable while disabled and listing only GETs; evidence refused
+  with 409 `INTEGRATION_DISABLED` until enabled; the versioned envelope carrying report, custody,
+  and cases; reading writing no custody event and changing no evidence; **every write verb refused
+  by routing itself**.
+- Migrations: v1-v8 databases upgrade in place to schema_version 9 with every row unchanged.
+- Frontend: the cases control's wording and its link/unlink/create calls; the coordinate panel's
+  notations, geometry, hidden-when-empty behaviour, and error/retry; the custody timeline's labels
+  for every Pass 1 and Pass 3 event.
+
+## 15. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180
