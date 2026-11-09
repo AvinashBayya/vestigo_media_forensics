@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     # Audio limits (D19), read-only in the Settings UI.
     max_audio_upload_bytes: int = Field(200 * MIB, gt=0)
     max_audio_duration_seconds: float = Field(7200.0, gt=0)
+    # Documents (Pass 2): PDFs are parsed in place, never rendered or executed.
+    max_document_upload_bytes: int = Field(100 * MIB, gt=0)
     phash_max_distance: int = Field(10, ge=0, le=64)
     job_mode: Literal["thread", "inline"] = "thread"
     job_workers: int = Field(2, ge=1)

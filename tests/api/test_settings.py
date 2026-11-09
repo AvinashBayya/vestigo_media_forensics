@@ -34,6 +34,14 @@ DEFAULT_VIDEO_OPTIONS = {
     "keyframe_ocr": False,
     "duplicate_search": True,
 }
+DEFAULT_DOCUMENT_OPTIONS = {
+    "metadata": True,
+    "pdf_structure": True,
+    "pdf_text": True,
+    "pdf_images": True,
+    "structural": True,
+    "duplicate_search": True,
+}
 DEFAULT_AUDIO_OPTIONS = {
     "metadata": True,
     "c2pa": True,
@@ -50,6 +58,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
         "default_analysis_options": DEFAULT_OPTIONS,
         "default_video_analysis_options": DEFAULT_VIDEO_OPTIONS,
         "default_audio_analysis_options": DEFAULT_AUDIO_OPTIONS,
+        "default_document_analysis_options": DEFAULT_DOCUMENT_OPTIONS,
         "library_page_size": 25,
         "auto_analyze_after_upload": True,
         "enabled_search_providers": [],
@@ -89,6 +98,7 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
         "default_analysis_options": {**DEFAULT_OPTIONS, "ocr": False},
         "default_video_analysis_options": DEFAULT_VIDEO_OPTIONS,
         "default_audio_analysis_options": DEFAULT_AUDIO_OPTIONS,
+        "default_document_analysis_options": DEFAULT_DOCUMENT_OPTIONS,
         "library_page_size": 50,
         "auto_analyze_after_upload": False,
         "enabled_search_providers": [],

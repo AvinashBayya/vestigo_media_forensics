@@ -29,6 +29,9 @@ from app.schemas.evidence import (
     MetadataSection,
     OCRPreprocessingStep,
     OCRSection,
+    PdfImagesSection,
+    PdfStructureSection,
+    PdfTextSection,
     PerceptualHashSection,
     Provenance,
     SceneChangesSection,
@@ -144,6 +147,23 @@ def _forensic_indicators(payload: dict[str, Any], provenance: Provenance) -> For
         video_statistics=payload.get("video_statistics", {}),
         notes=payload.get("notes", []),
         warnings=payload.get("warnings", []),
+        provenance=provenance,
+    )
+
+
+def _pdf_structure(payload: dict[str, Any], provenance: Provenance) -> PdfStructureSection:
+    return PdfStructureSection(**{**payload, "provenance": provenance})
+
+
+def _pdf_text(payload: dict[str, Any], provenance: Provenance) -> PdfTextSection:
+    return PdfTextSection(**{**payload, "provenance": provenance})
+
+
+def _pdf_images(payload: dict[str, Any], provenance: Provenance) -> PdfImagesSection:
+    return PdfImagesSection(
+        images=payload.get("images", []),
+        extracted=payload.get("extracted", 0),
+        notes=payload.get("notes", []),
         provenance=provenance,
     )
 
@@ -317,6 +337,9 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         "location_clues": _location_clues,
         "structural": _structural,
         "forensic_indicators": _forensic_indicators,
+        "pdf_structure": _pdf_structure,
+        "pdf_text": _pdf_text,
+        "pdf_images": _pdf_images,
         "perceptual_hash": _perceptual_hash,
         "ocr": _ocr,
         "duplicates": _duplicates(matched),

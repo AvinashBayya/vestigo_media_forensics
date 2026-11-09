@@ -10,7 +10,12 @@ from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
-from app.schemas.analysis import AnalysisOptions, AudioAnalysisOptions, VideoAnalysisOptions
+from app.schemas.analysis import (
+    AnalysisOptions,
+    AudioAnalysisOptions,
+    DocumentAnalysisOptions,
+    VideoAnalysisOptions,
+)
 from app.services.search_providers import PROVIDER_KEYS
 
 LibraryPageSize = Literal[10, 25, 50, 100]
@@ -32,6 +37,9 @@ class EditableSettings(BaseModel):
     default_analysis_options: AnalysisOptions = Field(default_factory=AnalysisOptions)
     default_video_analysis_options: VideoAnalysisOptions = Field(default_factory=VideoAnalysisOptions)
     default_audio_analysis_options: AudioAnalysisOptions = Field(default_factory=AudioAnalysisOptions)
+    default_document_analysis_options: DocumentAnalysisOptions = Field(
+        default_factory=DocumentAnalysisOptions
+    )
     library_page_size: LibraryPageSize = 25
     # Start the analysis as soon as an upload finishes.
     auto_analyze_after_upload: bool = True
@@ -65,6 +73,7 @@ class EnvironmentSettings(BaseModel):
     video_timeout_seconds: float
     max_audio_upload_bytes: int
     max_audio_duration_seconds: float
+    max_document_upload_bytes: int
     job_mode: str
     job_workers: int
     tool_timeout_seconds: float
@@ -86,6 +95,7 @@ class SettingsUpdate(BaseModel):
     default_analysis_options: AnalysisOptions | None = None
     default_video_analysis_options: VideoAnalysisOptions | None = None
     default_audio_analysis_options: AudioAnalysisOptions | None = None
+    default_document_analysis_options: DocumentAnalysisOptions | None = None
     library_page_size: LibraryPageSize | None = None
     auto_analyze_after_upload: bool | None = None
     enabled_search_providers: EnabledSearchProviders | None = None

@@ -207,6 +207,58 @@ class ForensicIndicatorsSection(BaseModel):
     provenance: Provenance
 
 
+class PdfStructureSection(BaseModel):
+    """What the PDF declares about itself (Pass 2, D25). Structural facts, never validated."""
+
+    pdf_version: str | None = None
+    file_size: int = 0
+    object_count: int = 0
+    page_count: int = 0
+    eof_markers: int = 0
+    startxref_markers: int = 0
+    # More than zero means the file was saved more than once: ordinary, not suspicious.
+    incremental_updates: int = 0
+    encrypted: bool = False
+    # Structural presence counts: javascript, open_action, embedded_file, interactive_form, ...
+    markers: dict[str, int] = {}
+    # Signature dictionaries present. Vestigo never validates a PDF signature.
+    signature_count: int = 0
+    linearized: bool = False
+    notes: list[str] = []
+    warnings: list[str] = []
+    provenance: Provenance
+
+
+class PdfTextSection(BaseModel):
+    """Provisional text from content streams (Pass 2). Not a verified transcription."""
+
+    text: str = ""
+    character_count: int = 0
+    streams_read: int = 0
+    streams_skipped: int = 0
+    streams_failed: int = 0
+    notes: list[str] = []
+    provenance: Provenance
+
+
+class PdfEmbeddedImage(BaseModel):
+    index: int
+    encoding: str
+    size_bytes: int
+    width: int | None = None
+    height: int | None = None
+    derived_file_id: str | None = None
+
+
+class PdfImagesSection(BaseModel):
+    """Images embedded in the document, copied out byte for byte. Not rendered pages."""
+
+    images: list[PdfEmbeddedImage] = []
+    extracted: int = 0
+    notes: list[str] = []
+    provenance: Provenance
+
+
 class PerceptualHashSection(BaseModel):
     algorithm: Literal["pHash"] = "pHash"
     bits: int
@@ -438,6 +490,9 @@ class EvidenceReport(BaseModel):
     location_clues: LocationCluesSection | None
     structural: StructuralSection | None
     forensic_indicators: ForensicIndicatorsSection | None
+    pdf_structure: PdfStructureSection | None
+    pdf_text: PdfTextSection | None
+    pdf_images: PdfImagesSection | None
     perceptual_hash: PerceptualHashSection | None
     ocr: OCRSection | None
     duplicates: DuplicatesSection | None

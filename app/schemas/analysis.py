@@ -5,6 +5,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.common import ErrorBody, JobStatus, StageStatus
 
 
+class DocumentAnalysisOptions(BaseModel):
+    """Optional document stages (Pass 2). Hashes always run; nothing in a PDF is ever executed."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    metadata: bool = True
+    pdf_structure: bool = True
+    pdf_text: bool = True
+    pdf_images: bool = True
+    structural: bool = True
+    duplicate_search: bool = True
+
+
 class AnalysisOptions(BaseModel):
     """Optional stages. Hashing and the perceptual hash always run (the hash feeds duplicate search)."""
 
@@ -60,6 +73,13 @@ class AudioAnalysisRequest(BaseModel):
 
     artifact_id: str
     options: AudioAnalysisOptions = Field(default_factory=AudioAnalysisOptions)
+
+
+class DocumentAnalysisRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    artifact_id: str
+    options: DocumentAnalysisOptions = Field(default_factory=DocumentAnalysisOptions)
 
 
 class VideoAnalysisRequest(BaseModel):

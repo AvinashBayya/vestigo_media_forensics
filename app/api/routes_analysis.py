@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.deps import Jobs, Services
 from app.schemas.analysis import (
     AudioAnalysisRequest,
+    DocumentAnalysisRequest,
     ImageAnalysisRequest,
     JobCreated,
     JobStatusResponse,
@@ -31,6 +32,14 @@ def start_video_analysis(services: Services, jobs: Jobs, request: VideoAnalysisR
 def start_audio_analysis(services: Services, jobs: Jobs, request: AudioAnalysisRequest) -> JobCreated:
     """Queue the audio pipeline (audio.v1): hashes, media info, metadata, byte-identical duplicates."""
     job = analysis.start_audio_analysis(services.db, jobs, request)
+    return JobCreated(job_id=job.id, artifact_id=job.artifact_id, status=JobStatus(job.status))
+
+
+@router.post("/document", status_code=202, response_model=JobCreated)
+def start_document_analysis(services: Services, jobs: Jobs, request: DocumentAnalysisRequest) -> JobCreated:
+    """Queue the document pipeline (document.v1): hashes, metadata, PDF structure, provisional text,
+    embedded images, structural inspection, and byte-identical duplicates. Nothing is executed."""
+    job = analysis.start_document_analysis(services.db, jobs, request)
     return JobCreated(job_id=job.id, artifact_id=job.artifact_id, status=JobStatus(job.status))
 
 

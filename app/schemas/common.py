@@ -8,6 +8,7 @@ class MediaType(StrEnum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+    DOCUMENT = "document"
 
 
 class ReviewState(StrEnum):
@@ -75,6 +76,7 @@ class ErrorCode(StrEnum):
     EVIDENCE_RECORD_NOT_FOUND = "EVIDENCE_RECORD_NOT_FOUND"
     EXPORT_FAILED = "EXPORT_FAILED"
     PREVIEW_FAILED = "PREVIEW_FAILED"
+    INVALID_DOCUMENT = "INVALID_DOCUMENT"
     AI_UNAVAILABLE = "AI_UNAVAILABLE"
 
 

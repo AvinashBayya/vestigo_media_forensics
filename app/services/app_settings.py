@@ -59,6 +59,7 @@ def environment_settings(services: AppServices) -> EnvironmentSettings:
         video_timeout_seconds=settings.video_timeout_seconds,
         max_audio_upload_bytes=settings.max_audio_upload_bytes,
         max_audio_duration_seconds=settings.max_audio_duration_seconds,
+        max_document_upload_bytes=settings.max_document_upload_bytes,
         job_mode=settings.job_mode,
         job_workers=settings.job_workers,
         tool_timeout_seconds=settings.tool_timeout_seconds,

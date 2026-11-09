@@ -10,11 +10,13 @@ from app.core.clock import utcnow
 from app.core.database import Database
 from app.models import AnalysisJob, Artifact, EvidenceRecord
 from app.pipeline.audio_pipeline import AUDIO_PIPELINE
+from app.pipeline.document_pipeline import DOCUMENT_PIPELINE
 from app.pipeline.image_pipeline import IMAGE_PIPELINE
 from app.pipeline.jobs import JobExecutor
 from app.pipeline.video_pipeline import VIDEO_PIPELINE
 from app.schemas.analysis import (
     AudioAnalysisRequest,
+    DocumentAnalysisRequest,
     ImageAnalysisRequest,
     JobHistory,
     JobHistoryItem,
@@ -124,6 +126,21 @@ def start_audio_analysis(db: Database, executor: JobExecutor, request: AudioAnal
         MediaType.AUDIO,
         "the matching endpoint",
         lambda session: editable_settings(session)[0].default_audio_analysis_options,
+    )
+
+
+def start_document_analysis(
+    db: Database, executor: JobExecutor, request: DocumentAnalysisRequest
+) -> AnalysisJob:
+    return _start_analysis(
+        db,
+        executor,
+        request.artifact_id,
+        request.options if "options" in request.model_fields_set else None,
+        DOCUMENT_PIPELINE,
+        MediaType.DOCUMENT,
+        "the matching endpoint",
+        lambda session: editable_settings(session)[0].default_document_analysis_options,
     )
 
 

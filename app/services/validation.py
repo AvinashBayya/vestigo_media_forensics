@@ -177,6 +177,13 @@ class VideoInfo:
     duration_seconds: float
 
 
+def sniff_document_format(head: bytes) -> str | None:
+    """The document family from the file's bytes, or None (Pass 2). PDF only for now."""
+    if head.startswith(b"%PDF-"):
+        return "pdf"
+    return None
+
+
 def sniff_video_container(head: bytes) -> str | None:
     """The container family from the file's bytes, or None.
 

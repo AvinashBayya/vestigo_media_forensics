@@ -35,6 +35,7 @@ from app.schemas.common import ErrorCode, JobStatus, MediaType, ReviewState
 from app.services import analysis, custody, library
 from app.services.errors import analysis_in_progress, artifact_not_found
 from app.services.hashing import CHUNK_SIZE, FileHasher, FileHashes
+from app.services.pdf import read_structure
 from app.services.validation import (
     AUDIO_CAPABLE_FAMILIES,
     SNIFF_BYTES,
@@ -50,6 +51,7 @@ from app.services.validation import (
     inspect_image,
     inspect_video,
     probe_video,
+    sniff_document_format,
     sniff_image_format,
     sniff_video_container,
 )
@@ -250,24 +252,49 @@ def _validate_audio(
     )
 
 
+def _validate_document(services: AppServices, received: ReceivedUpload, family: str) -> ValidatedMedia:
+    """A document is accepted on its bytes and its size. It is parsed later, never executed."""
+    settings = services.settings
+    if received.hashes.size_bytes > settings.max_document_upload_bytes:
+        raise _file_too_large(settings.max_document_upload_bytes)
+    structure = read_structure(received.temp_path)
+    if structure.pdf_version is None:
+        raise AppError(
+            422,
+            ErrorCode.INVALID_DOCUMENT,
+            "The file starts like a PDF but no %PDF- header version could be read.",
+        )
+    return ValidatedMedia(MediaType.DOCUMENT, "application/pdf", f".{family}", None, None, None)
+
+
 def create_artifact(services: AppServices, stream: BinaryIO, filename: str | None) -> Artifact:
     settings, storage = services.settings, services.storage
-    stream_cap = max(settings.max_upload_bytes, settings.max_video_upload_bytes)
+    stream_cap = max(
+        settings.max_upload_bytes,
+        settings.max_video_upload_bytes,
+        settings.max_document_upload_bytes,
+    )
     received = receive_upload(stream, storage, stream_cap)
     artifact_id = ids.new_id(ids.ARTIFACT)
     try:
         image_format = sniff_image_format(received.head)
         video_container = sniff_video_container(received.head) if image_format is None else None
+        document_family = (
+            sniff_document_format(received.head) if image_format is None and video_container is None else None
+        )
         if image_format is not None:
             media = _validate_image(services, received, image_format)
         elif video_container is not None:
             media = _validate_av(services, received, video_container)
+        elif document_family is not None:
+            media = _validate_document(services, received, document_family)
         else:
             raise AppError(
                 415,
                 ErrorCode.UNSUPPORTED_MEDIA_TYPE,
                 "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, "
-                "FLV, and 3GP videos, and WAV, MP3, FLAC, OGG, and M4A audio files are supported.",
+                "FLV, and 3GP videos, WAV, MP3, FLAC, OGG, and M4A audio files, and PDF "
+                "documents are supported.",
             )
         stored_path = storage.store_original(received.temp_path, artifact_id, media.extension)
     except BaseException:

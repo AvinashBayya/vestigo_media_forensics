@@ -47,6 +47,9 @@ class FixtureSet:
     webp: Path
     tiff: Path
     with_metadata: Path
+    pdf: Path
+    pdf_updated: Path
+    pdf_scripted: Path
     appended_jpeg: Path
     png_with_zip: Path
     jpeg_big_comment: Path
@@ -276,6 +279,60 @@ def build_structural_fixtures(path) -> dict[str, Path]:
         "png_with_zip": stapled,
         "jpeg_big_comment": commented,
     }
+
+
+def build_pdf_fixtures(path) -> dict[str, Path]:
+    """Hand-built PDFs (Pass 2): one with text and an embedded JPEG, one with a second save."""
+    import zlib
+
+    jpeg = path("base.jpg").read_bytes()
+
+    def pdf(objects: list[bytes], extra_eof: bool = False) -> bytes:
+        out = bytearray(b"%PDF-1.7\n")
+        offsets = []
+        for index, body in enumerate(objects, start=1):
+            offsets.append(len(out))
+            out += b"%d 0 obj\n" % index + body + b"\nendobj\n"
+        xref = len(out)
+        out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+        for offset in offsets:
+            out += b"%010d 00000 n \n" % offset
+        out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+        if extra_eof:
+            # A second save appended: an ordinary incremental update.
+            out += b"startxref\n%d\n%%%%EOF\n" % xref
+        return bytes(out)
+
+    content = b"BT /F1 24 Tf 72 700 Td (Vestigo fixture document) Tj ET\n"
+    compressed = zlib.compress(content)
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /XObject << /Im0 5 0 R >> >> >>",
+        b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(compressed) + compressed + b"\nendstream",
+        b"<< /Type /XObject /Subtype /Image /Width 640 /Height 480 /ColorSpace /DeviceRGB "
+        b"/BitsPerComponent 8 /Filter /DCTDecode /Length %d >>\nstream\n" % len(jpeg) + jpeg + b"\nendstream",
+    ]
+    simple = path("document.pdf")
+    simple.write_bytes(pdf(objects))
+
+    updated = path("document_updated.pdf")
+    updated.write_bytes(pdf(objects, extra_eof=True))
+
+    # A PDF declaring JavaScript and an automatic action: structural facts, not wrongdoing.
+    scripted = path("document_scripted.pdf")
+    scripted.write_bytes(
+        pdf(
+            [
+                b"<< /Type /Catalog /Pages 2 0 R /OpenAction 4 0 R /AcroForm << /Fields [] >> >>",
+                b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>",
+                b"<< /S /JavaScript /JS (app.alert\\(1\\);) >>",
+            ]
+        )
+    )
+    return {"pdf": simple, "pdf_updated": updated, "pdf_scripted": scripted}
 
 
 def font(name: str, size: int) -> ImageFont.FreeTypeFont:
@@ -697,9 +754,11 @@ def build_fixtures(target: Path) -> FixtureSet:
 
     videos = build_video_fixtures(path)
     structural_files = build_structural_fixtures(path)
+    pdf_files = build_pdf_fixtures(path)
     c2pa_files = build_c2pa_fixtures(path)
 
     return FixtureSet(
+        **pdf_files,
         **structural_files,
         **c2pa_files,
         **videos,

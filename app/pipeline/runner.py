@@ -22,9 +22,15 @@ from app.pipeline.base import (
     StageContext,
     StageResult,
 )
+from app.pipeline.document_pipeline import DOCUMENT_PIPELINE, DOCUMENT_STAGES
 from app.pipeline.image_pipeline import IMAGE_PIPELINE, IMAGE_STAGES
 from app.pipeline.video_pipeline import VIDEO_PIPELINE, VIDEO_STAGES
-from app.schemas.analysis import AnalysisOptions, AudioAnalysisOptions, VideoAnalysisOptions
+from app.schemas.analysis import (
+    AnalysisOptions,
+    AudioAnalysisOptions,
+    DocumentAnalysisOptions,
+    VideoAnalysisOptions,
+)
 from app.schemas.common import ErrorCode, JobStatus, ReviewState, StageStatus
 
 logger = get_logger("pipeline")
@@ -33,11 +39,13 @@ PIPELINES: dict[str, Sequence[AnalysisStage]] = {
     IMAGE_PIPELINE: IMAGE_STAGES,
     VIDEO_PIPELINE: VIDEO_STAGES,
     AUDIO_PIPELINE: AUDIO_STAGES,
+    DOCUMENT_PIPELINE: DOCUMENT_STAGES,
 }
 OPTIONS_MODELS = {
     IMAGE_PIPELINE: AnalysisOptions,
     VIDEO_PIPELINE: VideoAnalysisOptions,
     AUDIO_PIPELINE: AudioAnalysisOptions,
+    DOCUMENT_PIPELINE: DocumentAnalysisOptions,
 }
 
 
