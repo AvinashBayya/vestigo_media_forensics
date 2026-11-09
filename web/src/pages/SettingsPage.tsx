@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import { AIModelSettings } from "../components/AIModelSettings";
 import {
   errorMessage,
   getHealth,
@@ -168,31 +169,12 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
             {label}
           </label>
         ))}
-        <label className="block space-y-0.5">
-          <span className="text-xs text-slate-600 dark:text-slate-400">
-            Path to the model file for drafts (optional; e.g. /models/needle3.cact)
-          </span>
-          <input
-            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
-            value={form.ai_model_path}
-            onChange={(event) => change({ ...form, ai_model_path: event.target.value })}
-          />
-        </label>
-        <label className="block space-y-0.5">
-          <span className="text-xs text-slate-600 dark:text-slate-400">
-            Path to the speech-to-text model file (optional; e.g. /models/whistle.cact)
-          </span>
-          <input
-            className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-900"
-            value={form.transcription_model_path}
-            onChange={(event) => change({ ...form, transcription_model_path: event.target.value })}
-          />
-        </label>
+        <AIModelSettings form={form} onChange={change} />
         <p className="text-xs text-slate-600 dark:text-slate-400">
-          All off by default. Inference runs on this machine, vendor telemetry is disabled, and no
-          media, prompt, or embedding is ever sent anywhere. AI output is a labelled draft the
-          analyst reviews, never evidence. Install the runtime with{" "}
-          <span className="font-mono">pip install cactus-needle</span>; models are Apache-2.0 and
+          All off by default. Inference runs on this machine, vendor telemetry is disabled, downloads
+          are blocked in the backend, and no media, prompt, or embedding is ever sent anywhere. AI
+          output is a labelled draft the analyst reviews, never evidence. Install the runtime with{" "}
+          <span className="font-mono">pip install -e ".[dev,ai]"</span>; models are Apache-2.0 and
           tens of megabytes.
         </p>
       </fieldset>

@@ -5,6 +5,8 @@ import type {
   C2PASection,
   AIDraft,
   AIStatus,
+  ManagedModelInfo,
+  ManagedModelsResponse,
   CaseInfo,
   CustodyReport,
   ExternalLead,
@@ -723,7 +725,14 @@ export function aiStatus(overrides: Partial<AIStatus> = {}): AIStatus {
     runtime_package: "cactus-needle",
     runtime_installed: false,
     telemetry_disabled: true,
-    telemetry_environment: { NEEDLE_TELEMETRY: "0", DO_NOT_TRACK: "1", CACTUS_TELEMETRY: "0" },
+    telemetry_environment: { NEEDLE_TELEMETRY: "0", DO_NOT_TRACK: "1" },
+    offline_enforced: true,
+    offline_environment: { HF_HUB_OFFLINE: "1" },
+    engine_generation: 2,
+    engine_available: false,
+    engine_path: null,
+    engine_unavailable_reason:
+      "The generation 2 engine is not staged on this machine. Stage it once with: needle fetch --generation 2",
     ai_enabled: false,
     transcription_enabled: false,
     semantic_search_enabled: false,
@@ -739,14 +748,35 @@ export function aiStatus(overrides: Partial<AIStatus> = {}): AIStatus {
     ],
     known_models: [
       {
+        name: "needle2",
+        version: "2.0.4",
+        quantization: "2-bit",
+        source_url: "https://huggingface.co/Cactus-Compute/needle2",
+        license: "Apache-2.0",
+        runtime: "needle",
+        generation: 2,
+        local_path: null,
+        size_bytes: null,
+        sha256: null,
+        installed: false,
+        runnable: true,
+        unavailable_reason: null,
+      },
+      {
         name: "needle3",
         version: "3",
         quantization: "2-bit",
         source_url: "https://huggingface.co/Cactus-Compute/needle3",
         license: "Apache-2.0",
         runtime: "needle",
+        generation: 3,
         local_path: null,
+        size_bytes: null,
+        sha256: null,
         installed: false,
+        runnable: false,
+        unavailable_reason:
+          "The vendor publishes no generation 3 engine for this platform, so its models cannot be loaded.",
       },
       {
         name: "whistle",
@@ -755,8 +785,14 @@ export function aiStatus(overrides: Partial<AIStatus> = {}): AIStatus {
         source_url: "https://huggingface.co/Cactus-Compute/whistle",
         license: "Apache-2.0",
         runtime: "needle",
+        generation: 3,
         local_path: null,
+        size_bytes: null,
+        sha256: null,
         installed: false,
+        runnable: false,
+        unavailable_reason:
+          "The vendor publishes no generation 3 engine for this platform, so its models cannot be loaded.",
       },
     ],
     ...overrides,
@@ -1002,6 +1038,34 @@ export function geoTools(overrides: Partial<GeoToolsResponse> = {}): GeoToolsRes
     ],
     offline_map_available: false,
     offline_map_path: null,
+    ...overrides,
+  };
+}
+
+export const MODELS_NOTICE =
+  "Model files you have staged on this machine. Vestigo never downloads one; drop a .cact file in the models directory or import it here, and it appears in this list.";
+
+/** Staged model files, as a stock build reports them: the directory exists and is empty (D27). */
+export function aiModels(overrides: Partial<ManagedModelsResponse> = {}): ManagedModelsResponse {
+  return {
+    models: [],
+    models_directory: "/workspace/data/models",
+    notice: MODELS_NOTICE,
+    limitations: [
+      "A model file is a third-party artifact. Vestigo records its name, size, and SHA-256 so a draft can name the exact bytes that produced it; it does not validate the contents or vouch for them.",
+    ],
+    ...overrides,
+  };
+}
+
+export function managedModel(overrides: Partial<ManagedModelInfo> = {}): ManagedModelInfo {
+  return {
+    name: "needle2.cact",
+    size_bytes: 13_740_000,
+    sha256: "a".repeat(64),
+    modified_at: "2026-11-09T07:00:00Z",
+    path: "/workspace/data/models/needle2.cact",
+    configured_for: [],
     ...overrides,
   };
 }

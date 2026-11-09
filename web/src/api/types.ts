@@ -902,8 +902,31 @@ export interface AIModelInfo {
   source_url: string | null;
   license: string | null;
   runtime: string;
+  generation: number | null;
   local_path: string | null;
+  size_bytes: number | null;
+  sha256: string | null;
   installed: boolean;
+  /** Whether the engine that would load this model is staged here. Separate from `installed`. */
+  runnable: boolean;
+  unavailable_reason: string | null;
+}
+
+/** A model file staged on this machine, as measured on disk (D27). */
+export interface ManagedModelInfo {
+  name: string;
+  size_bytes: number;
+  sha256: string;
+  modified_at: string;
+  path: string;
+  configured_for: string[];
+}
+
+export interface ManagedModelsResponse {
+  models: ManagedModelInfo[];
+  models_directory: string;
+  notice: string;
+  limitations: string[];
 }
 
 export interface AIStatus {
@@ -911,6 +934,13 @@ export interface AIStatus {
   runtime_installed: boolean;
   telemetry_disabled: boolean;
   telemetry_environment: Record<string, string>;
+  /** Downloads are blocked in-process, so the runtime cannot fetch an engine or weights. */
+  offline_enforced: boolean;
+  offline_environment: Record<string, string>;
+  engine_generation: number;
+  engine_available: boolean;
+  engine_path: string | null;
+  engine_unavailable_reason: string | null;
   ai_enabled: boolean;
   transcription_enabled: boolean;
   semantic_search_enabled: boolean;

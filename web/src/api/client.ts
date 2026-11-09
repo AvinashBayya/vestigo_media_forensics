@@ -19,6 +19,8 @@ import type {
   AIDraftsResponse,
   AIStatus,
   AnswerResponse,
+  ManagedModelInfo,
+  ManagedModelsResponse,
   CaseInfo,
   CasesResponse,
   DocumentAnalysisOptions,
@@ -427,6 +429,21 @@ export function openStreetMapUrl(latitude: number, longitude: number): string {
 
 export function getAIStatus(): Promise<AIStatus> {
   return call(http.get<AIStatus>("/ai/status"));
+}
+
+export function getAIModels(): Promise<ManagedModelsResponse> {
+  return call(http.get<ManagedModelsResponse>("/ai/models"));
+}
+
+/** Stage a model file the analyst already has. A local copy: the backend fetches nothing. */
+export function importAIModel(file: File): Promise<ManagedModelInfo> {
+  const form = new FormData();
+  form.append("file", file);
+  return call(http.post<ManagedModelInfo>("/ai/models/import", form));
+}
+
+export function deleteAIModel(name: string): Promise<void> {
+  return call(http.delete<void>(`/ai/models/${encodeURIComponent(name)}`));
 }
 
 export function listAIDrafts(artifactId: string): Promise<AIDraftsResponse> {

@@ -115,6 +115,7 @@ export function AIAssistantPanel({ artifactId, mediaType, onChanged }: AIAssista
               Everything here is produced on this machine by a local model and is kept apart from the
               evidence: it is never a finding, and nothing is written back onto metadata or evidence.
               {status.telemetry_disabled && " Vendor telemetry is disabled."}
+              {status.offline_enforced && " Downloads are blocked, so no model can be fetched."}
             </p>
 
             <DraftsSection
