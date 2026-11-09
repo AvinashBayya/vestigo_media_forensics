@@ -1,35 +1,58 @@
-"""Local AI runtime: telemetry kill-switch, availability, and model provenance (Pass 1, D24).
+"""Local AI runtime: telemetry kill-switch, offline enforcement, availability, and provenance.
 
-Vestigo runs AI locally or not at all. Three rules are enforced here rather than trusted:
+Vestigo runs AI locally or not at all. Four rules are enforced here rather than trusted:
 
-1. **Telemetry off before anything loads.** The Needle binary ships with telemetry enabled; the
-   environment variables that disable it are set at import time, before any provider can import the
-   runtime, and `telemetry_disabled()` reports the state for the status endpoint and its test.
-2. **Nothing is fetched at import.** Importing this module never touches the network, never loads a
-   model, and never imports the third-party runtime. Providers import it lazily, inside calls, and
-   only when the analyst has enabled the feature and pointed it at a local model file.
-3. **No vendor cloud path.** Nothing here reads NEEDLE_API_KEY or offers fine-tuning, so the
-   vendor's platform fine-tuning (which uploads files to its GPUs) cannot be reached from Vestigo.
+1. **Telemetry off before anything loads.** The runtime ships with telemetry enabled; the variables
+   that disable it are forced at import, before any provider can import it, and `telemetry_disabled()`
+   reports the state for the status endpoint and its test.
+2. **No download, ever, from the backend.** The vendor resolves a missing engine or missing weights by
+   fetching them from Hugging Face at load time, and it pings the Hub even when its cache is warm.
+   `HF_HUB_OFFLINE=1` is forced at import, which turns every such lookup into a fast local failure.
+   Staging is a deliberate, documented, out-of-band step (`needle fetch`), never a side effect of use.
+3. **Nothing is fetched or imported at import time.** Importing this module never touches the network,
+   never loads a model, and never imports the third-party runtime. Providers import it inside calls.
+4. **No vendor cloud path.** Nothing here reads NEEDLE_API_KEY or OPENROUTER_API_KEY and nothing
+   offers fine-tuning, so the vendor's platform (which uploads training files to its GPUs) is
+   unreachable from Vestigo.
 
-AI output is never evidence: it carries this module's `ModelInfo` as provenance and is stored apart
-from the evidence tables, always labelled for analyst review.
+AI output is never evidence: it carries this module's `ModelInfo` as provenance, is stored apart from
+the evidence tables, and is always labelled for analyst review.
+
+Verified against cactus-needle 3.2.10 on linux-x86_64 (see D27). The engine is a single-model,
+not-thread-safe native library, so `ENGINE_LOCK` serialises every call into it.
 """
 
+import hashlib
 import os
+import threading
 from dataclasses import asdict, dataclass
 from importlib.util import find_spec
 from pathlib import Path
 from typing import Any
 
-# Set before any provider can `import needle`. Forced, not defaulted: a stale or hostile value in
-# the environment must not re-enable vendor telemetry.
-TELEMETRY_ENV = {"NEEDLE_TELEMETRY": "0", "DO_NOT_TRACK": "1", "CACTUS_TELEMETRY": "0"}
-for _key, _value in TELEMETRY_ENV.items():
+# Set before any provider can `import needle`. Forced, not defaulted: a stale or hostile value in the
+# environment must not re-enable vendor telemetry. These are the two switches the runtime reads;
+# `CACTUS_*` names are not read by this package and are deliberately not set.
+TELEMETRY_ENV = {"NEEDLE_TELEMETRY": "0", "DO_NOT_TRACK": "1"}
+
+# Forced for the same reason: the vendor downloads an absent engine or absent weights at load time.
+OFFLINE_ENV = {"HF_HUB_OFFLINE": "1"}
+
+for _key, _value in {**TELEMETRY_ENV, **OFFLINE_ENV}.items():
     os.environ[_key] = _value
 
 # The third-party runtime package, and the import name it exposes.
 RUNTIME_PACKAGE = "cactus-needle"
 RUNTIME_MODULE = "needle"
+
+# The engine generation Vestigo asks for. Generation 2 is the only one the vendor publishes an engine
+# binary for; generation 3 weights exist but no engine does, so its models cannot load. Vestigo asks
+# for what it can actually run and reports the rest as unavailable with the real reason.
+DEFAULT_GENERATION = 2
+
+# One model is loaded per process and the native library is not thread-safe, but FastAPI runs sync
+# endpoints in a thread pool. Every call into the engine is serialised through this lock.
+ENGINE_LOCK = threading.Lock()
 
 AI_LABEL = "AI-generated, unverified - analyst must review."
 
@@ -39,15 +62,18 @@ AI_LIMITATIONS: tuple[str, ...] = (
     "Models restate, summarise, and guess. Text can be wrong, invented, or subtly altered even when "
     "it reads plausibly, and the same input can give different output on another run.",
     "A confidence value is reported only when the model itself supplies one. It is the model's own "
-    "estimate, not a measured accuracy, and Vestigo never calculates one.",
-    "Nothing is sent anywhere: inference runs on this machine, vendor telemetry is disabled, and no "
-    "media, prompt, or embedding leaves it.",
+    "estimate, not a measured accuracy, and Vestigo never calculates one. An imported model archive "
+    "carries no confidence head, so confidence is then absent rather than guessed.",
+    "The model is small and quantized. It reads short passages of text; it does not look at the "
+    "image, and it cannot judge whether a file is authentic.",
+    "Nothing is sent anywhere: inference runs on this machine, vendor telemetry is disabled, "
+    "downloads are blocked in-process, and no media, prompt, or embedding leaves it.",
 )
 
 
 @dataclass(frozen=True)
 class ModelInfo:
-    """Provenance recorded on every AI artifact (Pass 1). Vendor-stated facts, recorded as such."""
+    """Provenance recorded on every AI artifact. Vendor-stated facts are recorded as such."""
 
     name: str
     version: str | None
@@ -55,16 +81,29 @@ class ModelInfo:
     source_url: str | None
     license: str | None
     runtime: str
-    # Where the weights were loaded from on this machine, when known.
+    # The engine generation these weights need. None for providers that are not engine-backed.
+    generation: int | None = None
+    # Where the weights were loaded from on this machine, and what those exact bytes were, when known.
     local_path: str | None = None
+    size_bytes: int | None = None
+    sha256: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-# Models this build knows about, with the facts needed for provenance. Sizes and languages are as
-# the vendor states them; Vestigo does not verify vendor claims.
+# Models this build knows about. Sizes, licences, and quantization are as the vendor states them;
+# what Vestigo verified is recorded in D27, not asserted here.
 KNOWN_MODELS: tuple[ModelInfo, ...] = (
+    ModelInfo(
+        name="needle2",
+        version="2.0.4",
+        quantization="2-bit",
+        source_url="https://huggingface.co/Cactus-Compute/needle2",
+        license="Apache-2.0",
+        runtime=RUNTIME_MODULE,
+        generation=2,
+    ),
     ModelInfo(
         name="needle3",
         version="3",
@@ -72,6 +111,7 @@ KNOWN_MODELS: tuple[ModelInfo, ...] = (
         source_url="https://huggingface.co/Cactus-Compute/needle3",
         license="Apache-2.0",
         runtime=RUNTIME_MODULE,
+        generation=3,
     ),
     ModelInfo(
         name="whistle",
@@ -80,8 +120,12 @@ KNOWN_MODELS: tuple[ModelInfo, ...] = (
         source_url="https://huggingface.co/Cactus-Compute/whistle",
         license="Apache-2.0",
         runtime=RUNTIME_MODULE,
+        generation=3,
     ),
 )
+
+# Suffix of a weights archive the runtime can load.
+MODEL_SUFFIX = ".cact"
 
 
 class AIUnavailableError(Exception):
@@ -97,6 +141,11 @@ def telemetry_disabled() -> bool:
     return all(os.environ.get(key) == value for key, value in TELEMETRY_ENV.items())
 
 
+def offline_enforced() -> bool:
+    """True when the runtime cannot download an engine or weights from this process."""
+    return all(os.environ.get(key) == value for key, value in OFFLINE_ENV.items())
+
+
 def runtime_installed() -> bool:
     """True when the third-party runtime is importable. Does not import it."""
     try:
@@ -105,14 +154,94 @@ def runtime_installed() -> bool:
         return False
 
 
+def file_digest(path: Path) -> str:
+    """SHA-256 of a model file, so a draft records which exact bytes produced it."""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def engine_library_path(generation: int = DEFAULT_GENERATION) -> Path | None:
+    """Where the engine binary for a generation already is, or None.
+
+    This repeats the vendor's own lookup order (override, package directory, cache) using its own
+    helpers, but stops short of its final step, which downloads. Read-only by construction: it is
+    called by the status endpoint, which must never fetch anything.
+    """
+    if not runtime_installed():
+        return None
+    try:
+        import needle
+        from needle.agent import fetch
+    except Exception:  # noqa: BLE001 - a runtime that will not import is simply unavailable
+        return None
+
+    override = os.environ.get(fetch.lib_path_env(generation))
+    if not override and generation == 2:
+        # NEEDLE_LIB_PATH predates multi-generation dispatch and names the generation 2 engine.
+        override = os.environ.get("NEEDLE_LIB_PATH")
+    if override:
+        chosen = Path(override)
+        return chosen if chosen.is_file() else None
+
+    library = fetch.lib_name(generation)
+    stem, suffix = os.path.splitext(library)
+    here = Path(needle.__file__).resolve().parent
+    names = [library if generation in fetch.NAMED_ENGINES else f"{stem}{generation}{suffix}"]
+    if generation == 2:
+        # Wheels published before the generation split shipped Needle 2 under the plain name.
+        names.append(library)
+    for name in names:
+        candidate = here / name
+        if candidate.is_file():
+            return candidate
+    try:
+        cached = Path(fetch.cache_dir(generation)) / library
+    except (ValueError, TypeError):
+        return None
+    return cached if cached.is_file() else None
+
+
+def engine_available(generation: int = DEFAULT_GENERATION) -> bool:
+    """True when the engine for a generation is staged on this machine."""
+    return engine_library_path(generation) is not None
+
+
+def engine_unavailable_reason(generation: int = DEFAULT_GENERATION) -> str | None:
+    """Why this generation cannot run, in words an analyst can act on. None when it can."""
+    if not runtime_installed():
+        return f"The local AI runtime is not installed. Install it with: pip install {RUNTIME_PACKAGE}"
+    if engine_available(generation):
+        return None
+    if generation == DEFAULT_GENERATION:
+        return (
+            f"The generation {generation} engine is not staged on this machine. Stage it once with: "
+            f"needle fetch --generation {generation}"
+        )
+    return (
+        f"The vendor publishes no generation {generation} engine for this platform, so its models "
+        "cannot be loaded. Vestigo will use it as soon as one is published; nothing is downloaded "
+        "automatically."
+    )
+
+
 def find_model(name: str) -> ModelInfo | None:
     return next((model for model in KNOWN_MODELS if model.name == name), None)
 
 
 def model_for_path(path: Path, fallback_name: str) -> ModelInfo:
-    """Provenance for a model file the analyst imported, matched to a known model where possible."""
+    """Provenance for a model file the analyst staged, matched to a known model where possible.
+
+    The file's size and digest are recorded so a draft names the exact bytes behind it.
+    """
     stem = path.stem.split("-")[0].lower()
     known = find_model(stem) or find_model(fallback_name)
+    try:
+        measured: dict[str, Any] = {"size_bytes": path.stat().st_size, "sha256": file_digest(path)}
+    except OSError:
+        measured = {"size_bytes": None, "sha256": None}
     if known is None:
         return ModelInfo(
             name=path.stem,
@@ -122,14 +251,17 @@ def model_for_path(path: Path, fallback_name: str) -> ModelInfo:
             license=None,
             runtime=RUNTIME_MODULE,
             local_path=str(path),
+            **measured,
         )
-    return ModelInfo(**{**known.as_dict(), "local_path": str(path)})
+    return ModelInfo(**{**known.as_dict(), "local_path": str(path), **measured})
 
 
 def imported_runtime() -> Any:
-    """Import the runtime, with telemetry already disabled. Raises AIUnavailableError if missing."""
+    """Import the runtime, with telemetry and downloads already disabled."""
     if not telemetry_disabled():  # pragma: no cover - the module sets these at import
         raise AIUnavailableError("Vendor telemetry could not be disabled; refusing to load the runtime.")
+    if not offline_enforced():  # pragma: no cover - the module sets these at import
+        raise AIUnavailableError("Downloads could not be blocked; refusing to load the runtime.")
     if not runtime_installed():
         raise AIUnavailableError(
             f"The local AI runtime is not installed. Install it with: pip install {RUNTIME_PACKAGE}"

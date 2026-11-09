@@ -55,27 +55,27 @@ class EmbeddingResult:
     model: ModelInfo
 
 
-@dataclass
-class GenerationResult:
-    text: str
-    model: ModelInfo
-    warnings: list[str] = field(default_factory=list)
+# Every provider says why it cannot work, so callers never inspect a private attribute. None means
+# the provider is ready; a string is a reason fit to show an analyst.
+class Provider(Protocol):
+    @property
+    def unavailable_reason(self) -> str | None: ...
 
 
-class FieldExtractor(Protocol):
+class FieldExtractor(Provider, Protocol):
     def extract(self, text: str, fields: list[str]) -> ExtractionResult: ...
 
 
-class Transcriber(Protocol):
+class Transcriber(Provider, Protocol):
     def transcribe(self, audio_path: Path, language: str | None = None) -> TranscriptionResult: ...
 
 
-class TextEmbedder(Protocol):
+class TextEmbedder(Provider, Protocol):
     def embed(self, texts: list[str]) -> EmbeddingResult: ...
 
     @property
     def dimensions(self) -> int: ...
 
 
-class TextGenerator(Protocol):
-    def generate(self, prompt: str) -> GenerationResult: ...
+# There is deliberately no text-generation protocol: the runtime exposes no free-text generation
+# (`complete()` with no tools returns an empty call), so Vestigo does not pretend to offer one.

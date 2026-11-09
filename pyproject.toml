@@ -25,13 +25,19 @@ dev = [
   "httpx>=0.27",
   "ruff>=0.5",
 ]
+# The local AI runtime. Optional on purpose: a stock build has no AI dependency, every AI capability
+# is off by default, and the suite passes with this group absent. Installing it downloads no model;
+# staging weights is a separate, deliberate step (see docs/10-DEPENDENCIES.md).
+ai = [
+  "cactus-needle>=3.2.10",
+]
 
 [tool.setuptools.packages.find]
 include = ["app*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not container'"
+addopts = "-m 'not container and not live_model'"
 filterwarnings = [
   # Starlette's TestClient prefers httpx2; httpx is the documented test dependency (10-DEPENDENCIES.md).
   "ignore:Using `httpx` with `starlette.testclient` is deprecated",
@@ -42,6 +48,7 @@ filterwarnings = [
 ]
 markers = [
   "container: checks the Dev Container environment and ports (run with: pytest -m container)",
+  "live_model: loads a real local AI model, so it needs the runtime installed and weights staged (run with: pytest -m live_model)",
 ]
 
 [tool.ruff]

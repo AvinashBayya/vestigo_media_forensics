@@ -94,13 +94,10 @@ def test_answers_always_carry_sources_and_are_never_stored(client: TestClient, f
 
     assert body["sources"], body
     assert body["sources"][0]["artifact_id"] == artifact_id
-    # With no local generator installed, Vestigo returns the material instead of inventing prose,
-    # and the notice says why rather than leaving an empty answer unexplained.
+    # This runtime has no text generation at all (D27), so Vestigo returns the material instead of
+    # inventing prose, and the notice says why rather than leaving an empty answer unexplained.
     assert body["answer"] is None
-    assert any(
-        phrase in body["notice"]
-        for phrase in ("No local text-generation model is available", "Local AI is turned off")
-    ), body["notice"]
+    assert "No local text-generation model exists in this runtime" in body["notice"], body["notice"]
     assert body["label"] == ai.AI_LABEL
 
     # Nothing about the answer is persisted anywhere, and it is not in the evidence report.

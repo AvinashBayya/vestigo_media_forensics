@@ -5,6 +5,7 @@ Layout:
     artifacts/{artifact_id}/derived/{job_id}/...          files produced by analysis
     tmp/                                                  uploads and scratch files in progress
     trash/                                                artifacts being deleted
+    models/                                               local AI model files the analyst staged
 
 Every path is built from validated IDs and checked to stay inside the data directory.
 User-supplied filenames are never used in paths.
@@ -41,11 +42,13 @@ class Storage:
         self.artifacts_dir = self.root / "artifacts"
         self.tmp_dir = self.root / "tmp"
         self.trash_dir = self.root / "trash"
+        self.models_dir = self.root / "models"
 
     def prepare(self) -> None:
         """Create the layout and clear leftovers from interrupted uploads or deletions."""
-        for directory in (self.artifacts_dir, self.tmp_dir, self.trash_dir):
+        for directory in (self.artifacts_dir, self.tmp_dir, self.trash_dir, self.models_dir):
             directory.mkdir(parents=True, exist_ok=True)
+        # models/ is deliberately absent here: a staged model is the analyst's, not a leftover.
         for directory in (self.tmp_dir, self.trash_dir):
             for child in directory.iterdir():
                 _remove(child)

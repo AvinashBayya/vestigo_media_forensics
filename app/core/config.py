@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     max_audio_duration_seconds: float = Field(7200.0, gt=0)
     # Documents (Pass 2): PDFs are parsed in place, never rendered or executed.
     max_document_upload_bytes: int = Field(100 * MIB, gt=0)
+
+    # Cap on a staged local AI model file. Current models are tens of megabytes; the ceiling is
+    # generous so a larger one does not need a code change, and it is separate from evidence limits.
+    max_model_bytes: int = Field(1024 * MIB, gt=0)
     # Offline map data the analyst supplies (Pass 3). Vestigo never downloads map data or tiles.
     offline_map_path: str = ""
     phash_max_distance: int = Field(10, ge=0, le=64)

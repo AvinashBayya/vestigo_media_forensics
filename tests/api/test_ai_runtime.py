@@ -56,12 +56,25 @@ def test_status_reports_the_label_and_limitations(client: TestClient) -> None:
 
 def test_known_models_carry_licence_and_source(client: TestClient) -> None:
     models = {model["name"]: model for model in status(client)["known_models"]}
-    assert set(models) == {"needle3", "whistle"}
+    assert set(models) == {"needle2", "needle3", "whistle"}
     for model in models.values():
         assert model["license"] == "Apache-2.0"
         assert model["source_url"].startswith("https://huggingface.co/Cactus-Compute/")
         assert model["runtime"] == "needle"
         assert model["installed"] is False  # nothing is bundled or fetched
+        assert model["generation"] in (2, 3)
+
+
+def test_a_model_can_be_known_without_being_runnable(client: TestClient) -> None:
+    """Generation 3 weights are published without an engine, so "installed" and "runnable" differ.
+
+    Reporting one as the other would be a lie in whichever direction the gap happens to run, so the
+    status endpoint carries both, and an unrunnable model carries the reason.
+    """
+    models = {model["name"]: model for model in status(client)["known_models"]}
+    for name in ("needle3", "whistle"):
+        if not models[name]["runnable"]:
+            assert models[name]["unavailable_reason"]
 
 
 def test_enabling_without_the_runtime_says_what_is_missing(client: TestClient) -> None:
@@ -93,7 +106,6 @@ def test_disabled_provider_refuses_every_capability() -> None:
         lambda: provider.extract("text", ["field"]),
         lambda: provider.transcribe(__import__("pathlib").Path("a.wav")),
         lambda: provider.embed(["text"]),
-        lambda: provider.generate("prompt"),
     ):
         try:
             call()
@@ -101,3 +113,13 @@ def test_disabled_provider_refuses_every_capability() -> None:
             assert "Local AI is turned off" in str(exc)
         else:  # pragma: no cover - a silent success would be the bug
             raise AssertionError("the disabled provider must refuse every capability")
+    # The reason is read through the documented property, never a private attribute.
+    assert ai.unavailable_reason(provider) == ai.DISABLED_REASON
+
+
+def test_status_reports_that_downloads_are_blocked(client: TestClient) -> None:
+    """The backend makes no outbound request, and says so from an enforced switch, not a promise."""
+    body = status(client)
+    assert body["offline_enforced"] is True
+    assert body["offline_environment"] == dict(ai.OFFLINE_ENV)
+    assert body["engine_generation"] == ai.DEFAULT_GENERATION

@@ -156,6 +156,12 @@ def create_transcript(services: AppServices, artifact_id: str, language: str | N
             {"artifact_id": artifact_id, "media_type": artifact.media_type},
         )
 
+    # Refuse before extracting anything. `_prepare_audio` runs ffmpeg and commits a derived file, so
+    # asking first keeps a turned-off feature from leaving derived evidence and custody behind.
+    unavailable = ai.unavailable_reason(transcriber)
+    if unavailable is not None:
+        raise AppError(409, ErrorCode.AI_UNAVAILABLE, unavailable, {"artifact_id": artifact_id})
+
     audio_path, derived_id, warnings = _prepare_audio(services, artifact)
     try:
         result = transcriber.transcribe(audio_path, language)

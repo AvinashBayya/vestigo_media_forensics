@@ -43,14 +43,12 @@ CHUNK_CHARACTERS = 600
 CHUNK_OVERLAP = 80
 MAX_CHUNKS_PER_ARTIFACT = 400
 
-ANSWER_LABEL = (
-    "AI-generated, unverified - analyst must review. This answer was drafted by a local model from "
-    "the sources listed beside it. It is not evidence, it is not stored, and the sources are what "
-    "matters: read them."
-)
+# Vestigo drafts no answers. The local runtime has no free-text generation at all: its `complete()`
+# call with no tools returns an empty call, and this was verified rather than assumed (D27). So
+# `answer` retrieves and returns the analyst's own material, and says that is what it did.
 NO_GENERATOR_NOTE = (
-    "No local text-generation model is available, so Vestigo returned the matching material itself "
-    "rather than drafting an answer. These are your own records, unaltered."
+    "No local text-generation model exists in this runtime, so Vestigo returned the matching "
+    "material itself rather than drafting an answer. These are your own records, unaltered."
 )
 
 _WHITESPACE = re.compile(r"\s+")
@@ -141,7 +139,7 @@ def _get_artifact(session: Session, artifact_id: str) -> Artifact:
 def _embedder(services: AppServices):
     editable = app_settings.get_settings_response(services).editable
     embedder = ai.resolve_embedder(enabled=editable.semantic_search_enabled)
-    reason = getattr(embedder, "_reason", None)
+    reason = ai.unavailable_reason(embedder)
     if reason is not None:
         raise AppError(409, ErrorCode.AI_UNAVAILABLE, reason, {})
     return embedder
@@ -249,32 +247,15 @@ def search(services: AppServices, query: str, limit: int = 20) -> SearchResponse
 def answer(
     services: AppServices, question: str, artifact_ids: list[str] | None, limit: int = 8
 ) -> AnswerResponse:
-    """Retrieve the analyst's own material for a question, with a drafted answer only if possible."""
+    """Retrieve the analyst's own material for a question. Nothing is drafted and nothing is invented."""
     found = search(services, question, limit=limit * 3)
     hits = [hit for hit in found.hits if not artifact_ids or hit.artifact_id in set(artifact_ids)]
     hits = hits[:limit]
-
-    editable = app_settings.get_settings_response(services).editable
-    generator = ai.resolve_extractor(enabled=editable.ai_enabled, model_path=editable.ai_model_path)
-    drafted: str | None = None
-    note = NO_GENERATOR_NOTE
-    generate = getattr(generator, "generate", None)
-    if hits and callable(generate):
-        context = "\n\n".join(f"[{index + 1}] {hit.text}" for index, hit in enumerate(hits))
-        try:
-            result = generate(
-                "Answer the question using only the numbered sources. Cite them as [1], [2]. If the "
-                f"sources do not answer it, say so.\n\nQuestion: {question}\n\nSources:\n{context}"
-            )
-            drafted = result.text
-            note = ANSWER_LABEL
-        except ai.AIUnavailableError as exc:
-            note = exc.reason
     return AnswerResponse(
         question=question,
-        # Sources always come back, whether or not an answer could be drafted.
+        # The sources are the answer. `answer` stays None because no local model can write one.
         sources=hits,
-        answer=drafted,
-        notice=note,
+        answer=None,
+        notice=NO_GENERATOR_NOTE,
         label=ai.AI_LABEL,
     )

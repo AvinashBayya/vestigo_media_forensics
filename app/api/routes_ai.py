@@ -1,8 +1,12 @@
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, File, UploadFile
 
 from app.api.deps import Services
-from app.schemas.ai import AIModelInfo, AIStatus
+from app.core.errors import AppError
+from app.schemas.ai import AIModelInfo, AIStatus, ManagedModelInfo, ManagedModelsResponse
 from app.schemas.ai_drafts import AIDraftInfo, AIDraftsResponse, DraftGenerateRequest, FieldDecision
+from app.schemas.common import ErrorCode
 from app.schemas.semantic import AnswerRequest, AnswerResponse, IndexResult, SearchResponse
 from app.schemas.transcripts import (
     TranscriptCreateRequest,
@@ -10,18 +14,19 @@ from app.schemas.transcripts import (
     TranscriptsResponse,
     TranscriptUpdate,
 )
-from app.services import ai, ai_drafts, app_settings, semantic, transcripts
+from app.services import ai, ai_drafts, ai_models, app_settings, semantic, transcripts
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 @router.get("/status", response_model=AIStatus)
 def get_ai_status(services: Services) -> AIStatus:
-    """Whether local AI is available, and on exactly what terms (Pass 1, D24).
+    """Whether local AI is available, and on exactly what terms (Pass 1, D24; D27).
 
     Reports the analyst's own switches, whether the runtime is installed, which model files are in
-    place, and that vendor telemetry is disabled in this process. Nothing here loads a model or
-    touches the network, so the status is safe to poll."""
+    place, whether each model's engine is actually staged, and that vendor telemetry and downloads
+    are disabled in this process. Nothing here loads a model or touches the network, so the status is
+    safe to poll."""
     editable = app_settings.get_settings_response(services).editable
     extractor = ai.resolve_extractor(enabled=editable.ai_enabled, model_path=editable.ai_model_path)
     transcriber = ai.resolve_transcriber(
@@ -29,14 +34,20 @@ def get_ai_status(services: Services) -> AIStatus:
     )
     embedder = ai.resolve_embedder(enabled=editable.semantic_search_enabled)
 
-    def reason(provider: object) -> str | None:
-        return getattr(provider, "_reason", None)
+    reason = ai.unavailable_reason
+    engine_path = ai.engine_library_path(ai.DEFAULT_GENERATION)
 
     return AIStatus(
         runtime_package=ai.RUNTIME_PACKAGE,
         runtime_installed=ai.runtime_installed(),
         telemetry_disabled=ai.telemetry_disabled(),
         telemetry_environment=dict(ai.TELEMETRY_ENV),
+        offline_enforced=ai.offline_enforced(),
+        offline_environment=dict(ai.OFFLINE_ENV),
+        engine_generation=ai.DEFAULT_GENERATION,
+        engine_available=engine_path is not None,
+        engine_path=str(engine_path) if engine_path is not None else None,
+        engine_unavailable_reason=ai.engine_unavailable_reason(ai.DEFAULT_GENERATION),
         ai_enabled=editable.ai_enabled,
         transcription_enabled=editable.transcription_enabled,
         semantic_search_enabled=editable.semantic_search_enabled,
@@ -49,10 +60,7 @@ def get_ai_status(services: Services) -> AIStatus:
         label=ai.AI_LABEL,
         limitations=list(ai.AI_LIMITATIONS),
         known_models=[
-            AIModelInfo(
-                **model.as_dict(),
-                installed=ai.resolve_model_installed(model.name, editable),
-            )
+            AIModelInfo(**model.as_dict(), **ai.model_state(model, editable))
             for model in ai.KNOWN_MODELS
         ],
     )
@@ -142,7 +150,34 @@ def semantic_search(services: Services, q: str, limit: int = 20) -> SearchRespon
 
 @router.post("/answer", response_model=AnswerResponse)
 def answer_question(services: Services, request: AnswerRequest) -> AnswerResponse:
-    """Answer a question over the analyst's own material (Pass 1). The sources are always returned;
-    a drafted answer is included only when a local generator is available, is labelled
-    AI-generated and unverified, is never stored, and never becomes an evidence record."""
+    """Return the analyst's own material for a question (Pass 1). The sources are the answer: this
+    runtime has no text generation, so nothing is drafted, nothing is invented, and nothing is
+    stored. The response says so."""
     return semantic.answer(services, request.question, request.artifact_ids)
+
+
+@router.get("/models", response_model=ManagedModelsResponse)
+def list_ai_models(services: Services) -> ManagedModelsResponse:
+    """Model files staged on this machine (D27). Scans the models directory; downloads nothing."""
+    return ManagedModelsResponse(
+        models=[ManagedModelInfo(**vars(model)) for model in ai_models.list_models(services)],
+        models_directory=str(services.storage.models_dir),
+        notice=ai_models.NOTICE,
+        limitations=list(ai_models.MODEL_LIMITATIONS),
+    )
+
+
+@router.post("/models/import", response_model=ManagedModelInfo, status_code=201)
+def import_ai_model(
+    services: Services, file: Annotated[UploadFile | None, File()] = None
+) -> ManagedModelInfo:
+    """Stage a model file the analyst already has. A local copy: nothing is fetched."""
+    if file is None:
+        raise AppError(422, ErrorCode.MISSING_FILE, "Attach a model file to import.", {})
+    return ManagedModelInfo(**vars(ai_models.import_model(services, file)))
+
+
+@router.delete("/models/{name}", status_code=204)
+def delete_ai_model(services: Services, name: str) -> None:
+    """Remove a staged model file. Refused while a setting still points at it."""
+    ai_models.delete_model(services, name)
