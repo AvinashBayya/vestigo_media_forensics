@@ -23,5 +23,8 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // browser-acceptance.test.tsx talks to a running backend and frontend, so it is not part of the
+    // hermetic suite. Run it with: npx vitest run --config browser-acceptance.config.ts
+    exclude: ["browser-acceptance.test.tsx", "node_modules/**", "dist/**"],
   },
 });

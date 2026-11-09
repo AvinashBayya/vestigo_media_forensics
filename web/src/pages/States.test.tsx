@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 
-import { ARTIFACT_ID, JOB_ID, artifactDetail, artifactList, jobStatus, listItem } from "../test/data";
+import { ARTIFACT_ID, JOB_ID, artifactDetail, artifactList, evidenceReport, jobStatus, listItem } from "../test/data";
 import { renderApp } from "../test/render";
 import { API, apiError, server } from "../test/server";
 
@@ -37,6 +37,31 @@ describe("Empty and loading states", () => {
     expect(screen.queryByRole("region", { name: "Export evidence" })).not.toBeInTheDocument();
     await user.click(within(empty).getByRole("button", { name: "Run analysis" }));
     await waitFor(() => expect(body).toEqual({ artifact_id: ARTIFACT_ID }));
+  });
+
+  it("never says an analysed artifact has not been analysed while its report loads", async () => {
+    // The detail and job history arrive first; the evidence report follows. During that gap the page
+    // used to render the not-analysed empty state over an artifact that had in fact been analysed.
+    let release: (() => void) | null = null;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get(`${API}/artifacts/${ARTIFACT_ID}/evidence`, async () => {
+        await held;
+        return HttpResponse.json(evidenceReport());
+      }),
+    );
+    renderApp(`/artifacts/${ARTIFACT_ID}`);
+
+    // The header proves the page has rendered with the artifact already loaded.
+    await screen.findByText(ARTIFACT_ID);
+    expect(screen.queryByText("This image has not been analysed yet")).not.toBeInTheDocument();
+    expect(await screen.findByText("Loading evidence…")).toBeInTheDocument();
+
+    release!();
+    await waitFor(() => expect(screen.queryByText("Loading evidence…")).not.toBeInTheDocument());
+    expect(screen.queryByText("This image has not been analysed yet")).not.toBeInTheDocument();
   });
 
   it("shows recent uploads with loading, error, and retry", async () => {

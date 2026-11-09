@@ -225,9 +225,23 @@ For developers, `alembic current` and `alembic revision -m "…"` work from the 
 python -m pytest                 # backend unit, pipeline, API, and migration tests
 python -m pytest -m container    # tools, SQLite, and ports 8400/5180 (starts servers if needed)
 ruff check app tests             # backend lint
-(cd web && npm test)             # frontend tests (Vitest)
+(cd web && npm test)             # frontend tests (Vitest, hermetic: no servers needed)
 (cd web && npm run build)        # type check and production build
 ```
+
+Every test above is hermetic. There is one extra check that drives the real UI against the running
+servers, to catch what a hermetic suite cannot: a blank page, a proxy or CORS problem, a failed API
+call, or a runtime JavaScript error. Start both servers first, then:
+
+```bash
+(cd web && npx vitest run --config browser-acceptance.config.ts)
+```
+
+It boots the real router in jsdom at `http://localhost:5180`, so requests take the same path the
+browser does (Vite proxy to the backend), with no mocking. It renders the library, settings, upload,
+search and not-found pages, asserts no runtime errors were raised, and - given
+`VESTIGO_TEST_ARTIFACT=<artifact id>` - renders that artifact's page and checks every evidence panel
+is present. It is excluded from `npm test` because it needs the servers up.
 
 ## Manual test of the Milestone 2 workflow
 

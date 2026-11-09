@@ -63,6 +63,9 @@ export function ArtifactPage() {
   const [artifact, setArtifact] = useState<ArtifactDetail | null>(null);
   const [job, setJob] = useState<JobStatusResponse | null>(null);
   const [report, setReport] = useState<EvidenceReport | null>(null);
+  // The artifact and its job history arrive before the evidence report does. Without this, that gap
+  // renders "has not been analysed yet" over an artifact that has been analysed.
+  const [evidenceLoading, setEvidenceLoading] = useState(true);
   const [history, setHistory] = useState<JobHistoryItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<ApiError | null>(null);
@@ -82,6 +85,7 @@ export function ArtifactPage() {
 
   const load = useCallback(async () => {
     setLoadError(null);
+    setEvidenceLoading(true);
     try {
       const [detail, jobs] = await Promise.all([getArtifact(artifactId), getJobHistory(artifactId)]);
       setArtifact(detail);
@@ -98,6 +102,8 @@ export function ArtifactPage() {
     } catch (err) {
       if (err instanceof ApiError && err.code === "ARTIFACT_NOT_FOUND") setNotFound(true);
       else setLoadError(err instanceof ApiError ? err : new ApiError("UNKNOWN_ERROR", errorMessage(err), 0));
+    } finally {
+      setEvidenceLoading(false);
     }
   }, [artifactId]);
 
@@ -299,7 +305,12 @@ export function ArtifactPage() {
 
         <div className="min-w-0 space-y-4">
           {job && <JobProgress job={job} />}
-          {!job && !report && (
+          {!job && !report && evidenceLoading && (
+            <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
+              Loading evidence…
+            </p>
+          )}
+          {!job && !report && !evidenceLoading && (
             <EmptyState
               title="This image has not been analysed yet"
               action={
