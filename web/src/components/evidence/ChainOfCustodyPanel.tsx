@@ -20,6 +20,16 @@ const EVENT_LABELS: Record<string, string> = {
   location_candidate_recorded: "Location candidate recorded",
   location_candidate_updated: "Location candidate edited",
   location_candidate_deleted: "Location candidate deleted",
+  ai_draft_generated: "AI draft generated",
+  ai_draft_field_reviewed: "AI draft field reviewed",
+  ai_draft_deleted: "AI draft deleted",
+  transcript_created: "Transcript created",
+  transcript_edited: "Transcript edited",
+  transcript_deleted: "Transcript deleted",
+  embeddings_indexed: "Search index built",
+  embeddings_cleared: "Search index cleared",
+  case_linked: "Added to a case",
+  case_unlinked: "Removed from a case",
 };
 
 function shortHash(value: unknown): string {
@@ -71,6 +81,25 @@ function eventSummary(event: CustodyTimelineEvent): string {
       return `fields changed: ${Array.isArray(d.fields) ? d.fields.join(", ") : String(d.fields)}`;
     case "location_candidate_deleted":
       return `analyst assessment was ${String(d.analyst_assessment)} · earlier events remain above`;
+    case "ai_draft_generated":
+      return `${String(d.model)} read ${String(d.source_kind)} · fields: ${
+        Array.isArray(d.field_names) ? d.field_names.join(", ") : String(d.field_names)
+      }`;
+    case "ai_draft_field_reviewed":
+      return `${String(d.field)} ${String(d.action)} by the analyst`;
+    case "transcript_created":
+      return `${String(d.model)}${d.language ? ` · ${String(d.language)}` : ""} · ${String(
+        d.segments,
+      )} segment(s)`;
+    case "transcript_edited":
+      return `fields changed: ${Array.isArray(d.fields) ? d.fields.join(", ") : String(d.fields)}`;
+    case "embeddings_indexed":
+      return `${String(d.chunks)} chunk(s) with ${String(d.model)}`;
+    case "embeddings_cleared":
+      return `${String(d.chunks)} chunk(s) removed`;
+    case "case_linked":
+    case "case_unlinked":
+      return String(d.case_name ?? d.case_id);
     default:
       return JSON.stringify(d);
   }

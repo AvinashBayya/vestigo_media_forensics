@@ -19,8 +19,11 @@ import type {
   AIDraftsResponse,
   AIStatus,
   AnswerResponse,
+  CaseInfo,
+  CasesResponse,
   DocumentAnalysisOptions,
   DraftSource,
+  GeoToolsResponse,
   FieldAction,
   IndexResult,
   SemanticSearchResponse,
@@ -512,4 +515,38 @@ export function askQuestion(question: string, artifactIds?: string[]): Promise<A
       ...(artifactIds && artifactIds.length > 0 ? { artifact_ids: artifactIds } : {}),
     }),
   );
+}
+
+// --- Cases and geospatial tools (Pass 3) ---------------------------------------------------------
+
+export function listCases(): Promise<CasesResponse> {
+  return call(http.get<CasesResponse>("/cases"));
+}
+
+export function createCase(name: string, notes = ""): Promise<CaseInfo> {
+  return call(http.post<CaseInfo>("/cases", { name, notes }));
+}
+
+export function deleteCase(caseId: string): Promise<void> {
+  return call(http.delete<void>(`/cases/${encodeURIComponent(caseId)}`));
+}
+
+export function linkArtifactToCase(caseId: string, artifactId: string): Promise<CaseInfo> {
+  return call(
+    http.put<CaseInfo>(
+      `/cases/${encodeURIComponent(caseId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    ),
+  );
+}
+
+export function unlinkArtifactFromCase(caseId: string, artifactId: string): Promise<CaseInfo> {
+  return call(
+    http.delete<CaseInfo>(
+      `/cases/${encodeURIComponent(caseId)}/artifacts/${encodeURIComponent(artifactId)}`,
+    ),
+  );
+}
+
+export function getGeoTools(artifactId: string): Promise<GeoToolsResponse> {
+  return call(http.get<GeoToolsResponse>(`/geo/artifacts/${encodeURIComponent(artifactId)}/tools`));
 }

@@ -22,6 +22,8 @@ import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { ChainOfCustodyPanel } from "../components/evidence/ChainOfCustodyPanel";
 import { AIAssistantPanel } from "../components/evidence/AIAssistantPanel";
+import { CasesControl } from "../components/CasesControl";
+import { GeoToolsPanel } from "../components/evidence/GeoToolsPanel";
 import {
   PdfImagesPanel,
   PdfStructurePanel,
@@ -76,6 +78,7 @@ export function ArtifactPage() {
   // Bumped on every location-candidate change so the custody panel refetches (M6 events).
   const [candidateActivity, setCandidateActivity] = useState(0);
   const [aiActivity, setAiActivity] = useState(0);
+  const [caseActivity, setCaseActivity] = useState(0);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -288,6 +291,10 @@ export function ArtifactPage() {
           <ReviewPanel artifact={artifact} onSaved={setArtifact} />
           <AnalysisHistory jobs={history} viewingJobId={report?.job_id ?? null} onView={(jobId) => void viewJob(jobId)} />
           <DuplicateLibraryControl artifact={artifact} onChanged={setArtifact} />
+          <CasesControl
+            artifactId={artifact.artifact_id}
+            onChanged={() => setCaseActivity((n) => n + 1)}
+          />
         </aside>
 
         <div className="min-w-0 space-y-4">
@@ -380,6 +387,10 @@ export function ArtifactPage() {
               {artifact.media_type !== "document" && (
                 <ForensicIndicatorsPanel section={report.forensic_indicators} />
               )}
+              <GeoToolsPanel
+                artifactId={artifact.artifact_id}
+                refreshKey={`${report.job_id}:${candidateActivity}`}
+              />
               <LocationPanel
                 artifactId={artifact.artifact_id}
                 section={report.location_clues}
@@ -402,7 +413,7 @@ export function ArtifactPage() {
           />
           <ChainOfCustodyPanel
             artifactId={artifact.artifact_id}
-            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}:${candidateActivity}:${aiActivity}`}
+            refreshKey={`${report?.job_id ?? ""}:${artifact.in_duplicate_library}:${artifact.has_playable_preview}:${leadActivity}:${candidateActivity}:${aiActivity}:${caseActivity}`}
           />
         </div>
       </div>

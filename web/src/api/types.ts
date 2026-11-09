@@ -137,6 +137,7 @@ export interface DeletionSummary {
   ai_drafts?: number;
   transcripts?: number;
   embedding_chunks?: number;
+  case_links?: number;
 }
 
 export type ReviewOrigin = "artifact" | "record" | "bulk";
@@ -473,6 +474,8 @@ export interface EvidenceReport {
   external_leads: ExternalLead[];
   /** Analyst-stated possible locations (M6), newest first. */
   location_candidates: LocationCandidate[];
+  /** Cases this artifact was put in (Pass 3). Organisation, not evidence. */
+  cases: { case_id: string; name: string }[];
 }
 
 export interface JobHistoryItem extends JobSummary {
@@ -543,6 +546,8 @@ export interface EditableSettings {
   ai_enabled: boolean;
   transcription_enabled: boolean;
   semantic_search_enabled: boolean;
+  /** Read-only integration surface (Pass 3). Off by default; it can never write anything. */
+  integration_api_enabled: boolean;
   ai_model_path: string;
   transcription_model_path: string;
 }
@@ -1119,4 +1124,61 @@ export interface PdfImagesSection {
   extracted: number;
   notes: string[];
   provenance: Provenance;
+}
+
+// --- Cases and geospatial tools (Pass 3) ---------------------------------------------------------
+
+export interface CaseArtifactRef {
+  artifact_id: string;
+  filename: string | null;
+  media_type: string | null;
+  added_at: string;
+}
+
+/** A case groups artifacts under a name. Organisation, never evidence. */
+export interface CaseInfo {
+  case_id: string;
+  name: string;
+  notes: string;
+  artifact_count: number;
+  artifacts: CaseArtifactRef[];
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface CasesResponse {
+  notice: string;
+  cases: CaseInfo[];
+}
+
+export interface CoordinateFormatsInfo {
+  decimal: string;
+  degrees_minutes_seconds: string;
+  degrees_decimal_minutes: string;
+  iso6709: string;
+}
+
+export interface CoordinatePoint {
+  source: string;
+  latitude: number;
+  longitude: number;
+  formats: CoordinateFormatsInfo;
+  candidate_id: string | null;
+}
+
+export interface CoordinatePair {
+  from_source: string;
+  to_source: string;
+  distance_metres: number;
+  bearing_degrees: number;
+}
+
+export interface GeoToolsResponse {
+  artifact_id: string;
+  notice: string;
+  points: CoordinatePoint[];
+  pairs: CoordinatePair[];
+  limitations: string[];
+  offline_map_available: boolean;
+  offline_map_path: string | null;
 }

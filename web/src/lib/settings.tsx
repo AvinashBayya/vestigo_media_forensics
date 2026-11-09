@@ -40,6 +40,7 @@ export const DEFAULT_SETTINGS: EditableSettings = {
   auto_analyze_after_upload: true,
   enabled_search_providers: [],
   enable_external_map_links: false,
+  integration_api_enabled: false,
   ai_enabled: false,
   transcription_enabled: false,
   semantic_search_enabled: false,

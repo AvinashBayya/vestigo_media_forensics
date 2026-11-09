@@ -156,6 +156,7 @@ function DefaultsForm({ initial }: { initial: EditableSettings }) {
             ["ai_enabled", "AI drafts: let a local model propose fields from material you already hold"],
             ["transcription_enabled", "Transcription: transcribe audio locally with Whistle"],
             ["semantic_search_enabled", "Semantic search: index your own notes and text for local search"],
+            ["integration_api_enabled", "Integration API: let another system read evidence from this machine (read-only)"],
           ] as [keyof EditableSettings, string][]
         ).map(([key, label]) => (
           <label key={key} className="flex items-center gap-2">

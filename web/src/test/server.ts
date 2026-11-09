@@ -1,7 +1,7 @@
 import { HttpResponse, http } from "msw";
 import { setupServer } from "msw/node";
 
-import { ARTIFACT_ID, DRAFTS_NOTICE, LEADS_NOTICE, LOCATION_NOTICE, TRANSCRIPTS_NOTICE, aiStatus, artifactDetail, artifactList, custodyReport, evidenceReport, health, jobHistoryItem, searchProviders, settingsResponse } from "./data";
+import { ARTIFACT_ID, CASES_NOTICE, DRAFTS_NOTICE, LEADS_NOTICE, LOCATION_NOTICE, TRANSCRIPTS_NOTICE, aiStatus, artifactDetail, artifactList, custodyReport, evidenceReport, health, jobHistoryItem, searchProviders, settingsResponse } from "./data";
 
 export const API = "/api/v1";
 
@@ -23,6 +23,18 @@ export const server = setupServer(
     HttpResponse.json({ artifact_id: params.artifactId, notice: LOCATION_NOTICE, candidates: [] }),
   ),
   http.get(`${API}/ai/status`, () => HttpResponse.json(aiStatus())),
+  http.get(`${API}/cases`, () => HttpResponse.json({ notice: CASES_NOTICE, cases: [] })),
+  http.get(`${API}/geo/artifacts/:artifactId/tools`, ({ params }) =>
+    HttpResponse.json({
+      artifact_id: params.artifactId,
+      notice: "Coordinate conversions and distances between points Vestigo already holds.",
+      points: [],
+      pairs: [],
+      limitations: [],
+      offline_map_available: false,
+      offline_map_path: null,
+    }),
+  ),
   http.get(`${API}/ai/artifacts/:artifactId/drafts`, ({ params }) =>
     HttpResponse.json({
       artifact_id: params.artifactId,

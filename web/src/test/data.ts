@@ -5,8 +5,10 @@ import type {
   C2PASection,
   AIDraft,
   AIStatus,
+  CaseInfo,
   CustodyReport,
   ExternalLead,
+  GeoToolsResponse,
   ForensicIndicatorsSection,
   PdfImagesSection,
   PdfStructureSection,
@@ -264,6 +266,7 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
     pdf_text: null,
     pdf_images: null,
     location_candidates: [],
+    cases: [],
     ...overrides,
   };
 }
@@ -346,6 +349,7 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
       auto_analyze_after_upload: true,
       enabled_search_providers: [],
       enable_external_map_links: false,
+      integration_api_enabled: false,
       ai_enabled: false,
       transcription_enabled: false,
       semantic_search_enabled: false,
@@ -949,4 +953,55 @@ export function documentReport(overrides: Partial<EvidenceReport> = {}): Evidenc
     structural: structuralSection({ container: "pdf", file_size: 48_000, logical_end: 48_000 }),
     ...overrides,
   });
+}
+
+export const CASES_NOTICE =
+  "A case groups artifacts under a name you chose. It is organisation, not evidence: it carries no " +
+  "classification, asserts nothing about the artifacts in it, and deleting a case removes only the " +
+  "case and its links - never an artifact or its evidence.";
+
+export function caseInfo(overrides: Partial<CaseInfo> = {}): CaseInfo {
+  return {
+    case_id: "case_" + "1".repeat(32),
+    name: "Operation Fixture",
+    notes: "",
+    artifact_count: 0,
+    artifacts: [],
+    created_at: NOW,
+    updated_at: null,
+    ...overrides,
+  };
+}
+
+export const GEO_NOTICE =
+  "Coordinate conversions and distances between points Vestigo already holds for this artifact: " +
+  "metadata clues read as written, and the analyst's own location candidates. Nothing here " +
+  "determines where media was captured, no coordinate is sent anywhere, and no map data is fetched.";
+
+export function geoTools(overrides: Partial<GeoToolsResponse> = {}): GeoToolsResponse {
+  return {
+    artifact_id: ARTIFACT_ID,
+    notice: GEO_NOTICE,
+    points: [
+      {
+        source: "metadata: EXIF/container GPS",
+        latitude: 51.5,
+        longitude: -0.12,
+        formats: {
+          decimal: "51.500000, -0.120000",
+          degrees_minutes_seconds: "51° 30' 0.00\" N 0° 7' 12.00\" W",
+          degrees_decimal_minutes: "51° 30.0000' N 0° 7.2000' W",
+          iso6709: "+51.500000-000.120000/",
+        },
+        candidate_id: null,
+      },
+    ],
+    pairs: [],
+    limitations: [
+      "These are conversions and distances over coordinates Vestigo already holds. A reformatted coordinate is the same coordinate, and a distance is geometry - neither is evidence about where media was captured.",
+    ],
+    offline_map_available: false,
+    offline_map_path: null,
+    ...overrides,
+  };
 }
