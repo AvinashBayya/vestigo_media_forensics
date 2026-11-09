@@ -503,6 +503,43 @@ and `transcription_model_path` (all off or empty). `DeletionSummary` gains `ai_d
 `transcripts`, and `embedding_chunks`. The export package gains a separated `ai/` area
 (`README.txt`, `drafts.json`, `transcripts.json`); `report.json` stays free of AI material.
 
+## Pass 2 — Structure, forensic indicators, and documents (D25)
+
+### New evidence sections (per job, null when the stage did not run)
+
+- `structural`: `container`, `file_size`, `logical_end`, `trailing_bytes`, `findings` (each with
+  `kind`, `offset`, `size`, `detail`), the declared `inventory`, `measurements` (each with `name`,
+  `value`, `method`, `note`), `notes` (how far parsing reached), `warnings`, and `binwalk_ran`.
+  Never a verdict: it reports neither "steganography detected" nor that a file is clean.
+- `forensic_indicators`: `quantization_tables` (with `implied_quality` for the last save only),
+  `channel_statistics`, `decoded_*` against `declared_*` dimensions with `dimensions_match`, and
+  `video_statistics` (keyframe spacing and packet-size distributions). DERIVED, no thresholds.
+- `pdf_structure`, `pdf_text`, `pdf_images` for documents — see below.
+
+### Documents
+
+Upload accepts PDFs sniffed from `%PDF-` as `media_type: "document"`, limited by
+`VESTIGO_MAX_DOCUMENT_UPLOAD_BYTES` (100 MB); a file whose header version cannot be read is refused
+with `INVALID_DOCUMENT`. `POST /analysis/document` queues `document.v1` (hashes, metadata,
+pdf_structure, pdf_text, pdf_images, structural, duplicates), each stage individually optional via
+`default_document_analysis_options`. Using the wrong analysis endpoint returns `WRONG_MEDIA_TYPE`
+in both directions.
+
+- `pdf_structure` (OBSERVED): `pdf_version`, `object_count`, `page_count`, `eof_markers`,
+  `startxref_markers`, `incremental_updates`, `encrypted`, `markers` (presence counts for
+  JavaScript, actions, embedded files, forms, object streams, URI actions), `signature_count`,
+  `linearized`. Signature presence only — Vestigo never validates a PDF signature.
+- `pdf_text` (DERIVED): provisional `text` with `character_count`, `streams_read`,
+  `streams_skipped`, `streams_failed`. Not a verified transcription.
+- `pdf_images` (OBSERVED): `images` (index, encoding, size, dimensions, `derived_file_id`) and
+  `extracted`. JPEG streams are copied byte for byte; other encodings are counted only.
+
+### Settings
+
+`editable` gains `default_document_analysis_options`; the image, video, and audio option sets gain
+`structural` and (image/video) `forensic_indicators`. `environment` gains
+`max_document_upload_bytes`.
+
 ## Review state values
 
 - `UNREVIEWED`

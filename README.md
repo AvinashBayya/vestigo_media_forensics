@@ -101,23 +101,33 @@ Local, optional, and off by default. All three tools are Cactus Compute's, Apach
 - **Confidence only where the model supplies it** — Vestigo never calculates one
 - **Vendor telemetry is forced off** in-process (`NEEDLE_TELEMETRY=0`, `DO_NOT_TRACK=1`, `CACTUS_TELEMETRY=0`) before the runtime can load, asserted by a test; `NEEDLE_API_KEY` is never read, so the vendor's upload-to-their-GPUs fine-tuning is unreachable
 
+### Pass 2 — Deep media forensics (D25)
+
+- **Structure and hidden-data inspection** for every media type: where a format's data ends and exactly how many bytes follow, container inventories (PNG chunks with CRCs verified, JPEG segments, MP4/MOV boxes, RIFF chunks), truncated chunks and impossible sizes, trailing padding, and known file signatures found at non-zero offsets — each placed with its offset and size
+- Measurements with their method and no thresholds: whole-file and windowed entropy, LSB balance, chi-square. It never says "steganography detected" and **never says a file is clean** — concealment can be undetectable by these checks, and the limitations say so. Nothing is extracted, carved, or password-attacked; binwalk is optional and only ever used for signature scanning, never extraction
+- **Forensic indicators**: JPEG quantisation tables with the quality each implies *for the last save only*, per-channel pixel statistics, declared against decoded dimensions, and video keyframe/packet distributions. Error-level analysis is deliberately **not** implemented, because its output is routinely misread as proof of editing
+- **Documents and PDFs** are a first-class media type, parsed in pure Python with no PDF library and no renderer: structure (pages, objects, repeated saves, encryption, signature *presence*, and features like JavaScript or forms as presence counts), provisional text labelled like OCR, and embedded JPEG images copied out **byte for byte**. Vestigo never validates a PDF signature, renders a page, executes anything in a document, or decrypts one
+- **Audio** keeps its header-level media info and metadata, gains the structural checks, and can be transcribed locally via Pass 1
+
 ## Supported formats and limits
 
 | Media | Formats (detected from the file's bytes) | Limits (environment-set, read-only in Settings) |
 |---|---|---|
 | Images | JPEG, PNG, WebP, TIFF | 50 MB (`VESTIGO_MAX_UPLOAD_BYTES`), 100 MP (`VESTIGO_MAX_IMAGE_PIXELS`) |
 | Videos | MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, 3GP, M4V | 500 MB (`VESTIGO_MAX_VIDEO_UPLOAD_BYTES`), 15 min (`VESTIGO_MAX_VIDEO_DURATION_SECONDS`), 4K per frame (`VESTIGO_MAX_VIDEO_PIXELS`) |
+| Documents | PDF | 100 MB (`VESTIGO_MAX_DOCUMENT_UPLOAD_BYTES`) |
 | Audio | WAV, MP3, FLAC, OGG, M4A | 200 MB (`VESTIGO_MAX_AUDIO_UPLOAD_BYTES`), 2 h (`VESTIGO_MAX_AUDIO_DURATION_SECONDS`) |
 
 Analysis pipelines (every stage records method, tool, version, timestamps, source, limitations,
 errors, and review state):
 
-- `image.v1`: hashes → metadata → location clues → C2PA detection and validation → perceptual hash → OCR → duplicate search
-- `video.v1`: hashes → media information (ffprobe) → metadata → C2PA validation → location clues → scene detection → keyframes →
+- `document.v1`: hashes → metadata → PDF structure → provisional text → embedded images → structural checks → duplicate search (byte-identical only)
+- `image.v1`: hashes → metadata → location clues → structural checks → forensic indicators → C2PA detection and validation → perceptual hash → OCR → duplicate search
+- `video.v1`: hashes → media information (ffprobe) → metadata → C2PA validation → location clues → structural checks → forensic indicators → scene detection → keyframes →
   keyframe perceptual hashes → keyframe OCR (optional, off by default, ≤ 10 frames) → duplicate
   search (keyframes vs. images and other videos' keyframes, including rotated and mirrored variants;
   limit `VESTIGO_MAX_KEYFRAMES`, scene threshold `VESTIGO_SCENE_THRESHOLD`)
-- `audio.v1`: hashes → media information → metadata → C2PA validation → location clues (metadata only) → duplicate search (byte-identical SHA-256 only —
+- `audio.v1`: hashes → media information → metadata → C2PA validation → location clues (metadata only) → structural checks → duplicate search (byte-identical SHA-256 only —
   no audio content is ever decoded or compared)
 
 Playable previews (videos only, on demand): one re-encoded H.264/AAC viewing copy per artifact,
@@ -238,6 +248,15 @@ With both servers running, open http://localhost:5180.
 5. **Keyframes panel.** Every thumbnail caption reads like "#4 · 0:03 · scene change (0.58)"; portrait videos sit cleanly in the grid; a failed thumbnail shows Retry; switching analyses in the history swaps to that run's keyframes.
 6. **Keyframe OCR panel.** With OCR enabled, every keyframe has a status row — text beside its thumbnail with confidence ("the engine's own estimate") and expandable raw output, "No text was detected…" for empty frames, the recorded error for failed frames, and "Not analysed — outside the 10-frame OCR limit" for the rest. Disabled OCR shows its skip reason.
 
+## Manual test of Pass 2 (structure, forensics, documents)
+
+1. **Appended data.** Build fixtures (`python -m tests.fixtures.make_fixtures`) and upload `samples/generated/png_with_zip.png`: the Structure panel lists the trailing data with its offset and size, plus both ZIP signatures, and frames them as a place to look rather than a conclusion.
+2. **A clean file.** Upload `samples/generated/base.jpg`: "Nothing structurally unusual was found" — followed immediately by the statement that this is *not* a finding that the file is clean.
+3. **Forensic indicators.** The same image shows its quantisation tables with the quality they imply for the last save, its channel statistics, and decoded-vs-declared dimensions. There is no ELA overlay anywhere, by design.
+4. **A PDF.** Upload `samples/generated/document.pdf`: the Document structure panel gives the version, page and object counts and the features present; Text in document shows the provisional text with its amber caveat; Images embedded in the document shows the extracted JPEG — and `sha256sum` of that derived file matches the JPEG the fixture embedded, byte for byte.
+5. **Repeated saves and signatures.** Upload `document_updated.pdf`: the panel says the file was saved twice and that this is normal annotation, not tampering. Any document with a signature structure says so *and* that Vestigo does not validate PDF signatures.
+6. **Export and deletion** behave as for any evidence: the structural report, extracted text, and extracted images are derived files inside the package, and all are removed with the artifact.
+
 ## Manual test of local AI (Pass 1)
 
 Everything below works with local AI **off** except where it says otherwise — that is the point.
@@ -289,6 +308,8 @@ Everything below works with local AI **off** except where it says otherwise — 
 
 ## Limitations
 
+- Structural findings and forensic measurements are **not verdicts**. Vestigo never reports that hidden data was found, never reports that a file is clean, applies no threshold to any measurement, and does not implement error-level analysis. An implied JPEG quality describes the last save only.
+- PDF **signature presence is not signature validity**: certificates and signer trust are never checked. Document text is provisional like OCR, extracted images are stored streams rather than rendered pages, and nothing in a document is rendered, executed, or decrypted.
 - Location metadata is a **clue, not a location**: it is read as written, is trivially edited or copied, and never proves where media was captured. Absence proves nothing. Flagged coordinates are kept as written, disagreeing sources are both shown, and no place names are extracted from OCR text. Location candidates are analyst statements (UNVERIFIED) with the analyst's own assessment label — never a machine confidence score, and never a finding that media was captured somewhere.
 - A **valid** C2PA / Content Credentials result means the manifest's hashes and claim signature verify — never that the content is truthful, accurate, or unmanipulated. No trust list is configured, so the signer's identity is not established. Absence of C2PA data proves nothing; most media has none and many platforms strip it.
 - OCR is best-effort and English only; its output is provisional, not a verified transcription (D14). Keyframe OCR reads at most 10 sampled frames.

@@ -98,6 +98,18 @@ inference.
   [Cactus-Compute/whistle](https://huggingface.co/Cactus-Compute/whistle) (16.9 MB speech-to-text).
 - No GPU, no account, and no recurring cost. Vendor telemetry is forced off in-process (D24).
 
+## Backend — Pass 2 deep forensics (D25)
+
+No new runtime dependency. Structural inspection, PDF parsing, and the forensic measurements are
+pure Python (`zlib`, `struct`, `hashlib`) plus the Pillow and numpy already present, and PDF
+metadata comes from the ExifTool already required.
+
+- `binwalk` v3 (MIT, [ReFirmLabs/binwalk](https://github.com/ReFirmLabs/binwalk)) is an **optional**
+  tool: when it is on PATH the structural stage includes its signature scan, always without
+  extraction. Absent is fine and is recorded as such; /health lists it as optional.
+- No PDF library, renderer, or rasteriser is used or required, which is why page appearance is never
+  reproduced and only stored JPEG streams are extracted.
+
 ## Future dependencies
 
 ### GEOINT

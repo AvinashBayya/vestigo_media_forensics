@@ -241,6 +241,29 @@ Machine and analyst work are separate records with different classifications:
 - Candidates appear in the evidence report (artifact-level, newest first), travel in the export
   package, and are deleted and counted with the artifact.
 
+## 16. Structure, measurements, and documents (Pass 2, D25)
+
+- **Structural findings are placed facts**: what was found, at which byte offset, and how large.
+  Data after a format's end, extra chunks, and embedded signatures all have ordinary causes, and a
+  signature match is a byte pattern rather than a file. Vestigo never reports that concealed data
+  was found, and never reports that a file is clean - concealment can be undetectable by these
+  checks, and the limitations say so.
+- **Measurements are numbers with methods**: entropy, LSB balance, chi-square, quantisation tables,
+  channel statistics, keyframe spacing. No threshold is applied to any of them, and an implied JPEG
+  quality describes the last save only. Error-level analysis is deliberately absent because its
+  output is routinely misread as proof of editing.
+- **Document structure is what the file declares**, not what it does: page and object counts,
+  repeated saves, encryption, and the presence of JavaScript, actions, embedded files, and forms -
+  none of which is a finding of wrongdoing. **Signature presence is never signature validity**:
+  Vestigo does not check certificates or signer trust.
+- **Extracted document text is provisional**, under the same rule as OCR (D14): no font mapping, so
+  characters can be wrong, and an empty result never means the page is blank.
+- **Extracted embedded images are stored bytes, not renders.** JPEG streams are copied out byte for
+  byte; other encodings are counted but not rebuilt, because a re-encoded image is not the stored
+  evidence. Vestigo has no PDF renderer, so page appearance is never reproduced.
+- Nothing is extracted from a file beyond those stored streams, nothing is carved, and no password
+  or passphrase is ever attacked. Originals are only ever read.
+
 ## 15. AI output is not evidence (Pass 1, D24)
 
 - **Separate by construction.** Model output lives in `ai_drafts`, `transcripts`, and

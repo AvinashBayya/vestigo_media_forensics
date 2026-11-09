@@ -79,7 +79,7 @@ same way `container` tests already are. Nothing downloads at import time, ever.
 - **No verdicts anywhere.** Structural findings and measurements only; the existing `VERDICT_WORDS`
   test guard is extended to the new sections.
 
-## 2. Pass 1 — Local intelligence foundation (schema 0008)
+## 2. Pass 1 — Local intelligence foundation — **complete** (2026-11-07, D24, schema 0008)
 
 | Commit | Contents |
 |---|---|
@@ -90,7 +90,7 @@ same way `container` tests already are. Nothing downloads at import time, ever.
 | 5 | **UI integration.** An "Assistant (AI drafts)" panel per artifact (drafts with per-field accept/edit/reject), a transcript panel with editing and the machine-generated label, a semantic-search page with answer-plus-sources, and Settings for enablement, model import, cache, and the telemetry indicator. |
 | 6 | **Tests and docs.** Hermetic fakes throughout; marked `local_ai` tests for the real runtime; export/deletion/custody/migration coverage; D24 decision record; README and test-plan updates. |
 
-## 3. Pass 2 — Deep media forensics (schema 0009)
+## 3. Pass 2 — Deep media forensics — **complete** (2026-11-09, D25; no migration needed)
 
 - **Hidden-data and structural inspection**: a `structural` stage for images, video, audio,
   documents, and archives — trailing data after a format's logical end, embedded file signatures with

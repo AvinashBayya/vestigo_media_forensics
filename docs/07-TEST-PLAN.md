@@ -344,7 +344,30 @@ matches with their source kind and score, answers always showing "Sources - read
 no-generator path returning material instead of prose, the empty-index explanation, and errors with
 retry; Settings switches off by default with the local-only wording.
 
-## 13. Container tests
+## 13. Pass 2 tests (deep media forensics, D25)
+
+- Structural: a clean file reporting no findings while refusing to call itself clean; bytes after a
+  JPEG's EOI located and sized; an appended ZIP showing as trailing data plus both its signatures
+  with PNG chunk CRCs verified; an oversized comment segment; image LSB measurements carrying their
+  method and caveat; video box and audio RIFF inventories; an unparsed container recorded as a scope
+  note with the stage still succeeding; the raw report kept as a derived file; the option switched
+  off; the original bytes unchanged; and a guard that no verdict language reaches the findings while
+  the limitations do name those claims to deny them.
+- Forensic indicators: quantisation tables with an implied quality in range; a non-JPEG saying
+  tables do not apply while still measuring pixels; channel statistics and decoded dimensions;
+  video keyframe and packet distributions; the absence of ELA and of verdict language; DERIVED
+  classification; the option switched off.
+- Documents: PDF upload typed as `document`; the document.v1 stage list; structure facts with the
+  signature and incremental-save honesty wording; JavaScript, open-action, and form markers as
+  presence counts; provisional text with non-text streams skipped rather than failed; an image-only
+  document explaining that the pages are not blank; an embedded JPEG extracted **byte-identical** to
+  the original and served; byte-identical-only duplicates with a re-saved copy not matching;
+  endpoint guards both ways; per-stage options; and the original file and its served bytes
+  unchanged.
+- Frontend: all three panels' wording and data, the document page end to end, the signature and
+  repeated-save explanations, the empty-text path, and the feature list as presence counts.
+
+## 14. Container tests
 
 - Backend starts on port 8400
 - Frontend starts on port 5180

@@ -17,7 +17,11 @@ The backend must:
 - Store originals separately from derived files
 - Reject unsupported or dangerous file types
 - Enforce video duration, frame-size, and keyframe limits
-- Never execute uploaded media (ffprobe and ffmpeg run with argument lists and timeouts)
+- Never execute uploaded media (ffprobe and ffmpeg run with argument lists and timeouts), and
+  never execute or render an uploaded document
+- Structural inspection reads bytes only: nothing is carved or extracted, and binwalk, when
+  installed, is run for signature scanning only - never with extraction, which would write
+  attacker-controlled paths out of untrusted input
 - A playable preview re-encodes the stored original locally with ffmpeg, on demand only; the output
   stays on the user's machine and the original is never modified
 - C2PA validation (Milestone 4) runs entirely locally with the c2pa-python library: no network
@@ -33,7 +37,10 @@ container-reported duration within the limits is required.
 Audio (D19): WAV, MP3, FLAC, OGG, M4A — validated with the same ffprobe pass; header-level
 inspection only, never decoding, transcription, or speaker identification.
 
-Documents and archives are not accepted.
+Documents (Pass 2): PDF, sniffed from `%PDF-`, with its own size limit. A document is parsed in
+place in pure Python and is **never rendered, executed, or decrypted**; no JavaScript or embedded
+action in it is run, no password is attacked, and only stored JPEG streams are copied out - never
+re-encoded. Other document and archive formats are still not accepted.
 
 ## 4. External-service policy
 

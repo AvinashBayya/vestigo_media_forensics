@@ -413,3 +413,54 @@ approval.
   but no confirmed text-embedding call, so semantic search uses Vestigo's own deterministic
   embedder, which matches shared wording rather than meaning. Swapping in Needle text vectors is a
   change in one resolver, because every chunk records its model.
+
+## D25 — Pass 2: deep media forensics
+
+Implemented 2026-11-09 (plan `17-CONSOLIDATED-CAPABILITY-ROADMAP.md`). Four capabilities, all local,
+all reporting observable facts and measurements rather than conclusions. No new runtime dependency
+was added: everything is pure Python plus the ExifTool, ffprobe, and Pillow the project already has.
+
+- **Structural and hidden-data inspection** (`structural`, optional, default on, images/video/audio/
+  documents). Reports where a format's data logically ends and exactly how many bytes follow,
+  container inventories (PNG chunks with CRCs verified, JPEG segments, MP4/MOV boxes, RIFF chunks),
+  truncated chunks, impossible box sizes, declared sizes past the end of the file, missing end
+  markers, trailing padding runs, and known file signatures at non-zero offsets. Measurements:
+  whole-file entropy, highest-entropy 4 KiB window, and for images the LSB ones-ratio and a
+  chi-square statistic. **No thresholds and no verdicts**: it never reports "steganography detected"
+  and never reports a file as clean, and the limitations say both. A signature hit is a byte pattern
+  and a place to look, not a file. Nothing is extracted, carved, decoded, or password-attacked;
+  binwalk is optional and used for signature scanning only, never with `-e`, because extraction
+  writes attacker-controlled paths. A container Vestigo does not parse structurally is a scope note,
+  not a partial result.
+- **Forensic indicators** (`forensic_indicators`, DERIVED). Images: every JPEG quantisation table
+  with the IJG quality its values imply, per-channel pixel statistics, and declared against decoded
+  dimensions. Video: keyframe spacing and packet-size distributions from ffprobe. The limitations
+  state that an implied quality describes the **last save only**, that these numbers move with any
+  re-save or platform processing and stay unremarkable in heavily edited files, and that no
+  threshold separating "edited" from "original" exists anywhere in Vestigo. **Error-level analysis
+  is deliberately not implemented** and the method text says so: its output is routinely misread as
+  proof of editing.
+- **Document and PDF analysis** (`document.v1`, new `document` media type, PDF sniffed from
+  `%PDF-`, own 100 MB limit). Parsed in pure Python with no PDF library and no renderer:
+  `pdf_structure` (OBSERVED) reports version, object and page counts, `%%EOF`/`startxref` markers so
+  incremental saves are visible, declared encryption and linearisation, signature-dictionary count,
+  and presence counts for JavaScript, automatic actions, embedded files, forms, object streams, and
+  URI actions — with the limitations stating that none of these is wrongdoing, that repeated saves
+  are ordinary annotation rather than tampering, and that **Vestigo never validates a PDF signature,
+  checks a certificate, or reports a document as signed and valid**. `pdf_text` (DERIVED) extracts
+  provisional text from Tj/TJ operators via zlib, labelled under the OCR honesty rule (D14): no font
+  mapping, so characters can be wrong or missing, operator order is not reading order, and an empty
+  result does not mean the page is blank. `pdf_images` copies JPEG-compressed embedded images out
+  **byte for byte** as derived files (a test pins them identical to the embedded original); other
+  encodings are counted but not extracted, because rebuilding them would mean re-encoding and a
+  re-encoded image is not the stored evidence. These are embedded images, never rendered pages.
+  Document duplicates are byte-identical only. Nothing in a PDF is rendered, executed, or decrypted,
+  and no password is attacked.
+- **Audio analysis** is complete without new stages: media info already reports duration, codec,
+  channels, and sample rate from headers; metadata covers ID3 and container tags; the new
+  `structural` stage covers embedded artifacts and structural indicators; and transcription comes
+  from Pass 1 (D24). No authenticity verdicts anywhere.
+
+No migration was needed: `media_type` is an unconstrained column, and every new section is an
+evidence record with its raw output kept as a derived file, so export, custody, and deletion cover
+them with no new wiring.
