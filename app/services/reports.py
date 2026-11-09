@@ -38,7 +38,7 @@ from app.schemas.evidence import (
     StageError,
     StructuralSection,
 )
-from app.services import leads, location_candidates, review
+from app.services import cases, leads, location_candidates, review
 from app.services.analysis import active_job, latest_job, to_job_summary
 from app.services.artifacts import get_artifact, to_review_info, to_summary
 from app.services.errors import analysis_in_progress, job_not_found
@@ -318,6 +318,7 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         review_history = review.history(session, artifact_id)
         external_leads = leads.list_leads(session, artifact_id)
         candidates = location_candidates.list_candidates(session, artifact_id)
+        linked_cases = cases.cases_for_artifact(session, artifact_id)
         duplicates = records.get("duplicates")
         matches = duplicates.payload.get("matches", []) if duplicates else []
         matched_ids = {match["artifact_id"] for match in matches}
@@ -373,5 +374,6 @@ def build_report(db: Database, artifact_id: str, job_id: str | None = None) -> E
         review_history=review_history,
         external_leads=external_leads,
         location_candidates=candidates,
+        cases=linked_cases,
         **sections,
     )

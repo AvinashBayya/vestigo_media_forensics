@@ -54,6 +54,8 @@ class EditableSettings(BaseModel):
     transcription_enabled: bool = False
     semantic_search_enabled: bool = False
     # Paths to locally held model files (.cact). Empty means "let the runtime resolve its default".
+    # Read-only integration surface (Pass 3). Off by default; it can never write anything.
+    integration_api_enabled: bool = False
     ai_model_path: str = ""
     transcription_model_path: str = ""
 
@@ -103,6 +105,7 @@ class SettingsUpdate(BaseModel):
     ai_enabled: bool | None = None
     transcription_enabled: bool | None = None
     semantic_search_enabled: bool | None = None
+    integration_api_enabled: bool | None = None
     ai_model_path: str | None = Field(default=None, max_length=1000)
     transcription_model_path: str | None = Field(default=None, max_length=1000)
 

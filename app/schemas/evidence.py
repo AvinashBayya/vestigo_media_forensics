@@ -507,5 +507,7 @@ class EvidenceReport(BaseModel):
     external_leads: list[ExternalLeadInfo] = []
     # Analyst-stated possible locations (M6), newest first.
     location_candidates: list[LocationCandidateInfo] = []
+    # Cases this artifact was put in (Pass 3). Organisation, not evidence.
+    cases: list[dict[str, str]] = []
     # Every review change for this artifact, artifact- and record-level, newest first.
     review_history: list[ReviewEventOut] = []

@@ -170,6 +170,7 @@ class DeletionSummary(BaseModel):
     ai_drafts: int = 0
     transcripts: int = 0
     embedding_chunks: int = 0
+    case_links: int = 0
 
 
 class PreviewInfo(BaseModel):

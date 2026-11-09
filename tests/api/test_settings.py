@@ -66,6 +66,7 @@ def test_defaults_and_environment(client: TestClient, settings: Settings) -> Non
         "ai_enabled": False,
         "transcription_enabled": False,
         "semantic_search_enabled": False,
+        "integration_api_enabled": False,
         "ai_model_path": "",
         "transcription_model_path": "",
     }
@@ -106,6 +107,7 @@ def test_partial_update_persists_across_restarts(client: TestClient, settings: S
         "ai_enabled": False,
         "transcription_enabled": False,
         "semantic_search_enabled": False,
+        "integration_api_enabled": False,
         "ai_model_path": "",
         "transcription_model_path": "",
     }

@@ -20,6 +20,7 @@ from app.models import (
     AIDraft,
     AnalysisJob,
     Artifact,
+    CaseArtifact,
     CustodyEvent,
     DerivedFile,
     EmbeddingChunk,
@@ -462,6 +463,7 @@ def delete_artifact(services: AppServices, artifact_id: str) -> DeletionSummary:
                 ai_drafts=_count(session, AIDraft, artifact_id),
                 transcripts=_count(session, Transcript, artifact_id),
                 embedding_chunks=_count(session, EmbeddingChunk, artifact_id),
+                case_links=_count(session, CaseArtifact, artifact_id),
             )
             trashed = storage.move_to_trash(artifact_id)
             _delete_rows(session, artifact_id)

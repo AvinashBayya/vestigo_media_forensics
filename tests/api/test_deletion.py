@@ -62,6 +62,7 @@ def test_delete_removes_files_evidence_and_rows(
         "ai_drafts": 0,
         "transcripts": 0,
         "embedding_chunks": 0,
+        "case_links": 0,
     }
     assert not artifact_dir.exists()
     assert list((settings.data_dir / "trash").iterdir()) == []

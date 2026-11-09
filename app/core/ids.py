@@ -14,6 +14,7 @@ LOCATION_CANDIDATE = "loc"
 AI_DRAFT = "draft"
 TRANSCRIPT = "tsc"
 EMBEDDING_CHUNK = "emb"
+CASE = "case"
 
 
 def new_id(prefix: str) -> str:

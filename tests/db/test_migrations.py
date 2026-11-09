@@ -182,7 +182,7 @@ def test_milestone_1_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m1_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "8")]
+    assert after.pop("schema_meta") == [("schema_version", "9")]
     before.pop("schema_meta")
     assert after == before
     assert revision_in(path) == migrations.head_revision()
@@ -378,7 +378,7 @@ def test_milestone_2_database_is_upgraded_in_place_without_data_loss(tmp_path: P
     db.dispose()
 
     after = m2_rows(path)
-    assert after.pop("schema_meta") == [("schema_version", "8")]
+    assert after.pop("schema_meta") == [("schema_version", "9")]
     before.pop("schema_meta")
     assert after == before
     with sqlite3.connect(path) as connection:
