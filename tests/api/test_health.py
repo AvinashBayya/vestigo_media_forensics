@@ -15,8 +15,12 @@ def test_health_returns_ok_with_all_tools(client: TestClient) -> None:
     assert body["version"] == __version__
     assert body["database"] == "ok"
     assert body["storage"] == "ok"
-    assert set(body["tools"]) == {"exiftool", "tesseract", "ffmpeg", "ffprobe"}
-    for tool in body["tools"].values():
+    # binwalk is optional (Pass 2): it is listed, but its absence never degrades health.
+    assert set(body["tools"]) == {"exiftool", "tesseract", "ffmpeg", "ffprobe", "binwalk"}
+    assert body["tools"]["binwalk"]["used_in"].startswith("Pass 2")
+    for name, tool in body["tools"].items():
+        if name == "binwalk":
+            continue  # optional and not installed here; health stays ok regardless
         assert tool["status"] == "ok"
         assert tool["version"]
     assert "eng" in body["tools"]["tesseract"]["languages"]
