@@ -1,8 +1,20 @@
 import { useEffect, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 
-import { errorMessage, startAudioAnalysis, startImageAnalysis, startVideoAnalysis, uploadArtifact } from "../api/client";
-import type { AnalysisOptions, AudioAnalysisOptions, VideoAnalysisOptions } from "../api/types";
+import {
+  errorMessage,
+  startAudioAnalysis,
+  startDocumentAnalysis,
+  startImageAnalysis,
+  startVideoAnalysis,
+  uploadArtifact,
+} from "../api/client";
+import type {
+  AnalysisOptions,
+  AudioAnalysisOptions,
+  DocumentAnalysisOptions,
+  VideoAnalysisOptions,
+} from "../api/types";
 import { formatBytes } from "../lib/format";
 import { useSettings } from "../lib/settings";
 import { ErrorBanner } from "./Messages";
@@ -26,17 +38,22 @@ const VIDEO_EXTENSIONS = /\.(mp4|mov|webm|mkv|avi|ts|wmv|flv|3gp|m4v)$/i;
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 
+const DOCUMENT_TYPES = ["application/pdf"];
+const DOCUMENT_EXTENSIONS = /\.pdf$/i;
+const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
+
 const AUDIO_TYPES = ["audio/wav", "audio/x-wav", "audio/mpeg", "audio/flac", "audio/ogg", "audio/mp4", "audio/x-m4a"];
 const AUDIO_EXTENSIONS = /\.(wav|mp3|flac|ogg|m4a)$/i;
-const ACCEPTED_TYPES = [...IMAGE_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES];
+const ACCEPTED_TYPES = [...IMAGE_TYPES, ...VIDEO_TYPES, ...AUDIO_TYPES, ...DOCUMENT_TYPES];
 const MAX_AUDIO_BYTES = 200 * 1024 * 1024;
 
-type MediaKind = "image" | "video" | "audio";
+type MediaKind = "image" | "video" | "audio" | "document";
 
 function kindOf(file: File): MediaKind | null {
   if (IMAGE_TYPES.includes(file.type) || IMAGE_EXTENSIONS.test(file.name)) return "image";
   if (VIDEO_TYPES.includes(file.type) || VIDEO_EXTENSIONS.test(file.name)) return "video";
   if (AUDIO_TYPES.includes(file.type) || AUDIO_EXTENSIONS.test(file.name)) return "audio";
+  if (DOCUMENT_TYPES.includes(file.type) || DOCUMENT_EXTENSIONS.test(file.name)) return "document";
   return null;
 }
 
@@ -44,6 +61,8 @@ export const OPTION_LABELS: Record<keyof AnalysisOptions, string> = {
   metadata: "Embedded metadata (EXIF, XMP, IPTC)",
   c2pa: "Content Credentials (C2PA) validation",
   location_clues: "Location clues in metadata (GPS, place tags, timestamps)",
+  structural: "Structure and hidden-data checks",
+  forensic_indicators: "Forensic indicators (quantisation tables, pixel statistics)",
   ocr: "Text in image (OCR, English)",
   duplicate_search: "Duplicate search in the local library",
 };
@@ -52,6 +71,16 @@ export const AUDIO_OPTION_LABELS: Record<keyof AudioAnalysisOptions, string> = {
   metadata: "Embedded metadata (ID3 and container tags)",
   c2pa: "Content Credentials (C2PA) validation",
   location_clues: "Location clues in metadata (GPS, place tags, timestamps)",
+  structural: "Structure and hidden-data checks",
+  duplicate_search: "Duplicate search (byte-identical files only)",
+};
+
+export const DOCUMENT_OPTION_LABELS: Record<keyof DocumentAnalysisOptions, string> = {
+  metadata: "Embedded metadata (PDF info and XMP)",
+  pdf_structure: "Document structure (pages, objects, saves, features present)",
+  pdf_text: "Text in document (provisional, no font mapping)",
+  pdf_images: "Extract embedded images (JPEG streams, byte for byte)",
+  structural: "Structure and hidden-data checks",
   duplicate_search: "Duplicate search (byte-identical files only)",
 };
 
@@ -59,6 +88,8 @@ export const VIDEO_OPTION_LABELS: Record<keyof VideoAnalysisOptions, string> = {
   metadata: "Embedded metadata (QuickTime, Matroska, XMP)",
   c2pa: "Content Credentials (C2PA) validation",
   location_clues: "Location clues in metadata (GPS, place tags, timestamps)",
+  structural: "Structure and hidden-data checks",
+  forensic_indicators: "Forensic indicators (keyframe spacing, packet sizes)",
   scene_detection: "Scene-change detection",
   keyframe_ocr: "Text in keyframes (OCR, English, up to 10 frames)",
   duplicate_search: "Duplicate search in the local library",
@@ -74,6 +105,9 @@ export function UploadForm() {
   const [options, setOptions] = useState<AnalysisOptions>(settings.default_analysis_options);
   const [videoOptions, setVideoOptions] = useState<VideoAnalysisOptions>(settings.default_video_analysis_options);
   const [audioOptions, setAudioOptions] = useState<AudioAnalysisOptions>(settings.default_audio_analysis_options);
+  const [documentOptions, setDocumentOptions] = useState<DocumentAnalysisOptions>(
+    settings.default_document_analysis_options,
+  );
   const [optionsTouched, setOptionsTouched] = useState(false);
 
   // Start from the saved defaults once they arrive, unless the analyst already changed the options.
@@ -82,6 +116,7 @@ export function UploadForm() {
       setOptions(settings.default_analysis_options);
       setVideoOptions(settings.default_video_analysis_options);
       setAudioOptions(settings.default_audio_analysis_options);
+      setDocumentOptions(settings.default_document_analysis_options);
     }
   }, [settingsLoaded, optionsTouched, settings.default_analysis_options, settings.default_video_analysis_options]);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -96,12 +131,20 @@ export function UploadForm() {
     if (kind === null) {
       setFile(null);
       setError(
-        "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos, and WAV, MP3, FLAC, OGG, and M4A audio files are supported.",
+        "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos, WAV, MP3, FLAC, OGG, and M4A audio files, and PDF documents are supported.",
       );
       return;
     }
-    const limit = kind === "video" ? MAX_VIDEO_BYTES : kind === "audio" ? MAX_AUDIO_BYTES : MAX_IMAGE_BYTES;
-    const limitLabel = kind === "video" ? "500" : kind === "audio" ? "200" : "50";
+    const limit =
+      kind === "video"
+        ? MAX_VIDEO_BYTES
+        : kind === "audio"
+          ? MAX_AUDIO_BYTES
+          : kind === "document"
+            ? MAX_DOCUMENT_BYTES
+            : MAX_IMAGE_BYTES;
+    const limitLabel =
+      kind === "video" ? "500" : kind === "audio" ? "200" : kind === "document" ? "100" : "50";
     if (selected.size > limit) {
       setFile(null);
       setError(`The file is larger than the ${limitLabel} MB limit for ${kind} files.`);
@@ -142,6 +185,7 @@ export function UploadForm() {
     try {
       if (fileKind === "video") await startVideoAnalysis(artifactId, videoOptions);
       else if (fileKind === "audio") await startAudioAnalysis(artifactId, audioOptions);
+      else if (fileKind === "document") await startDocumentAnalysis(artifactId, documentOptions);
       else await startImageAnalysis(artifactId, options);
       navigate(`/artifacts/${artifactId}`);
     } catch (err) {
@@ -174,7 +218,7 @@ export function UploadForm() {
         <span className="text-xs text-slate-600 dark:text-slate-400">
           {file
             ? formatBytes(file.size)
-            : "Images up to 50 MB · videos (MP4, MOV, WebM, MKV, AVI, TS, WMV, FLV, 3GP) up to 500 MB · audio (WAV, MP3, FLAC, OGG, M4A) up to 200 MB"}
+            : "Images up to 50 MB · videos (MP4, MOV, WebM, MKV, AVI, TS, WMV, FLV, 3GP) up to 500 MB · audio (WAV, MP3, FLAC, OGG, M4A) up to 200 MB · PDF documents up to 100 MB"}
         </span>
         <input
           id="file-input"
@@ -193,6 +237,20 @@ export function UploadForm() {
       )}
       <fieldset className="space-y-1" disabled={busy} hidden={!autoAnalyze}>
         <legend className="mb-1 text-sm font-medium">Checks to run</legend>
+        {fileKind === "document" &&
+          (Object.keys(DOCUMENT_OPTION_LABELS) as (keyof DocumentAnalysisOptions)[]).map((key) => (
+            <label key={key} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={documentOptions[key]}
+                onChange={(event) => {
+                  setOptionsTouched(true);
+                  setDocumentOptions({ ...documentOptions, [key]: event.target.checked });
+                }}
+              />
+              {DOCUMENT_OPTION_LABELS[key]}
+            </label>
+          ))}
         {fileKind === "audio" &&
           (Object.keys(AUDIO_OPTION_LABELS) as (keyof AudioAnalysisOptions)[]).map((key) => (
             <label key={key} className="flex items-center gap-2 text-sm">
@@ -207,7 +265,7 @@ export function UploadForm() {
               {AUDIO_OPTION_LABELS[key]}
             </label>
           ))}
-        {fileKind === "video"
+        {fileKind === "document" ? null : fileKind === "video"
           ? (Object.keys(VIDEO_OPTION_LABELS) as (keyof VideoAnalysisOptions)[]).map((key) => (
               <label key={key} className="flex items-center gap-2 text-sm">
                 <input
@@ -237,7 +295,9 @@ export function UploadForm() {
               </label>
             ))}
         <p className="text-xs text-slate-600 dark:text-slate-400">
-          {fileKind === "video"
+          {fileKind === "document"
+            ? "File hashes always run. Nothing in a PDF is rendered, executed, or decrypted."
+            : fileKind === "video"
             ? "File hashes, media information, keyframes, and keyframe perceptual hashes always run."
             : fileKind === "audio"
               ? "File hashes and media information always run. No audio is decoded or transcribed."

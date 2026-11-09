@@ -59,6 +59,8 @@ describe("UploadPage", () => {
       metadata: true,
       c2pa: true,
       location_clues: true,
+      structural: true,
+      forensic_indicators: true,
       scene_detection: true,
       keyframe_ocr: true,
       duplicate_search: true,
@@ -98,7 +100,13 @@ describe("UploadPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
     await screen.findByRole("heading", { name: "harbour.jpg" });
-    expect(posted).toEqual({ metadata: true, c2pa: true, location_clues: true, duplicate_search: true });
+    expect(posted).toEqual({
+      metadata: true,
+      c2pa: true,
+      location_clues: true,
+      structural: true,
+      duplicate_search: true,
+    });
   });
 
   it("rejects a video over the 500 MB limit without uploading", async () => {
@@ -133,7 +141,7 @@ describe("UploadPage", () => {
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile("notes.txt", "text/plain"));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos, and WAV, MP3, FLAC, OGG, and M4A audio files are supported.",
+      "Only JPEG, PNG, WebP, and TIFF images, MP4, MOV, WebM, MKV, AVI, MPEG-TS, WMV, FLV, and 3GP videos, WAV, MP3, FLAC, OGG, and M4A audio files, and PDF documents are supported.",
     );
     expect(screen.getByRole("button", { name: "Upload and analyse" })).toBeDisabled();
   });
@@ -172,6 +180,8 @@ describe("UploadPage", () => {
       metadata: true,
       c2pa: true,
       location_clues: true,
+      structural: true,
+      forensic_indicators: true,
       ocr: false,
       duplicate_search: true,
     });

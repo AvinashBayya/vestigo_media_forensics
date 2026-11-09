@@ -22,6 +22,13 @@ import { ExportMenu } from "../components/ExportMenu";
 import { C2PAPanel } from "../components/evidence/C2PAPanel";
 import { ChainOfCustodyPanel } from "../components/evidence/ChainOfCustodyPanel";
 import { AIAssistantPanel } from "../components/evidence/AIAssistantPanel";
+import {
+  PdfImagesPanel,
+  PdfStructurePanel,
+  PdfTextPanel,
+} from "../components/evidence/DocumentPanel";
+import { ForensicIndicatorsPanel } from "../components/evidence/ForensicIndicatorsPanel";
+import { StructuralPanel } from "../components/evidence/StructuralPanel";
 import { LocationPanel } from "../components/evidence/LocationPanel";
 import { ReverseImageSearchPanel } from "../components/evidence/ReverseImageSearchPanel";
 import { DuplicatesPanel } from "../components/evidence/DuplicatesPanel";
@@ -317,7 +324,18 @@ export function ArtifactPage() {
               </div>
               <ProblemsSummary report={report} job={shownJob} />
               <HashesPanel section={report.hashes} />
-              {artifact.media_type === "audio" ? (
+              {artifact.media_type === "document" ? (
+                <>
+                  <PdfStructurePanel section={report.pdf_structure} />
+                  <PdfTextPanel section={report.pdf_text} />
+                  <PdfImagesPanel artifactId={artifact.artifact_id} section={report.pdf_images} />
+                  <DuplicatesPanel
+                    section={report.duplicates}
+                    addedSince={viewingEarlier ? null : artifact.added_since_analysis}
+                    onRerun={analysing ? undefined : () => void runAnalysis()}
+                  />
+                </>
+              ) : artifact.media_type === "audio" ? (
                 <>
                   <MediaInfoPanel section={report.media_info} />
                   <C2PAPanel section={report.c2pa} />
@@ -358,6 +376,10 @@ export function ArtifactPage() {
                 </>
               )}
               <MetadataPanel section={report.metadata} />
+              <StructuralPanel section={report.structural} />
+              {artifact.media_type !== "document" && (
+                <ForensicIndicatorsPanel section={report.forensic_indicators} />
+              )}
               <LocationPanel
                 artifactId={artifact.artifact_id}
                 section={report.location_clues}

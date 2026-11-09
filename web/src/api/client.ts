@@ -19,6 +19,7 @@ import type {
   AIDraftsResponse,
   AIStatus,
   AnswerResponse,
+  DocumentAnalysisOptions,
   DraftSource,
   FieldAction,
   IndexResult,
@@ -97,6 +98,8 @@ export const DEFAULT_OPTIONS: AnalysisOptions = {
   metadata: true,
   c2pa: true,
   location_clues: true,
+  structural: true,
+  forensic_indicators: true,
   ocr: true,
   duplicate_search: true,
 };
@@ -140,9 +143,19 @@ export function startAudioAnalysis(artifactId: string, options?: AudioAnalysisOp
 }
 
 /** Starts the pipeline matching the artifact's media type, with the saved defaults. */
+export function startDocumentAnalysis(
+  artifactId: string,
+  options?: DocumentAnalysisOptions,
+): Promise<JobCreated> {
+  return call(
+    http.post<JobCreated>("/analysis/document", { artifact_id: artifactId, ...(options ? { options } : {}) }),
+  );
+}
+
 export function startAnalysis(artifactId: string, mediaType: MediaType): Promise<JobCreated> {
   if (mediaType === "video") return startVideoAnalysis(artifactId);
   if (mediaType === "audio") return startAudioAnalysis(artifactId);
+  if (mediaType === "document") return startDocumentAnalysis(artifactId);
   return startImageAnalysis(artifactId);
 }
 

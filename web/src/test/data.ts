@@ -7,6 +7,11 @@ import type {
   AIStatus,
   CustodyReport,
   ExternalLead,
+  ForensicIndicatorsSection,
+  PdfImagesSection,
+  PdfStructureSection,
+  PdfTextSection,
+  StructuralSection,
   Transcript,
   LocationCandidate,
   LocationCluesSection,
@@ -253,6 +258,11 @@ export function evidenceReport(overrides: Partial<EvidenceReport> = {}): Evidenc
     review_history: [],
     external_leads: [],
     location_clues: locationClues(),
+    structural: structuralSection(),
+    forensic_indicators: null,
+    pdf_structure: null,
+    pdf_text: null,
+    pdf_images: null,
     location_candidates: [],
     ...overrides,
   };
@@ -267,7 +277,15 @@ export function jobHistoryItem(overrides: Partial<JobHistoryItem> = {}): JobHist
     completed_at: NOW,
     pipeline: "image.v1",
     app_version: "0.1.0",
-    options: { metadata: true, c2pa: true, location_clues: true, ocr: true, duplicate_search: true },
+    options: {
+      metadata: true,
+      c2pa: true,
+      location_clues: true,
+      structural: true,
+      forensic_indicators: true,
+      ocr: true,
+      duplicate_search: true,
+    },
     error: null,
     problem_count: 0,
     ...overrides,
@@ -294,6 +312,8 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
         metadata: true,
         c2pa: true,
         location_clues: true,
+        structural: true,
+        forensic_indicators: true,
         ocr: true,
         duplicate_search: true,
       },
@@ -301,6 +321,8 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
         metadata: true,
         c2pa: true,
         location_clues: true,
+        structural: true,
+        forensic_indicators: true,
         scene_detection: true,
         keyframe_ocr: false,
         duplicate_search: true,
@@ -309,6 +331,15 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
         metadata: true,
         c2pa: true,
         location_clues: true,
+        structural: true,
+        duplicate_search: true,
+      },
+      default_document_analysis_options: {
+        metadata: true,
+        pdf_structure: true,
+        pdf_text: true,
+        pdf_images: true,
+        structural: true,
         duplicate_search: true,
       },
       library_page_size: 25,
@@ -335,6 +366,7 @@ export function settingsResponse(editable: Partial<SettingsResponse["editable"]>
       video_timeout_seconds: 600,
       max_audio_upload_bytes: 209_715_200,
       max_audio_duration_seconds: 7200,
+      max_document_upload_bytes: 104_857_600,
       job_mode: "thread",
       job_workers: 2,
       tool_timeout_seconds: 60,
@@ -788,4 +820,133 @@ export function transcript(overrides: Partial<Transcript> = {}): Transcript {
     updated_at: null,
     ...overrides,
   };
+}
+
+/** Structure and byte statistics as the report serves them (Pass 2). */
+export function structuralSection(overrides: Partial<StructuralSection> = {}): StructuralSection {
+  return {
+    container: "jpeg",
+    file_size: 36_000,
+    logical_end: 36_000,
+    trailing_bytes: 0,
+    findings: [],
+    inventory: [{ marker: "0xDB", offset: 2, length: 132 }],
+    measurements: [
+      {
+        name: "byte_entropy",
+        value: 7.8589,
+        method: "Shannon entropy over all file bytes, in bits per byte (0-8).",
+        note: "Compressed and encrypted data sit near 8. Media files normally do too.",
+      },
+    ],
+    notes: [],
+    warnings: [],
+    binwalk_ran: false,
+    provenance: provenance("structural", { classification: "OBSERVED", tool: "vestigo-structural" }),
+    ...overrides,
+  };
+}
+
+export function forensicIndicators(
+  overrides: Partial<ForensicIndicatorsSection> = {},
+): ForensicIndicatorsSection {
+  return {
+    container: "jpeg",
+    quantization_tables: [
+      { index: 0, precision: 8, values: Array.from({ length: 64 }, () => 8), implied_quality: 92, matches_standard: false },
+    ],
+    channel_statistics: [
+      { channel: "red", mean: 98.94, standard_deviation: 61.2, minimum: 0, maximum: 255 },
+    ],
+    decoded_width: 640,
+    decoded_height: 480,
+    declared_width: 640,
+    declared_height: 480,
+    dimensions_match: true,
+    video_statistics: {},
+    notes: [],
+    warnings: [],
+    provenance: provenance("forensic_indicators", { tool: "vestigo-forensics" }),
+    ...overrides,
+  };
+}
+
+export function pdfStructure(overrides: Partial<PdfStructureSection> = {}): PdfStructureSection {
+  return {
+    pdf_version: "1.7",
+    file_size: 48_000,
+    object_count: 5,
+    page_count: 1,
+    eof_markers: 1,
+    startxref_markers: 1,
+    incremental_updates: 0,
+    encrypted: false,
+    markers: {},
+    signature_count: 0,
+    linearized: false,
+    notes: [],
+    warnings: [],
+    provenance: provenance("pdf_structure", { classification: "OBSERVED", tool: "vestigo-pdf" }),
+    ...overrides,
+  };
+}
+
+export function pdfText(overrides: Partial<PdfTextSection> = {}): PdfTextSection {
+  return {
+    text: "Vestigo fixture document",
+    character_count: 24,
+    streams_read: 1,
+    streams_skipped: 2,
+    streams_failed: 0,
+    notes: [],
+    provenance: provenance("pdf_text", { tool: "vestigo-pdf" }),
+    ...overrides,
+  };
+}
+
+export function pdfImages(overrides: Partial<PdfImagesSection> = {}): PdfImagesSection {
+  return {
+    images: [
+      {
+        index: 1,
+        encoding: "DCTDecode",
+        size_bytes: 32_536,
+        width: 640,
+        height: 480,
+        derived_file_id: "df_" + "5".repeat(32),
+      },
+    ],
+    extracted: 1,
+    notes: [],
+    provenance: provenance("pdf_images", { classification: "OBSERVED", tool: "vestigo-pdf" }),
+    ...overrides,
+  };
+}
+
+/** An analysed PDF document with all document sections filled (Pass 2). */
+export function documentDetail(overrides: Partial<ArtifactDetail> = {}): ArtifactDetail {
+  return artifactDetail({
+    filename: "report.pdf",
+    media_type: "document",
+    mime_type: "application/pdf",
+    size_bytes: 48_000,
+    width: null,
+    height: null,
+    ...overrides,
+  });
+}
+
+export function documentReport(overrides: Partial<EvidenceReport> = {}): EvidenceReport {
+  return evidenceReport({
+    c2pa: null,
+    perceptual_hash: null,
+    ocr: null,
+    location_clues: null,
+    forensic_indicators: null,
+    pdf_structure: pdfStructure(),
+    pdf_text: pdfText(),
+    pdf_images: pdfImages(),
+    structural: structuralSection({ container: "pdf", file_size: 48_000, logical_end: 48_000 }),
+    ...overrides,
+  });
 }

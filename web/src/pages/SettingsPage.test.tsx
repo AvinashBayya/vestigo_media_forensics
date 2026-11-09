@@ -59,6 +59,8 @@ describe("SettingsPage", () => {
         metadata: true,
         c2pa: true,
         location_clues: true,
+        structural: true,
+        forensic_indicators: true,
         ocr: false,
         duplicate_search: true,
       },
@@ -66,6 +68,8 @@ describe("SettingsPage", () => {
         metadata: true,
         c2pa: true,
         location_clues: true,
+        structural: true,
+        forensic_indicators: true,
         scene_detection: true,
         keyframe_ocr: false,
         duplicate_search: true,
@@ -74,6 +78,15 @@ describe("SettingsPage", () => {
         metadata: true,
         c2pa: true,
         location_clues: true,
+        structural: true,
+        duplicate_search: true,
+      },
+      default_document_analysis_options: {
+        metadata: true,
+        pdf_structure: true,
+        pdf_text: true,
+        pdf_images: true,
+        structural: true,
         duplicate_search: true,
       },
       library_page_size: 50,
@@ -287,7 +300,15 @@ describe("Settings applied elsewhere", () => {
     server.use(
       http.get(`${API}/settings`, () =>
         HttpResponse.json(
-          settingsResponse({ default_analysis_options: { metadata: true, c2pa: false, location_clues: true, ocr: false, duplicate_search: true } }),
+          settingsResponse({ default_analysis_options: {
+            metadata: true,
+            c2pa: false,
+            location_clues: true,
+            structural: true,
+            forensic_indicators: true,
+            ocr: false,
+            duplicate_search: true,
+          } }),
         ),
       ),
       http.post(`${API}/artifacts/upload`, uploadResponse),
@@ -304,7 +325,15 @@ describe("Settings applied elsewhere", () => {
     await user.upload(screen.getByLabelText(/choose an image/i), imageFile());
     await user.click(screen.getByRole("button", { name: "Upload and analyse" }));
 
-    await waitFor(() => expect(options).toEqual({ metadata: true, c2pa: false, location_clues: true, ocr: false, duplicate_search: true }));
+    await waitFor(() => expect(options).toEqual({
+            metadata: true,
+            c2pa: false,
+            location_clues: true,
+            structural: true,
+            forensic_indicators: true,
+            ocr: false,
+            duplicate_search: true,
+          }));
   });
 
   it("uses the saved page size in the Library", async () => {

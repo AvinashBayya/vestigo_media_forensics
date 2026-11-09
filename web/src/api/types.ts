@@ -1,6 +1,6 @@
 // Mirrors the Pydantic schemas in app/schemas/.
 
-export type MediaType = "image" | "video" | "audio";
+export type MediaType = "image" | "video" | "audio" | "document";
 
 export type ReviewState = "UNREVIEWED" | "IN_REVIEW" | "REVIEWED" | "FLAGGED" | "ARCHIVED";
 export const REVIEW_STATES: ReviewState[] = ["UNREVIEWED", "IN_REVIEW", "REVIEWED", "FLAGGED", "ARCHIVED"];
@@ -182,6 +182,8 @@ export interface VideoAnalysisOptions {
   metadata: boolean;
   c2pa: boolean;
   location_clues: boolean;
+  structural: boolean;
+  forensic_indicators: boolean;
   scene_detection: boolean;
   keyframe_ocr: boolean;
   duplicate_search: boolean;
@@ -192,6 +194,17 @@ export interface AudioAnalysisOptions {
   metadata: boolean;
   c2pa: boolean;
   location_clues: boolean;
+  structural: boolean;
+  duplicate_search: boolean;
+}
+
+/** Document options (Pass 2). Nothing in a PDF is ever rendered or executed. */
+export interface DocumentAnalysisOptions {
+  metadata: boolean;
+  pdf_structure: boolean;
+  pdf_text: boolean;
+  pdf_images: boolean;
+  structural: boolean;
   duplicate_search: boolean;
 }
 
@@ -199,6 +212,8 @@ export interface AnalysisOptions {
   metadata: boolean;
   c2pa: boolean;
   location_clues: boolean;
+  structural: boolean;
+  forensic_indicators: boolean;
   ocr: boolean;
   duplicate_search: boolean;
 }
@@ -438,6 +453,11 @@ export interface EvidenceReport {
   metadata: MetadataSection | null;
   c2pa: C2PASection | null;
   location_clues: LocationCluesSection | null;
+  structural: StructuralSection | null;
+  forensic_indicators: ForensicIndicatorsSection | null;
+  pdf_structure: PdfStructureSection | null;
+  pdf_text: PdfTextSection | null;
+  pdf_images: PdfImagesSection | null;
   perceptual_hash: PerceptualHashSection | null;
   ocr: OCRSection | null;
   duplicates: DuplicatesSection | null;
@@ -512,6 +532,7 @@ export interface EditableSettings {
   default_analysis_options: AnalysisOptions;
   default_video_analysis_options: VideoAnalysisOptions;
   default_audio_analysis_options: AudioAnalysisOptions;
+  default_document_analysis_options: DocumentAnalysisOptions;
   library_page_size: LibraryPageSize;
   auto_analyze_after_upload: boolean;
   /** Reverse-image search providers the analyst enabled (M5). All disabled by default. */
@@ -540,6 +561,7 @@ export interface EnvironmentSettings {
   video_timeout_seconds: number;
   max_audio_upload_bytes: number;
   max_audio_duration_seconds: number;
+  max_document_upload_bytes: number;
   job_mode: string;
   job_workers: number;
   tool_timeout_seconds: number;
@@ -994,4 +1016,107 @@ export interface AnswerResponse {
   answer: string | null;
   notice: string;
   label: string;
+}
+
+// --- Structure, forensic indicators, and documents (Pass 2) --------------------------------------
+
+/** One structural observation: what, where, how big. Never a conclusion. */
+export interface StructuralFinding {
+  kind: string;
+  offset: number;
+  size: number | null;
+  detail: string | null;
+}
+
+/** One number with the method that produced it, and what it does not mean. */
+export interface StructuralMeasurement {
+  name: string;
+  value: number;
+  method: string;
+  note: string | null;
+}
+
+export interface StructuralSection {
+  container: string | null;
+  file_size: number;
+  logical_end: number | null;
+  trailing_bytes: number;
+  findings: StructuralFinding[];
+  inventory: Record<string, unknown>[];
+  measurements: StructuralMeasurement[];
+  /** How far structural parsing reached; not problems. */
+  notes: string[];
+  warnings: string[];
+  binwalk_ran: boolean;
+  provenance: Provenance;
+}
+
+export interface QuantizationTableInfo {
+  index: number;
+  precision: number;
+  values: number[];
+  /** The IJG quality whose standard table is closest. An estimate of the LAST save only. */
+  implied_quality: number | null;
+  matches_standard: boolean;
+}
+
+export interface ForensicIndicatorsSection {
+  container: string | null;
+  quantization_tables: QuantizationTableInfo[];
+  channel_statistics: Record<string, number | string>[];
+  decoded_width: number | null;
+  decoded_height: number | null;
+  declared_width: number | null;
+  declared_height: number | null;
+  /** Whether the metadata's dimensions match the decoded pixels. A fact, not an accusation. */
+  dimensions_match: boolean | null;
+  video_statistics: Record<string, unknown>;
+  notes: string[];
+  warnings: string[];
+  provenance: Provenance;
+}
+
+export interface PdfStructureSection {
+  pdf_version: string | null;
+  file_size: number;
+  object_count: number;
+  page_count: number;
+  eof_markers: number;
+  startxref_markers: number;
+  /** More than zero means the file was saved more than once: ordinary, not suspicious. */
+  incremental_updates: number;
+  encrypted: boolean;
+  markers: Record<string, number>;
+  /** Signature dictionaries present. Vestigo never validates a PDF signature. */
+  signature_count: number;
+  linearized: boolean;
+  notes: string[];
+  warnings: string[];
+  provenance: Provenance;
+}
+
+export interface PdfTextSection {
+  text: string;
+  character_count: number;
+  streams_read: number;
+  streams_skipped: number;
+  streams_failed: number;
+  notes: string[];
+  provenance: Provenance;
+}
+
+export interface PdfEmbeddedImage {
+  index: number;
+  encoding: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+  derived_file_id: string | null;
+}
+
+export interface PdfImagesSection {
+  images: PdfEmbeddedImage[];
+  extracted: number;
+  notes: string[];
+  provenance: Provenance;
 }
