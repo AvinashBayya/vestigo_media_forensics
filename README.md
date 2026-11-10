@@ -4,6 +4,11 @@ Vestigo Media Forensics is a local-first media provenance and verification servi
 
 It helps users inspect images and, later, videos; extract technical evidence; detect manipulation signals; check provenance metadata; and organize findings into reviewable evidence—without claiming that a file is definitely real or fake.
 
+**New here, or picking this up from someone else?** Read
+[`docs/18-SETUP-AND-HANDOFF.md`](docs/18-SETUP-AND-HANDOFF.md) first: host and WSL2 prerequisites,
+the Docker Dev Container, configuration, folder structure, running instructions, troubleshooting,
+the project's standing rules, and how another system integrates with Vestigo.
+
 ## Core principles
 
 - Local-first: media and analysis results remain on the user’s machine.
